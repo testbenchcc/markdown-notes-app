@@ -1,0 +1,308 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.top-bar {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #1f2937;
+  background: linear-gradient(to right, #020617, #0f172a);
+}
+
+.top-bar-title {
+  font-weight: 600;
+}
+
+.top-bar-subtitle {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.error-banner {
+  padding: 0.4rem 1rem;
+  background: #7f1d1d;
+  color: #fee2e2;
+  font-size: 0.8rem;
+  border-bottom: 1px solid #b91c1c;
+}
+
+#main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+#nav-pane {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 280px;
+  min-width: 180px;
+  max-width: 60%;
+  border-right: 1px solid #1f2937;
+  background: #020617;
+  overflow: hidden;
+}
+
+.nav-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #1f2937;
+}
+
+.nav-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.nav-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.small-btn {
+  padding: 0.1rem 0.4rem;
+  font-size: 0.7rem;
+  border-radius: 3px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.small-btn:hover {
+  background: #111827;
+}
+
+#tree {
+  flex: 1;
+  padding: 0.25rem 0.25rem 0.75rem;
+  overflow-y: auto;
+  font-size: 0.85rem;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  padding: 0.1rem 0.2rem;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tree-item.folder > .label::before {
+  content: "▸";
+  display: inline-block;
+  width: 1rem;
+  color: #6b7280;
+}
+
+.tree-item.folder.expanded > .label::before {
+  content: "▾";
+}
+
+.tree-item.note > .label::before {
+  content: "●";
+  display: inline-block;
+  width: 1rem;
+  font-size: 0.5rem;
+  color: #4b5563;
+}
+
+.tree-item:hover {
+  background: #0b1120;
+}
+
+.tree-item.selected {
+  background: #111827;
+}
+
+.tree-children {
+  margin-left: 0.75rem;
+}
+
+.divider {
+  width: 4px;
+  cursor: col-resize;
+  background: #020617;
+  border-right: 1px solid #1f2937;
+  border-left: 1px solid #1f2937;
+}
+
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+#content-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #1f2937;
+  background: #020617;
+}
+
+.content-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.note-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.note-path {
+  font-size: 0.75rem;
+}
+
+.muted {
+  color: #9ca3af;
+}
+
+.content-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.content-actions button {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.content-actions button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.content-actions button:not(:disabled):hover {
+  background: #111827;
+}
+
+.content-body {
+  flex: 1;
+  position: relative;
+  display: flex;
+  min-height: 0;
+}
+
+.content-view,
+.content-edit {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+
+.content-view {
+  line-height: 1.6;
+}
+
+.content-edit {
+  background: #020617;
+  border: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  resize: none;
+  color: #e5e7eb;
+}
+
+.content-edit:focus {
+  outline: none;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Basic markdown styling */
+
+.content-view h1 {
+  font-size: 1.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.content-view h2 {
+  font-size: 1.2rem;
+  margin-top: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.content-view h3 {
+  font-size: 1rem;
+  margin-top: 0.8rem;
+  margin-bottom: 0.3rem;
+}
+
+.content-view p {
+  margin-bottom: 0.5rem;
+}
+
+.content-view ul,
+.content-view ol {
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.content-view pre {
+  background: #020617;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  overflow-x: auto;
+}
+
+.content-view code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background: #020617;
+  padding: 0.1rem 0.25rem;
+  border-radius: 3px;
+}
+
+.content-view pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.content-view a {
+  color: #60a5fa;
+}
+
+.content-view blockquote {
+  border-left: 3px solid #1f2937;
+  padding-left: 0.75rem;
+  color: #9ca3af;
+  margin-bottom: 0.5rem;
+}
