@@ -50,12 +50,13 @@
 
 ## v1.1.6 - Note export improvements
 
-- [] Add a default theme selection to the settings modal Appearance category for the exported theme default.
-
+- [x] Add a default theme selection to the settings modal Appearance category for the exported theme default. (implemented)
+- [x] Update note exporting to use the selected theme. (implemented)
 
 ## v1.1.7 - Version Revisoning
 
-- [] Add setting for auto-commiting, pushing, pulling, repository, github api key.
+- [] Add setting for auto-commiting items in the notes folder, pushing, pulling, repository, github api key.
+- [] Add setting for auto pulling on new version release. have a setting for how often it checks. 
 - [] Automatically commit, push, and pull using using the configured settings. 
 
 

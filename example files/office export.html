@@ -1,0 +1,53 @@
+<!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>welcome</title>
+        <style>
+    @import url("/static/styles.css");
+
+:root {
+  --md-bg: #f5f5f7;
+  --md-bg-alt: #ffffff;
+  --md-bg-alt-soft: #e5e7eb;
+  --md-border-subtle: #d1d5db;
+  --md-text-main: #111827;
+  --md-text-muted: #6b7280;
+  --md-red: #b91c1c;
+  --md-yellow: #ca8a04;
+  --md-green: #15803d;
+  --md-aqua: #0ea5e9;
+  --md-blue: #1d4ed8;
+  --md-purple: #7c3aed;
+  --md-link: #2563eb;
+  --md-link-hover: #1d4ed8;
+  --md-code: #0f766e;
+}
+
+        </style>
+      </head>
+      <body>
+        <div class="content-view">
+    <h1>Welcome to Markdown Notes</h1>
+<p>This is an example note stored as a plain <code>.md</code> file under the <code>notes/</code> folder.</p>
+<ul>
+<li>Click notes in the left-hand tree to load them.</li>
+<li>Use the <strong>View/Edit</strong> toggle in the header to switch modes.</li>
+<li>Click <strong>Save</strong> to persist changes back to disk.</li>
+</ul>
+<p>Because notes are just files, you can also edit them directly with any editor
+or manage them with Git.</p>
+<div class="codehilite" style="background: #f8f8f8"><pre style="line-height: 125%;"><span></span><code><span style="color: #008000; font-weight: bold">import</span><span style="color: #BBB"> </span><span style="color: #00F; font-weight: bold">os</span>
+
+<span style="color: #3D7B7B; font-style: italic"># Get current working directory</span>
+cwd <span style="color: #666">=</span> os<span style="color: #666">.</span>getcwd()
+<span style="color: #008000">print</span>(<span style="color: #BA2121">&quot;Current directory:&quot;</span>, cwd)
+
+<span style="color: #3D7B7B; font-style: italic"># List files in the current directory</span>
+<span style="color: #008000; font-weight: bold">for</span> item <span style="color: #A2F; font-weight: bold">in</span> os<span style="color: #666">.</span>listdir(cwd):
+    <span style="color: #008000">print</span>(<span style="color: #BA2121">&quot;Found:&quot;</span>, item)
+</code></pre></div>
+        </div>
+      </body>
+    </html>
+    

@@ -39,6 +39,7 @@
   let settingsInitialized = false;
   let settingsEditorSpellcheckInput = null;
   let settingsThemeSelect = null;
+  let settingsExportThemeSelect = null;
 
   const THEME_DEFINITIONS = {
     "gruvbox-dark": {
@@ -75,6 +76,7 @@
     return {
       editorSpellcheck: false,
       theme: DEFAULT_THEME_ID,
+      exportTheme: "match-app-theme",
     };
   }
 
@@ -167,6 +169,10 @@
       const themeId = draftSettings.theme || DEFAULT_THEME_ID;
       settingsThemeSelect.value = themeId;
     }
+    if (settingsExportThemeSelect) {
+      const exportTheme = draftSettings.exportTheme || "match-app-theme";
+      settingsExportThemeSelect.value = exportTheme;
+    }
   }
 
   function attachSettingsModalHandlers(root) {
@@ -187,6 +193,7 @@
       "#settings-editor-spellcheck"
     );
     settingsThemeSelect = root.querySelector("#settings-theme");
+    settingsExportThemeSelect = root.querySelector("#settings-export-theme");
 
     function selectCategory(categoryId) {
       navItems.forEach((btn) => {
@@ -241,6 +248,19 @@
         draftSettings.theme = selectedTheme;
         setSettingsCategoryDirty("appearance", true);
         applyTheme(selectedTheme);
+      });
+    }
+
+    if (settingsExportThemeSelect) {
+      settingsExportThemeSelect.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const value = settingsExportThemeSelect.value || "match-app-theme";
+        draftSettings.exportTheme = value;
+        setSettingsCategoryDirty("appearance", true);
       });
     }
 
@@ -384,22 +404,33 @@
     try {
       clearError();
       const encodedPath = encodeURIComponent(currentNote.path);
-      const res = await fetch(`/api/export-note/${encodedPath}`);
+      const settings = savedSettings || getDefaultSettings();
+      let exportTheme = settings.exportTheme || "match-app-theme";
+      if (exportTheme === "match-app-theme") {
+        exportTheme = settings.theme || DEFAULT_THEME_ID;
+      }
+      let url = `/api/export-note/${encodedPath}`;
+      if (exportTheme && THEME_DEFINITIONS[exportTheme]) {
+        const params = new URLSearchParams();
+        params.set("theme", exportTheme);
+        url = `${url}?${params.toString()}`;
+      }
+      const res = await fetch(url);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`Request failed (${res.status}): ${text}`);
       }
       const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      const blobUrl = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      a.href = blobUrl;
       const baseName = currentNote.name || "note.md";
       const nameWithoutExt = baseName.replace(/\.md$/i, "") || "note";
       a.download = `${nameWithoutExt}.html`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
       showError(`Failed to export note: ${err.message}`);
     }

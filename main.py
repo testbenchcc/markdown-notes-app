@@ -38,6 +38,16 @@ from pydantic import BaseModel
 # Determine application root based on this file location.
 APP_ROOT = Path(__file__).resolve().parent
 
+BASE_THEME_CSS_PATH = APP_ROOT / "static" / "styles.css"
+
+EXPORT_THEME_CSS_MAP: Dict[str, Path] = {
+    "gruvbox-dark": BASE_THEME_CSS_PATH,
+    "office": APP_ROOT / "static" / "styles-office.css",
+    "high-contrast": APP_ROOT / "static" / "styles-high-contrast.css",
+}
+
+DEFAULT_EXPORT_THEME_ID = "gruvbox-dark"
+
 # Root folder where markdown notes are stored. Change this in one place if
 # you want to point the app at a different notes directory.
 _env_notes_root = os.getenv("NOTES_ROOT")
@@ -247,7 +257,7 @@ async def get_note(note_path: str) -> Dict[str, Any]:
     }
  
 @app.get("/api/export-note/{note_path:path}")
-async def export_note_html(note_path: str) -> HTMLResponse:
+async def export_note_html(note_path: str, theme: str | None = None) -> HTMLResponse:
     """Export a single markdown note as a standalone HTML document."""
 
     ensure_notes_root()
@@ -269,14 +279,47 @@ async def export_note_html(note_path: str) -> HTMLResponse:
     title = file_path.stem or file_path.name
     safe_title = html_module.escape(title, quote=True)
 
+    theme_id = (theme or "").strip() or DEFAULT_EXPORT_THEME_ID
+    if theme_id not in EXPORT_THEME_CSS_MAP:
+        theme_id = DEFAULT_EXPORT_THEME_ID
+
+    css_parts: list[str] = []
+
+    try:
+        base_css = BASE_THEME_CSS_PATH.read_text(encoding="utf-8")
+        css_parts.append(base_css)
+    except Exception:
+        pass
+
+    if theme_id != DEFAULT_EXPORT_THEME_ID:
+        variant_path = EXPORT_THEME_CSS_MAP.get(theme_id)
+        if variant_path and variant_path != BASE_THEME_CSS_PATH:
+            try:
+                variant_css = variant_path.read_text(encoding="utf-8")
+                filtered_lines = [
+                    line
+                    for line in variant_css.splitlines()
+                    if not line.lstrip().lower().startswith("@import")
+                ]
+                css_parts.append("\n".join(filtered_lines))
+            except Exception:
+                pass
+
+    css_text = "\n\n".join(css_parts)
+
     full_html = f"""<!doctype html>
     <html lang="en">
       <head>
         <meta charset="utf-8">
         <title>{safe_title}</title>
+        <style>
+    {css_text}
+        </style>
       </head>
       <body>
+        <div class="content-view">
     {body_html}
+        </div>
       </body>
     </html>
     """

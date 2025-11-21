@@ -18,7 +18,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
   - Remembers the last opened note per browser (localStorage)
   - Theme support with a Gruvbox-inspired dark default (based on Obsidian Gruvbox), plus Office and High Contrast themes
 - Simple text search across markdown notes
-- Settings modal (via the header "Settings" button) with per-browser preferences, currently including options to enable spellcheck in the editor and select the UI theme
+- Settings modal (via the header "Settings" button) with per-browser preferences, currently including options to enable spellcheck in the editor, select the UI theme, and choose a default theme for exported HTML notes
 - Improved markdown rendering: fenced code blocks with syntax highlighting and tables with clear outlines
 - No authentication or user accounts
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
@@ -90,7 +90,7 @@ To move or copy a notebook, you can either copy or clone the entire repository f
   - If a note already exists and the imported version is **older** (based on the last git commit timestamp, with a filesystem modification time fallback), the app prompts you before overwriting newer notes.
   - If you decline, the import is cancelled and no files are overwritten.
   
-- The editor header also includes an `Export` button next to `Save` that downloads the currently selected note as a standalone `.html` document.
+- The editor header also includes an `Export` button next to `Save` that downloads the currently selected note as a standalone `.html` document, using the theme selected in the Appearance settings (by default matching the app theme).
 
 ## API overview
 
@@ -106,3 +106,8 @@ See `main.py` for details.
 ## Roadmap
 
 See `roadmap.md` for a Markdown task-list of enhancements (search, dark mode, export/import, etc.).
+
+## Needed APIs
+
+- If auto push is configured in the settings a Github fine-grained personal access token with Content read/write is needed.
+
