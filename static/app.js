@@ -13,6 +13,14 @@
   const navPane = document.getElementById("nav-pane");
   const mainEl = document.getElementById("main");
 
+  const contextMenuEl = document.createElement("div");
+  contextMenuEl.id = "context-menu";
+  contextMenuEl.className = "context-menu hidden";
+  document.body.appendChild(contextMenuEl);
+
+  let contextMenuTarget = null;
+  let contextMenuTargetEl = null;
+
   let currentNote = null; // { path, name, content, html }
   let mode = "view"; // "view" | "edit"
 
@@ -46,6 +54,130 @@
     errorBannerEl.classList.add("hidden");
   }
 
+  function hideContextMenu() {
+    if (!contextMenuEl) return;
+    contextMenuEl.classList.add("hidden");
+    contextMenuEl.innerHTML = "";
+    contextMenuTarget = null;
+    contextMenuTargetEl = null;
+  }
+
+  function buildContextMenuItems(target) {
+    const items = [];
+
+    if (target.type === "folder") {
+      items.push({ id: "new-note", label: "New note in folder" });
+      items.push({ id: "new-folder", label: "New subfolder" });
+      items.push({ separator: true });
+      items.push({ id: "copy-path", label: "Copy folder path" });
+    } else if (target.type === "note") {
+      items.push({ id: "open-note", label: "Open note" });
+      items.push({ separator: true });
+      items.push({ id: "copy-path", label: "Copy note path" });
+    }
+
+    contextMenuEl.innerHTML = "";
+
+    items.forEach((def) => {
+      if (def.separator) {
+        const sep = document.createElement("div");
+        sep.className = "context-menu-separator";
+        contextMenuEl.appendChild(sep);
+        return;
+      }
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "context-menu-item";
+      btn.textContent = def.label;
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        handleContextMenuAction(def.id);
+      });
+      contextMenuEl.appendChild(btn);
+    });
+  }
+
+  function showContextMenuForItem(item, clientX, clientY) {
+    if (!contextMenuEl) return;
+
+    const type = item.classList.contains("folder") ? "folder" : "note";
+    const path = item.dataset.path || "";
+
+    contextMenuTarget = { type, path };
+    contextMenuTargetEl = item;
+
+    buildContextMenuItems(contextMenuTarget);
+
+    contextMenuEl.style.left = "0px";
+    contextMenuEl.style.top = "0px";
+    contextMenuEl.classList.remove("hidden");
+
+    const rect = contextMenuEl.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let x = clientX;
+    let y = clientY;
+
+    if (x + rect.width > viewportWidth) {
+      x = viewportWidth - rect.width - 4;
+    }
+    if (y + rect.height > viewportHeight) {
+      y = viewportHeight - rect.height - 4;
+    }
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+
+    contextMenuEl.style.left = `${x}px`;
+    contextMenuEl.style.top = `${y}px`;
+  }
+
+  async function handleContextMenuAction(actionId) {
+    if (!contextMenuTarget) {
+      hideContextMenu();
+      return;
+    }
+
+    const { type, path } = contextMenuTarget;
+    const targetEl = contextMenuTargetEl;
+
+    hideContextMenu();
+
+    if (actionId === "copy-path") {
+      const value = path || "/";
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(value);
+        } else {
+          window.prompt("Path", value);
+        }
+      } catch (err) {
+        window.prompt("Path", value);
+      }
+      return;
+    }
+
+    if (type === "folder") {
+      if (actionId === "new-note") {
+        await promptNewNote(path || "");
+      } else if (actionId === "new-folder") {
+        await promptNewFolder(path || "");
+      }
+      return;
+    }
+
+    if (type === "note") {
+      if (actionId === "open-note" && path) {
+        if (targetEl) {
+          clearSelection();
+          targetEl.classList.add("selected");
+        }
+        await loadNote(path);
+      }
+    }
+  }
+
   function setMode(nextMode) {
     mode = nextMode;
     if (!currentNote) {
@@ -71,6 +203,7 @@
   async function loadTree() {
     try {
       clearError();
+      hideContextMenu();
       const tree = await fetchJSON("/api/tree");
       renderTree(tree);
     } catch (err) {
@@ -119,11 +252,19 @@
     const item = document.createElement("div");
     item.classList.add("tree-item", node.type);
 
+    item.dataset.path = typeof node.path === "string" ? node.path : "";
+
     const label = document.createElement("span");
     label.classList.add("label");
     label.textContent = node.name || "notes";
     label.style.paddingLeft = `${depth * 12 + 4}px`;
     item.appendChild(label);
+
+    item.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenuForItem(item, e.clientX, e.clientY);
+    });
 
     if (node.type === "folder") {
       item.classList.add("expanded");
@@ -149,7 +290,6 @@
         });
       }
     } else {
-      item.dataset.path = node.path;
       item.addEventListener("click", async (e) => {
         e.stopPropagation();
         clearSelection();
@@ -205,11 +345,18 @@
     }
   }
 
-  async function promptNewFolder() {
-    const path = window.prompt(
-      "New folder path (relative to notes root, e.g. 'projects' or 'work/personal')"
-    );
-    if (!path) return;
+  async function promptNewFolder(parentFolderPath) {
+    const base = parentFolderPath && parentFolderPath.trim()
+      ? parentFolderPath.trim().replace(/\/+$/, "")
+      : "";
+    const message = base
+      ? `New folder name inside '${base}' (e.g. 'projects' or 'personal')`
+      : "New folder path (relative to notes root, e.g. 'projects' or 'work/personal')";
+    const input = window.prompt(message, "");
+    if (!input) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    const path = base ? `${base}/${trimmed}` : trimmed;
     try {
       clearError();
       await fetchJSON("/api/folders", {
@@ -222,10 +369,15 @@
     }
   }
 
-  async function promptNewNote() {
-    const input = window.prompt(
-      "New note path (relative to notes root, e.g. 'inbox' or 'work/todo'; '.md' will be added automatically)"
-    );
+  async function promptNewNote(parentFolderPath) {
+    const base = parentFolderPath && parentFolderPath.trim()
+      ? parentFolderPath.trim().replace(/\/+$/, "")
+      : "";
+    const message = base
+      ? `New note name inside '${base}' (e.g. 'todo' or 'meeting-notes'; '.md' will be added automatically)`
+      : "New note path (relative to notes root, e.g. 'inbox' or 'work/todo'; '.md' will be added automatically)";
+    const defaultValue = base ? "untitled" : "";
+    const input = window.prompt(message, defaultValue);
     if (!input) return;
     const trimmed = input.trim();
     if (!trimmed) return;
@@ -233,7 +385,7 @@
       showError("Note path must include a file name, not just a folder.");
       return;
     }
-    let path = trimmed;
+    let path = base ? `${base}/${trimmed}` : trimmed;
     if (!path.toLowerCase().endsWith(".md")) {
       path = `${path}.md`;
     }
@@ -277,6 +429,24 @@
     });
   }
 
+  window.addEventListener("click", (e) => {
+    if (contextMenuEl.classList.contains("hidden")) return;
+    if (contextMenuEl.contains(e.target)) return;
+    hideContextMenu();
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      hideContextMenu();
+    }
+  });
+
+  treeContainer.addEventListener("scroll", () => {
+    if (!contextMenuEl.classList.contains("hidden")) {
+      hideContextMenu();
+    }
+  });
+
   // Wire up controls
   modeToggleBtn.addEventListener("click", () => {
     if (!currentNote) return;
@@ -289,11 +459,11 @@
   });
 
   newFolderBtn.addEventListener("click", () => {
-    promptNewFolder();
+    promptNewFolder("");
   });
 
   newNoteBtn.addEventListener("click", () => {
-    promptNewNote();
+    promptNewNote("");
   });
 
   setupSplitter();

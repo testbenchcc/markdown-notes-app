@@ -102,6 +102,39 @@ body {
   font-size: 0.85rem;
 }
 
+.context-menu {
+  position: fixed;
+  min-width: 160px;
+  padding: 0.25rem 0;
+  background: #020617;
+  border: 1px solid #1f2937;
+  border-radius: 4px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.75rem;
+  background: transparent;
+  border: none;
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.context-menu-item:hover {
+  background: #111827;
+}
+
+.context-menu-separator {
+  height: 1px;
+  margin: 0.25rem 0;
+  background: #1f2937;
+}
+
 .tree-item {
   display: flex;
   align-items: center;
