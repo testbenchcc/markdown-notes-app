@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import markdown
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -225,6 +225,45 @@ async def save_note(note_path: str, payload: SaveNoteRequest) -> Dict[str, Any]:
     rel_path = file_path.relative_to(NOTES_ROOT).as_posix()
 
     return {"ok": True, "path": rel_path, "name": file_path.name}
+
+
+@app.get("/api/search")
+async def search_notes(q: str = Query(..., min_length=1, max_length=200)) -> Dict[str, Any]:
+    """Search across all markdown notes for a simple text query.
+
+    Returns a list of notes with matching lines.
+    """
+
+    ensure_notes_root()
+    query = q.strip()
+    if not query:
+        return {"query": query, "results": []}
+
+    lowered = query.lower()
+    results = []
+
+    for path in NOTES_ROOT.rglob("*.md"):
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        matches = []
+        for index, line in enumerate(text.splitlines(), start=1):
+            if lowered in line.lower():
+                matches.append({"line_number": index, "line": line.strip()})
+                if len(matches) >= 5:
+                    break
+
+        if matches:
+            rel_path = path.relative_to(NOTES_ROOT).as_posix()
+            results.append({"path": rel_path, "name": path.name, "matches": matches})
+
+    results.sort(key=lambda item: item["path"].lower())
+
+    return {"query": query, "results": results}
 
 
 @app.post("/api/rename")

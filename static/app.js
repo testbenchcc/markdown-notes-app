@@ -12,6 +12,8 @@
   const divider = document.getElementById("divider");
   const navPane = document.getElementById("nav-pane");
   const mainEl = document.getElementById("main");
+  const searchInputEl = document.getElementById("search-input");
+  const searchResultsEl = document.getElementById("search-results");
 
   const contextMenuEl = document.createElement("div");
   contextMenuEl.id = "context-menu";
@@ -52,6 +54,127 @@
     if (!errorBannerEl) return;
     errorBannerEl.textContent = "";
     errorBannerEl.classList.add("hidden");
+  }
+
+  function clearSearchResults() {
+    if (!searchResultsEl) return;
+    searchResultsEl.innerHTML = "";
+    searchResultsEl.classList.add("hidden");
+  }
+
+  function renderSearchResults(payload) {
+    if (!searchResultsEl) return;
+    searchResultsEl.innerHTML = "";
+
+    if (!payload || !Array.isArray(payload.results) || payload.results.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "search-results-empty";
+      empty.textContent = "No results";
+      searchResultsEl.appendChild(empty);
+      searchResultsEl.classList.remove("hidden");
+      return;
+    }
+
+    const header = document.createElement("div");
+    header.className = "search-results-header";
+    const label = document.createElement("span");
+    label.textContent = `Search: "${payload.query || ""}"`;
+    const count = document.createElement("span");
+    count.textContent = `${payload.results.length} note(s)`;
+    header.appendChild(label);
+    header.appendChild(count);
+    searchResultsEl.appendChild(header);
+
+    payload.results.forEach((result) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "search-result-item";
+
+      const pathEl = document.createElement("div");
+      pathEl.className = "search-result-path";
+      pathEl.textContent = result.path || result.name || "";
+
+      const snippetEl = document.createElement("div");
+      snippetEl.className = "search-result-snippet";
+      if (Array.isArray(result.matches) && result.matches.length > 0) {
+        const first = result.matches[0];
+        const prefix = first.line_number ? `${first.line_number}: ` : "";
+        snippetEl.textContent = `${prefix}${first.line || ""}`;
+      }
+
+      item.appendChild(pathEl);
+      item.appendChild(snippetEl);
+
+      const path = result.path;
+      if (path) {
+        item.addEventListener("click", async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          clearSelection();
+          const treeItems = document.querySelectorAll(".tree-item.note");
+          let matched = false;
+          for (const el of treeItems) {
+            if (el.dataset.path === path) {
+              el.classList.add("selected");
+              matched = true;
+              break;
+            }
+          }
+          await loadNote(path);
+          if (!matched) {
+            try {
+              const storage = window.localStorage;
+              if (storage) {
+                storage.setItem("lastNotePath", path);
+              }
+            } catch (e) {
+              // Ignore storage errors
+            }
+          }
+        });
+      }
+
+      searchResultsEl.appendChild(item);
+    });
+
+    searchResultsEl.classList.remove("hidden");
+  }
+
+  async function handleSearchInput() {
+    if (!searchInputEl || !searchResultsEl) return;
+    const query = searchInputEl.value.trim();
+    if (!query) {
+      clearSearchResults();
+      return;
+    }
+    if (query.length < 2) {
+      searchResultsEl.classList.remove("hidden");
+      searchResultsEl.innerHTML = "";
+      const info = document.createElement("div");
+      info.className = "search-results-empty";
+      info.textContent = "Type at least 2 characters to search.";
+      searchResultsEl.appendChild(info);
+      return;
+    }
+    try {
+      clearError();
+      searchResultsEl.classList.remove("hidden");
+      searchResultsEl.innerHTML = "";
+      const loading = document.createElement("div");
+      loading.className = "search-results-empty";
+      loading.textContent = "Searching…";
+      searchResultsEl.appendChild(loading);
+      const payload = await fetchJSON(`/api/search?q=${encodeURIComponent(query)}`);
+      renderSearchResults(payload);
+    } catch (err) {
+      showError(`Failed to search notes: ${err.message}`);
+      searchResultsEl.classList.remove("hidden");
+      searchResultsEl.innerHTML = "";
+      const errorEl = document.createElement("div");
+      errorEl.className = "search-results-empty";
+      errorEl.textContent = "Search failed.";
+      searchResultsEl.appendChild(errorEl);
+    }
   }
 
   function hideContextMenu() {
@@ -576,6 +699,18 @@
   newNoteBtn.addEventListener("click", () => {
     promptNewNote("");
   });
+
+  if (searchInputEl) {
+    searchInputEl.addEventListener("input", () => {
+      handleSearchInput();
+    });
+    searchInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        searchInputEl.value = "";
+        clearSearchResults();
+      }
+    });
+  }
 
   setupSplitter();
   loadTree();
