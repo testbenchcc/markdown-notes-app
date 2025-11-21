@@ -16,9 +16,9 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
   - Right-click context menu on tree items for quick actions (open note, copy path, create/rename/delete notes and folders)
   - Keyboard navigation in the notes tree (arrow keys, Home/End, Enter/Space)
   - Remembers the last opened note per browser (localStorage)
-  - Gruvbox-inspired dark markdown theme (based on Obsidian Gruvbox)
+  - Theme support with a Gruvbox-inspired dark default (based on Obsidian Gruvbox), plus Office and High Contrast themes
 - Simple text search across markdown notes
-- Settings modal (via the header "Settings" button) with per-browser preferences, currently including an option to enable spellcheck in the editor
+- Settings modal (via the header "Settings" button) with per-browser preferences, currently including options to enable spellcheck in the editor and select the UI theme
 - Improved markdown rendering: fenced code blocks with syntax highlighting and tables with clear outlines
 - No authentication or user accounts
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree

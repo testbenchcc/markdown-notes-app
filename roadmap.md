@@ -44,18 +44,22 @@
 
 ## v1.1.5 - Themes
 
-- [] Implement a theme/Appearance selection. Allow for index to switch between multiple style.css files. Keep the existing styles.css file, but create variations of it to swap in (or whatever the best practice is, just keep it simple). Utilize the settings modal. Reload when the selection is made so the user can preview the change, but do not make it permanent until settings are applied.
-- [] Create a professional theme for office settings. I still want a bit of color, not just black and white.
-- [] Create a high contrast theme.
-
+- [x] Implement a theme/Appearance selection. Allow for index to switch between multiple style.css files. Keep the existing styles.css file, but create variations of it to swap in (or whatever the best practice is, just keep it simple). Utilize the settings modal. Reload when the selection is made so the user can preview the change, but do not make it permanent until settings are applied. (implemented)
+- [x] Create a professional theme for office settings. I still want a bit of color, not just black and white. (implemented)
+- [x] Create a high contrast theme. (implemented)
 
 ## v1.1.6 - Note export improvements
 
 - [] Add a default theme selection to the settings modal Appearance category for the exported theme default.
 
-## v1.1.7 - Update sub-title 
+
+## v1.1.7 - Version Revisoning
+
+- [] Add setting for auto-commiting, pushing, pulling, repository, github api key.
+- [] Automatically commit, push, and pull using using the configured settings. 
+
+
+## v1.1.8 - Update sub-title 
 
 - [] Add a setting for the page title which is currently hard coded to `NoteBooks`.
-- [] Set the build number (number of commits) and tag (if it exists) for the top-bar-subtitle text. Use git (installed) to get the information.
-
-## v1.1.8 - 
+- [] Set the build number (number of commits) and tag (if it exists) for the top-bar-subtitle text. use github api key configured in settings.

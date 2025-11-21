@@ -19,6 +19,7 @@
   const importFileInput = document.getElementById("import-file-input");
   const noteExportBtn = document.getElementById("note-export-btn");
   const settingsBtn = document.getElementById("settings-btn");
+  const themeLinkEl = document.getElementById("theme-stylesheet");
 
   const contextMenuEl = document.createElement("div");
   contextMenuEl.id = "context-menu";
@@ -37,10 +38,43 @@
   let settingsOverlayEl = null;
   let settingsInitialized = false;
   let settingsEditorSpellcheckInput = null;
+  let settingsThemeSelect = null;
+
+  const THEME_DEFINITIONS = {
+    "gruvbox-dark": {
+      href: "/static/styles.css",
+    },
+    office: {
+      href: "/static/styles-office.css",
+    },
+    "high-contrast": {
+      href: "/static/styles-high-contrast.css",
+    },
+  };
+
+  const DEFAULT_THEME_ID = "gruvbox-dark";
+
+  function applyTheme(themeId) {
+    if (!themeLinkEl) {
+      return;
+    }
+    let id = themeId;
+    if (!id || !THEME_DEFINITIONS[id]) {
+      id = DEFAULT_THEME_ID;
+    }
+    const def = THEME_DEFINITIONS[id];
+    if (!def || !def.href) {
+      return;
+    }
+    if (themeLinkEl.getAttribute("href") !== def.href) {
+      themeLinkEl.setAttribute("href", def.href);
+    }
+  }
 
   function getDefaultSettings() {
     return {
       editorSpellcheck: false,
+      theme: DEFAULT_THEME_ID,
     };
   }
 
@@ -83,6 +117,7 @@
     if (editorEl) {
       editorEl.spellcheck = !!settings.editorSpellcheck;
     }
+    applyTheme(settings.theme);
   }
 
   function setSettingsCategoryDirty(categoryId, dirty) {
@@ -128,6 +163,10 @@
     if (settingsEditorSpellcheckInput) {
       settingsEditorSpellcheckInput.checked = !!draftSettings.editorSpellcheck;
     }
+    if (settingsThemeSelect) {
+      const themeId = draftSettings.theme || DEFAULT_THEME_ID;
+      settingsThemeSelect.value = themeId;
+    }
   }
 
   function attachSettingsModalHandlers(root) {
@@ -147,6 +186,7 @@
     settingsEditorSpellcheckInput = root.querySelector(
       "#settings-editor-spellcheck"
     );
+    settingsThemeSelect = root.querySelector("#settings-theme");
 
     function selectCategory(categoryId) {
       navItems.forEach((btn) => {
@@ -190,6 +230,20 @@
       });
     }
 
+    if (settingsThemeSelect) {
+      settingsThemeSelect.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const selectedTheme = settingsThemeSelect.value || DEFAULT_THEME_ID;
+        draftSettings.theme = selectedTheme;
+        setSettingsCategoryDirty("appearance", true);
+        applyTheme(selectedTheme);
+      });
+    }
+
     function saveSettingsAndClose() {
       if (!draftSettings) {
         draftSettings = savedSettings
@@ -209,6 +263,7 @@
         : getDefaultSettings();
       syncSettingsControlsFromDraft();
       clearAllSettingsCategoryDirty();
+      applySettings(savedSettings);
       closeSettingsModal();
     }
 

@@ -46,9 +46,19 @@
         </section>
         <section class="settings-category-panel hidden" data-category="appearance">
           <h3 class="settings-category-title">Appearance</h3>
-          <p class="settings-field-description">
-            Theme selection and additional appearance options will be added in a future release.
-          </p>
+          <div class="settings-field">
+            <label class="settings-field-label" for="settings-theme">
+              Theme
+            </label>
+            <select id="settings-theme" class="settings-select">
+              <option value="gruvbox-dark">Gruvbox dark (default)</option>
+              <option value="office">Office</option>
+              <option value="high-contrast">High contrast</option>
+            </select>
+            <p class="settings-field-description">
+              Changes are previewed immediately. Click Save to keep them.
+            </p>
+          </div>
         </section>
       </div>
     </div>

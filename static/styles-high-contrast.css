@@ -1,0 +1,19 @@
+@import url("/static/styles.css");
+
+:root {
+  --md-bg: #000000;
+  --md-bg-alt: #000000;
+  --md-bg-alt-soft: #111827;
+  --md-border-subtle: #f9fafb;
+  --md-text-main: #ffffff;
+  --md-text-muted: #e5e7eb;
+  --md-red: #ff4b4b;
+  --md-yellow: #facc15;
+  --md-green: #22c55e;
+  --md-aqua: #22d3ee;
+  --md-blue: #3b82f6;
+  --md-purple: #e879f9;
+  --md-link: #38bdf8;
+  --md-link-hover: #facc15;
+  --md-code: #f97316;
+}
