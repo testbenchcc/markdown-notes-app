@@ -245,9 +245,8 @@ async def get_note(note_path: str) -> Dict[str, Any]:
         "content": raw,
         "html": html,
     }
-
-
-@app.get("/api/notes/export/{note_path:path}")
+ 
+@app.get("/api/export-note/{note_path:path}")
 async def export_note_html(note_path: str) -> HTMLResponse:
     """Export a single markdown note as a standalone HTML document."""
 

@@ -53,7 +53,7 @@
     try {
       clearError();
       const encodedPath = encodeURIComponent(currentNote.path);
-      const res = await fetch(`/api/notes/export/${encodedPath}`);
+      const res = await fetch(`/api/export-note/${encodedPath}`);
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`Request failed (${res.status}): ${text}`);
