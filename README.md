@@ -22,6 +22,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
 - Improved markdown rendering: fenced code blocks with syntax highlighting and tables with clear outlines
 - No authentication or user accounts
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
+- Optional auto-commit and push of notes to a dedicated Git repository under `notes/` (when enabled in Settings)
 
 ## Requirements
 
@@ -74,6 +75,7 @@ The container uses a bind mount of the project directory so that notes and code 
 - By default, all notes live under the `notes/` folder in this repo.
 - Subfolders represent categories.
 - Each `.md` file is a note.
+- The `notes/` folder can also be initialized as a separate Git repository (for example `https://github.com/testbenchcc/markdown-notes.git`), which is git-ignored by the main app repo and used for versioning and sync.
 - The app treats the folder where `main.py` lives as the notebook root and uses a configurable `NOTES_ROOT` path defined near the top of `main.py`.
 - You can also override the notes root by setting a `NOTES_ROOT` environment variable. If it is a relative path, it is resolved against the application root (the folder containing `main.py`).
 

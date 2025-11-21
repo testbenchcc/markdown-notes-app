@@ -53,14 +53,20 @@
 - [x] Add a default theme selection to the settings modal Appearance category for the exported theme default. (implemented)
 - [x] Update note exporting to use the selected theme. (implemented)
 
-## v1.1.7 - Version Revisoning
+## v1.1.7 - Version Revisioning
 
-- [] Add setting for auto-commiting items in the notes folder, pushing, pulling, repository, github api key.
-- [] Add setting for auto pulling on new version release. have a setting for how often it checks. 
-- [] Automatically commit, push, and pull using using the configured settings. 
-
+- [x] Initialize and connect a dedicated Git repository for the notes folder (`notes/`), using the remote `https://github.com/testbenchcc/markdown-notes.git`.
+- [x] Add a setting to automatically commit changes inside the notes folder and push them to the dedicated notes repository.
+- [] Add a setting to automatically pull updates from the dedicated notes repository.
+- [] Add settings for the notes repository location (local path under `notes/` and remote URL) and the GitHub API key.
+  - Always commit and push local notes changes before pulling from the notes repository. Do not push if the local branch is out of sync with its remote. This should not happen since I am the only user, but the safeguard still needs to be there.
+- [] Add a setting to auto pull when a new version of the application is released. Include an interval setting for how often to check. Ensure that application auto-pull never overwrites the `notes/` folder, since it is now a separate, git-ignored notes repository. Usse the remote `https://github.com/testbenchcc/markdown-notes-app.git`
 
 ## v1.1.8 - Update sub-title 
 
 - [] Add a setting for the page title which is currently hard coded to `NoteBooks`.
 - [] Set the build number (number of commits) and tag (if it exists) for the top-bar-subtitle text. use github api key configured in settings.
+
+## v1.1.9 - Move stored settings into notes folder
+
+- [] Move the notebooks settings into the root notes folder as a JSON file. This way they travel with the notes. 

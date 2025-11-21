@@ -40,6 +40,7 @@
   let settingsEditorSpellcheckInput = null;
   let settingsThemeSelect = null;
   let settingsExportThemeSelect = null;
+  let settingsAutoCommitNotesInput = null;
 
   const THEME_DEFINITIONS = {
     "gruvbox-dark": {
@@ -77,6 +78,7 @@
       editorSpellcheck: false,
       theme: DEFAULT_THEME_ID,
       exportTheme: "match-app-theme",
+      autoCommitNotes: false,
     };
   }
 
@@ -153,8 +155,11 @@
     if (!savedSettings || !draftSettings) {
       return;
     }
-    const dirty =
+    const spellcheckDirty =
       !!draftSettings.editorSpellcheck !== !!savedSettings.editorSpellcheck;
+    const autoCommitDirty =
+      !!draftSettings.autoCommitNotes !== !!savedSettings.autoCommitNotes;
+    const dirty = spellcheckDirty || autoCommitDirty;
     setSettingsCategoryDirty("general", dirty);
   }
 
@@ -164,6 +169,9 @@
     }
     if (settingsEditorSpellcheckInput) {
       settingsEditorSpellcheckInput.checked = !!draftSettings.editorSpellcheck;
+    }
+    if (settingsAutoCommitNotesInput) {
+      settingsAutoCommitNotesInput.checked = !!draftSettings.autoCommitNotes;
     }
     if (settingsThemeSelect) {
       const themeId = draftSettings.theme || DEFAULT_THEME_ID;
@@ -194,6 +202,9 @@
     );
     settingsThemeSelect = root.querySelector("#settings-theme");
     settingsExportThemeSelect = root.querySelector("#settings-export-theme");
+    settingsAutoCommitNotesInput = root.querySelector(
+      "#settings-auto-commit-notes"
+    );
 
     function selectCategory(categoryId) {
       navItems.forEach((btn) => {
@@ -233,6 +244,18 @@
             : getDefaultSettings();
         }
         draftSettings.editorSpellcheck = !!settingsEditorSpellcheckInput.checked;
+        updateGeneralCategoryDirty();
+      });
+    }
+
+    if (settingsAutoCommitNotesInput) {
+      settingsAutoCommitNotesInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        draftSettings.autoCommitNotes = !!settingsAutoCommitNotesInput.checked;
         updateGeneralCategoryDirty();
       });
     }
@@ -998,6 +1021,21 @@
     }
   }
 
+  async function triggerNotesAutoCommit() {
+    try {
+      const settings = savedSettings || getDefaultSettings();
+      if (!settings.autoCommitNotes) {
+        return;
+      }
+      await fetchJSON("/api/versioning/notes/commit-and-push", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+    } catch (err) {
+      showError(`Failed to sync notes repository: ${err.message}`);
+    }
+  }
+
   async function saveCurrentNote() {
     if (!currentNote) return;
     try {
@@ -1009,6 +1047,7 @@
       });
       // Reload to update rendered HTML
       await loadNote(currentNote.path);
+      await triggerNotesAutoCommit();
     } catch (err) {
       showError(`Failed to save note: ${err.message}`);
     }

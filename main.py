@@ -60,6 +60,9 @@ else:
     NOTES_ROOT = APP_ROOT / "notes"
 
 
+NOTES_REPO_REMOTE_URL = os.getenv("NOTES_REPO_REMOTE_URL") or "https://github.com/testbenchcc/markdown-notes.git"
+
+
 class SaveNoteRequest(BaseModel):
     content: str
 
@@ -152,6 +155,100 @@ def get_git_last_commit_timestamp(path: Path) -> int | None:
         return int(output.splitlines()[0])
     except Exception:
         return None
+
+
+def _run_notes_git(args: list[str]) -> subprocess.CompletedProcess:
+    ensure_notes_root()
+    try:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=str(NOTES_ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail="Notes git command failed")
+    return completed
+
+
+def _ensure_notes_repo_initialized() -> None:
+    ensure_notes_root()
+    git_dir = NOTES_ROOT / ".git"
+    if not git_dir.is_dir():
+        init_result = _run_notes_git(["init"])
+        if init_result.returncode != 0:
+            raise HTTPException(status_code=500, detail="Failed to initialize notes git repository")
+    remotes_result = _run_notes_git(["remote"])
+    if remotes_result.returncode == 0:
+        names = {line.strip() for line in remotes_result.stdout.splitlines() if line.strip()}
+    else:
+        names = set()
+    if "origin" not in names and NOTES_REPO_REMOTE_URL:
+        add_remote = _run_notes_git(["remote", "add", "origin", NOTES_REPO_REMOTE_URL])
+        if add_remote.returncode != 0:
+            raise HTTPException(status_code=500, detail="Failed to configure notes git remote")
+
+
+def _notes_repo_has_changes() -> bool:
+    status_result = _run_notes_git(["status", "--porcelain"])
+    if status_result.returncode != 0:
+        raise HTTPException(status_code=500, detail="Failed to read notes git status")
+    return bool(status_result.stdout.strip())
+
+
+def _notes_repo_sync_state() -> str:
+    head = _run_notes_git(["rev-parse", "@"])
+    if head.returncode != 0:
+        return "unknown"
+    upstream = _run_notes_git(["rev-parse", "@{u}"])
+    if upstream.returncode != 0:
+        return "no_upstream"
+    base = _run_notes_git(["merge-base", "@", "@{u}"])
+    if base.returncode != 0:
+        return "unknown"
+    head_sha = head.stdout.strip()
+    upstream_sha = upstream.stdout.strip()
+    base_sha = base.stdout.strip()
+    if not head_sha or not upstream_sha or not base_sha:
+        return "unknown"
+    if head_sha == upstream_sha:
+        return "up_to_date"
+    if head_sha == base_sha:
+        return "behind"
+    if upstream_sha == base_sha:
+        return "ahead"
+    return "diverged"
+
+
+def auto_commit_and_push_notes() -> Dict[str, Any]:
+    ensure_notes_root()
+    _ensure_notes_repo_initialized()
+    if not _notes_repo_has_changes():
+        return {"ok": True, "committed": False, "pushed": False, "reason": "no_changes"}
+    add_result = _run_notes_git(["add", "."])
+    if add_result.returncode != 0:
+        raise HTTPException(status_code=500, detail="Failed to stage notes changes")
+    message = f"Auto-commit notes at {datetime.now(tz=timezone.utc).isoformat()}"
+    commit_result = _run_notes_git(["commit", "-m", message])
+    output = (commit_result.stdout or "") + (commit_result.stderr or "")
+    if commit_result.returncode != 0:
+        lowered = output.lower()
+        if "nothing to commit" in lowered:
+            return {"ok": True, "committed": False, "pushed": False, "reason": "no_changes"}
+        raise HTTPException(status_code=500, detail="Failed to commit notes changes")
+    state = _notes_repo_sync_state()
+    if state in {"behind", "diverged"}:
+        return {"ok": True, "committed": True, "pushed": False, "reason": state}
+    if state == "no_upstream":
+        push_args = ["push", "-u", "origin", "HEAD"]
+    else:
+        push_args = ["push"]
+    push_result = _run_notes_git(push_args)
+    if push_result.returncode != 0:
+        raise HTTPException(status_code=500, detail="Failed to push notes changes")
+    return {"ok": True, "committed": True, "pushed": True, "reason": state}
 
 
 def build_notes_tree() -> Dict[str, Any]:
@@ -652,3 +749,8 @@ async def import_notebook(
             shutil.copyfileobj(src, dst)
     archive.close()
     return {"ok": True}
+
+
+@app.post("/api/versioning/notes/commit-and-push")
+async def versioning_notes_commit_and_push() -> Dict[str, Any]:
+    return auto_commit_and_push_notes()
