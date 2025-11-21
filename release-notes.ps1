@@ -145,5 +145,46 @@ Remove-Item $tempFile -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "Created tag '$newTag' with release notes." -ForegroundColor Green
-Write-Host "You can push it with:" -ForegroundColor Cyan
-Write-Host "  git push origin $newTag"
+
+# Ask to push branch and tag
+Write-Host ""
+$pushConfirm = Read-Host "Push current branch and tag '$newTag' to origin now? [y/N]"
+
+if ($pushConfirm -in @("y","Y","yes","YES")) {
+    # Get current branch name
+    $currentBranch = (git rev-parse --abbrev-ref HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($currentBranch)) {
+        Write-Error "Could not determine current branch. Tag was created locally, but you need to push it manually."
+        Write-Host "Manual commands:" -ForegroundColor Cyan
+        Write-Host "  git push origin <your-branch-name>"
+        Write-Host "  git push origin $newTag"
+        exit 1
+    }
+
+    Write-Host ""
+    Write-Host "Pushing branch '$currentBranch' to origin..." -ForegroundColor Cyan
+    git push origin $currentBranch
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to push branch '$currentBranch'. Tag is still only local."
+    } else
+    {
+        Write-Host "Branch '$currentBranch' pushed successfully." -ForegroundColor Green
+    }
+
+    Write-Host ""
+    Write-Host "Pushing tag '$newTag' to origin..." -ForegroundColor Cyan
+    git push origin $newTag
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to push tag '$newTag'. You may need to push it manually with:"
+        Write-Host "  git push origin $newTag"
+    } else
+    {
+        Write-Host "Tag '$newTag' pushed successfully." -ForegroundColor Green
+    }
+} else {
+    Write-Host ""
+    Write-Host "Tag created locally but not pushed." -ForegroundColor Yellow
+    Write-Host "You can push later with:" -ForegroundColor Cyan
+    Write-Host "  git push origin <your-branch-name>"
+    Write-Host "  git push origin $newTag"
+}

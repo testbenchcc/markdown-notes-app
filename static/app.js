@@ -14,6 +14,9 @@
   const mainEl = document.getElementById("main");
   const searchInputEl = document.getElementById("search-input");
   const searchResultsEl = document.getElementById("search-results");
+  const exportBtn = document.getElementById("export-btn");
+  const importBtn = document.getElementById("import-btn");
+  const importFileInput = document.getElementById("import-file-input");
 
   const contextMenuEl = document.createElement("div");
   contextMenuEl.id = "context-menu";
@@ -175,6 +178,91 @@
       errorEl.textContent = "Search failed.";
       searchResultsEl.appendChild(errorEl);
     }
+  }
+
+  async function downloadExport() {
+    try {
+      clearError();
+      const res = await fetch("/api/export");
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Request failed (${res.status}): ${text}`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "markdown-notes-notebook.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      showError(`Failed to export notebook: ${err.message}`);
+    }
+  }
+
+  async function importNotebookFromFile(file, force) {
+    if (!file) return;
+    try {
+      clearError();
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = force ? "/api/import?force=true" : "/api/import";
+      const res = await fetch(url, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.status === 409) {
+        let payload;
+        try {
+          payload = await res.json();
+        } catch (e) {
+          throw new Error("Import conflict and response could not be parsed.");
+        }
+
+        if (
+          payload &&
+          payload.reason === "older_notes" &&
+          Array.isArray(payload.conflicts)
+        ) {
+          const count = payload.conflicts.length;
+          const message =
+            count === 1
+              ? "The imported notebook contains an older version of 1 note. Restore it and overwrite your newer note?"
+              : `The imported notebook contains older versions of ${count} notes. Restore them and overwrite your newer notes?`;
+          const proceed = window.confirm(message);
+          if (!proceed) {
+            showError(
+              "Import cancelled: existing newer notes were kept. No files were overwritten."
+            );
+            return;
+          }
+
+          await importNotebookFromFile(file, true);
+          return;
+        }
+
+        throw new Error("Import failed with a conflict.");
+      }
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Import failed (${res.status}): ${text}`);
+      }
+
+      await res.json();
+      await loadTree();
+    } catch (err) {
+      showError(`Failed to import notebook: ${err.message}`);
+    }
+  }
+
+  function triggerImportFilePicker() {
+    if (!importFileInput) return;
+    importFileInput.value = "";
+    importFileInput.click();
   }
 
   function hideContextMenu() {
@@ -861,6 +949,27 @@
   newNoteBtn.addEventListener("click", () => {
     promptNewNote("");
   });
+
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      downloadExport();
+    });
+  }
+
+  if (importBtn) {
+    importBtn.addEventListener("click", () => {
+      triggerImportFilePicker();
+    });
+  }
+
+  if (importFileInput) {
+    importFileInput.addEventListener("change", () => {
+      const files = importFileInput.files;
+      if (!files || !files.length) return;
+      const file = files[0];
+      importNotebookFromFile(file, false);
+    });
+  }
 
   if (searchInputEl) {
     searchInputEl.addEventListener("input", () => {

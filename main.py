@@ -18,14 +18,19 @@ repository. Subfolders represent categories.
 
 from __future__ import annotations
 
+import io
+import json
 import os
 import shutil
+import subprocess
+import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
 import markdown
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, File, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -111,6 +116,31 @@ def _resolve_destination_path(relative_path: str) -> Path:
         raise HTTPException(status_code=400, detail="Path escapes notes root")
 
     return full
+
+
+def get_git_last_commit_timestamp(path: Path) -> int | None:
+    try:
+        rel = path.relative_to(APP_ROOT)
+    except ValueError:
+        return None
+    try:
+        completed = subprocess.run(
+            ["git", "log", "-1", "--format=%ct", "--", str(rel)],
+            cwd=str(APP_ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        return None
+    output = completed.stdout.strip()
+    if not output:
+        return None
+    try:
+        return int(output.splitlines()[0])
+    except Exception:
+        return None
 
 
 def build_notes_tree() -> Dict[str, Any]:
@@ -364,3 +394,168 @@ async def create_note(payload: CreatePathRequest) -> Dict[str, Any]:
     rel_path = file_path.relative_to(NOTES_ROOT).as_posix()
 
     return {"ok": True, "path": rel_path, "name": file_path.name}
+
+
+@app.get("/api/export")
+async def export_notebook() -> StreamingResponse:
+    ensure_notes_root()
+    buffer = io.BytesIO()
+    notes_meta: Dict[str, Dict[str, int]] = {}
+    include_names = [
+        ".git",
+        "static",
+        "docker-compose.yml",
+        "Dockerfile",
+        "main.py",
+        "requirements.txt",
+    ]
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name in include_names:
+            path = APP_ROOT / name
+            if not path.exists():
+                continue
+            if path.is_dir():
+                for root, _, files in os.walk(path):
+                    root_path = Path(root)
+                    for filename in files:
+                        file_path = root_path / filename
+                        arcname = file_path.relative_to(APP_ROOT).as_posix()
+                        archive.write(file_path, arcname)
+            else:
+                arcname = path.relative_to(APP_ROOT).as_posix()
+                archive.write(path, arcname)
+        notes_root = NOTES_ROOT.resolve()
+        if notes_root.is_dir():
+            for item in notes_root.rglob("*"):
+                if not item.is_file():
+                    continue
+                rel = item.relative_to(notes_root).as_posix()
+                arcname = (Path("notes") / rel).as_posix()
+                archive.write(item, arcname)
+                ts = get_git_last_commit_timestamp(item)
+                if ts is None:
+                    try:
+                        ts = int(item.stat().st_mtime)
+                    except Exception:
+                        ts = None
+                if ts is not None:
+                    notes_meta[arcname] = {"commit_timestamp": ts}
+        meta = {
+            "version": 1,
+            "generated_at": int(datetime.now(tz=timezone.utc).timestamp()),
+            "notes": notes_meta,
+        }
+        archive.writestr(
+            ".notebook-export-meta.json",
+            json.dumps(meta, ensure_ascii=False),
+        )
+    buffer.seek(0)
+    headers = {
+        "Content-Disposition": 'attachment; filename="markdown-notes-notebook.zip"'
+    }
+    return StreamingResponse(buffer, media_type="application/zip", headers=headers)
+
+
+@app.post("/api/import")
+async def import_notebook(
+    file: UploadFile = File(...),
+    force: bool = False,
+):
+    ensure_notes_root()
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File is required")
+    data = await file.read()
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="Invalid zip file")
+    try:
+        raw_meta = archive.read(".notebook-export-meta.json")
+        meta = json.loads(raw_meta.decode("utf-8"))
+        notes_meta = meta.get("notes") or {}
+    except KeyError:
+        notes_meta = {}
+    except Exception:
+        notes_meta = {}
+    plan = []
+    for info in archive.infolist():
+        name = info.filename
+        normalized = name.replace("\\", "/")
+        if not normalized.startswith("notes/"):
+            continue
+        subpath = normalized[len("notes/") :]
+        if not subpath:
+            continue
+        parts = [p for p in subpath.split("/") if p]
+        if any(part == ".." for part in parts):
+            archive.close()
+            raise HTTPException(status_code=400, detail="Invalid path in archive")
+        is_dir = info.is_dir()
+        rel_subpath = "/".join(parts)
+        if is_dir:
+            plan.append({"type": "dir", "subpath": rel_subpath})
+        else:
+            plan.append(
+                {
+                    "type": "file",
+                    "subpath": rel_subpath,
+                    "zip_name": name,
+                    "info": info,
+                }
+            )
+    older_conflicts = []
+    for item in plan:
+        if item["type"] != "file":
+            continue
+        subpath = item["subpath"]
+        target = _resolve_destination_path(subpath)
+        if not target.exists():
+            continue
+        meta_key = f"notes/{subpath}"
+        imported_meta = notes_meta.get(meta_key) or {}
+        imported_ts = imported_meta.get("commit_timestamp")
+        if imported_ts is None:
+            try:
+                dt = datetime(*item["info"].date_time, tzinfo=timezone.utc)
+                imported_ts = int(dt.timestamp())
+            except Exception:
+                imported_ts = None
+        current_ts = get_git_last_commit_timestamp(target)
+        if current_ts is None:
+            try:
+                current_ts = int(target.stat().st_mtime)
+            except Exception:
+                current_ts = None
+        if (
+            imported_ts is not None
+            and current_ts is not None
+            and imported_ts < current_ts
+            and not force
+        ):
+            older_conflicts.append(
+                {
+                    "path": subpath,
+                    "current_timestamp": current_ts,
+                    "imported_timestamp": imported_ts,
+                }
+            )
+    if older_conflicts and not force:
+        archive.close()
+        return JSONResponse(
+            status_code=409,
+            content={
+                "reason": "older_notes",
+                "conflicts": older_conflicts,
+            },
+        )
+    for item in plan:
+        subpath = item["subpath"]
+        target = _resolve_destination_path(subpath)
+        if item["type"] == "dir":
+            target.mkdir(parents=True, exist_ok=True)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with archive.open(item["zip_name"]) as src, target.open("wb") as dst:
+            shutil.copyfileobj(src, dst)
+    archive.close()
+    return {"ok": True}

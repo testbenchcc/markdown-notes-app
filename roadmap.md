@@ -33,6 +33,7 @@
 ## v3 – Advanced features (optional)
 
 - [x] Improve markdown rendering. (Code rendering within ``` fences and table outlines) (implemented)
-- [ ] Export/import utilities (zip up notebook, import from another folder).
+- [x] Export/import utility (export and import notebook as zip file). (implemented)
+  - Include: ./.git, ./notes, ./static, docker-compose.yml, Dockerfile, main.py, requirements.txt
 
 This roadmap is intentionally simple and can be adjusted as the project evolves.
