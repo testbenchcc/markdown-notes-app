@@ -35,5 +35,6 @@
 - [x] Improve markdown rendering. (Code rendering within ``` fences and table outlines) (implemented)
 - [x] Export/import utility (export and import notebook as zip file). (implemented)
   - Include: ./.git, ./notes, ./static, docker-compose.yml, Dockerfile, main.py, requirements.txt
+- [x] Export note to html document. (implemented)
 
 This roadmap is intentionally simple and can be adjusted as the project evolves.

@@ -87,6 +87,8 @@ To move or copy a notebook, you can either copy or clone the entire repository f
   - Notes are created or overwritten based on their relative paths.
   - If a note already exists and the imported version is **older** (based on the last git commit timestamp, with a filesystem modification time fallback), the app prompts you before overwriting newer notes.
   - If you decline, the import is cancelled and no files are overwritten.
+  
+- The editor header also includes an `Export` button next to `Save` that downloads the currently selected note as a standalone `.html` document.
 
 ## API overview
 

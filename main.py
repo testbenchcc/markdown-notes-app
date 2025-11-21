@@ -27,10 +27,11 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
+import html as html_module
 
 import markdown
 from fastapi import FastAPI, HTTPException, Query, File, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -244,6 +245,56 @@ async def get_note(note_path: str) -> Dict[str, Any]:
         "content": raw,
         "html": html,
     }
+
+
+@app.get("/api/notes/export/{note_path:path}")
+async def export_note_html(note_path: str) -> HTMLResponse:
+    """Export a single markdown note as a standalone HTML document."""
+
+    ensure_notes_root()
+    file_path = _resolve_relative_path(note_path)
+
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    if file_path.suffix.lower() != ".md":
+        raise HTTPException(status_code=400, detail="Not a markdown file")
+
+    raw = file_path.read_text(encoding="utf-8")
+    body_html = markdown.markdown(
+        raw,
+        extensions=["extra", "codehilite"],
+        extension_configs={"codehilite": {"guess_lang": False, "noclasses": True}},
+    )
+
+    title = file_path.stem or file_path.name
+    safe_title = html_module.escape(title, quote=True)
+
+    full_html = f"""<!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>{safe_title}</title>
+      </head>
+      <body>
+    {body_html}
+      </body>
+    </html>
+    """
+
+    base_name = file_path.stem or file_path.name
+    safe_name = "".join(
+        ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in base_name
+    )
+    if not safe_name:
+        safe_name = "note"
+    filename = f"{safe_name}.html"
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"'
+    }
+
+    return HTMLResponse(content=full_html, media_type="text/html", headers=headers)
 
 
 @app.put("/api/notes/{note_path:path}")

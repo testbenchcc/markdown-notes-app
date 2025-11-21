@@ -17,6 +17,7 @@
   const exportBtn = document.getElementById("export-btn");
   const importBtn = document.getElementById("import-btn");
   const importFileInput = document.getElementById("import-file-input");
+  const noteExportBtn = document.getElementById("note-export-btn");
 
   const contextMenuEl = document.createElement("div");
   contextMenuEl.id = "context-menu";
@@ -44,6 +45,32 @@
   function clearSelection() {
     for (const el of document.querySelectorAll(".tree-item")) {
       el.classList.remove("selected");
+    }
+  }
+
+  async function downloadCurrentNoteHtml() {
+    if (!currentNote || !currentNote.path) return;
+    try {
+      clearError();
+      const encodedPath = encodeURIComponent(currentNote.path);
+      const res = await fetch(`/api/notes/export/${encodedPath}`);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Request failed (${res.status}): ${text}`);
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const baseName = currentNote.name || "note.md";
+      const nameWithoutExt = baseName.replace(/\.md$/i, "") || "note";
+      a.download = `${nameWithoutExt}.html`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      showError(`Failed to export note: ${err.message}`);
     }
   }
 
@@ -592,6 +619,9 @@
       viewerEl.innerHTML = note.html || "";
       editorEl.value = note.content || "";
       modeToggleBtn.disabled = false;
+      if (noteExportBtn) {
+        noteExportBtn.disabled = false;
+      }
       setMode("view");
     } catch (err) {
       viewerEl.textContent = "Failed to load note.";
@@ -599,6 +629,9 @@
       currentNote = null;
       modeToggleBtn.disabled = true;
       saveBtn.disabled = true;
+      if (noteExportBtn) {
+        noteExportBtn.disabled = true;
+      }
       showError(`Failed to load note: ${err.message}`);
     }
   }
@@ -743,6 +776,9 @@
         currentNote = null;
         modeToggleBtn.disabled = true;
         saveBtn.disabled = true;
+        if (noteExportBtn) {
+          noteExportBtn.disabled = true;
+        }
         noteNameEl.textContent = "No note selected";
         notePathEl.textContent = "";
         try {
@@ -941,6 +977,13 @@
     if (!currentNote) return;
     saveCurrentNote();
   });
+
+  if (noteExportBtn) {
+    noteExportBtn.addEventListener("click", () => {
+      if (!currentNote) return;
+      downloadCurrentNoteHtml();
+    });
+  }
 
   newFolderBtn.addEventListener("click", () => {
     promptNewFolder("");
