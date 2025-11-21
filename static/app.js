@@ -66,12 +66,29 @@
     const items = [];
 
     if (target.type === "folder") {
-      items.push({ id: "new-note", label: "New note in folder" });
-      items.push({ id: "new-folder", label: "New subfolder" });
+      const isRoot = !target.path;
+      items.push({
+        id: "new-note",
+        label: isRoot ? "New note" : "New note in folder",
+      });
+      items.push({
+        id: "new-folder",
+        label: isRoot ? "New folder" : "New subfolder",
+      });
+      if (!isRoot) {
+        items.push({ separator: true });
+        items.push({ id: "rename", label: "Rename folder" });
+        items.push({ id: "delete", label: "Delete folder" });
+      }
       items.push({ separator: true });
-      items.push({ id: "copy-path", label: "Copy folder path" });
+      items.push({
+        id: "copy-path",
+        label: isRoot ? "Copy notebook root path" : "Copy folder path",
+      });
     } else if (target.type === "note") {
       items.push({ id: "open-note", label: "Open note" });
+      items.push({ id: "rename", label: "Rename note" });
+      items.push({ id: "delete", label: "Delete note" });
       items.push({ separator: true });
       items.push({ id: "copy-path", label: "Copy note path" });
     }
@@ -163,6 +180,10 @@
         await promptNewNote(path || "");
       } else if (actionId === "new-folder") {
         await promptNewFolder(path || "");
+      } else if (actionId === "rename") {
+        await renameItem("folder", path || "");
+      } else if (actionId === "delete") {
+        await deleteItem("folder", path || "");
       }
       return;
     }
@@ -174,6 +195,10 @@
           targetEl.classList.add("selected");
         }
         await loadNote(path);
+      } else if (actionId === "rename" && path) {
+        await renameItem("note", path);
+      } else if (actionId === "delete" && path) {
+        await deleteItem("note", path);
       }
     }
   }
@@ -398,6 +423,92 @@
       await loadTree();
     } catch (err) {
       showError(`Failed to create note: ${err.message}`);
+    }
+  }
+
+  async function renameItem(type, currentPath) {
+    if (!currentPath) return;
+
+    const isNote = type === "note";
+    const label = isNote ? "note" : "folder";
+    const example = isNote ? "work/todo.md" : "projects/archive";
+    const input = window.prompt(
+      `New ${label} path (relative to notes root, e.g. '${example}')`,
+      currentPath
+    );
+    if (!input) return;
+    let newPath = input.trim();
+    if (!newPath) return;
+    if (isNote && !newPath.toLowerCase().endsWith(".md")) {
+      newPath = `${newPath}.md`;
+    }
+
+    try {
+      clearError();
+      await fetchJSON("/api/rename", {
+        method: "POST",
+        body: JSON.stringify({ old_path: currentPath, new_path: newPath }),
+      });
+      await loadTree();
+
+      if (isNote) {
+        try {
+          const storage = window.localStorage;
+          if (storage) {
+            storage.setItem("lastNotePath", newPath);
+          }
+        } catch (e) {
+          // Ignore storage errors
+        }
+        await loadNote(newPath);
+      }
+    } catch (err) {
+      showError(`Failed to rename ${label}: ${err.message}`);
+    }
+  }
+
+  async function deleteItem(type, path) {
+    if (!path) return;
+
+    const label = type === "note" ? "note" : "folder";
+    const message =
+      type === "note"
+        ? `Delete note '${path}'? This cannot be undone.`
+        : `Delete folder '${path}' and all its contents? This cannot be undone.`;
+    if (!window.confirm(message)) return;
+
+    try {
+      clearError();
+      await fetchJSON("/api/delete", {
+        method: "POST",
+        body: JSON.stringify({ path }),
+      });
+
+      if (
+        type === "note" &&
+        currentNote &&
+        currentNote.path === path
+      ) {
+        viewerEl.textContent = "";
+        editorEl.value = "";
+        currentNote = null;
+        modeToggleBtn.disabled = true;
+        saveBtn.disabled = true;
+        noteNameEl.textContent = "No note selected";
+        notePathEl.textContent = "";
+        try {
+          const storage = window.localStorage;
+          if (storage && storage.getItem("lastNotePath") === path) {
+            storage.removeItem("lastNotePath");
+          }
+        } catch (e) {
+          // Ignore storage errors
+        }
+      }
+
+      await loadTree();
+    } catch (err) {
+      showError(`Failed to delete ${label}: ${err.message}`);
     }
   }
 

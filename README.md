@@ -13,7 +13,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
   - View/Edit toggle and Save button
   - Draggable vertical splitter between panes
   - Inline error banner for failed API operations
-  - Right-click context menu on tree items for quick actions (open note, copy path, create note/folder)
+  - Right-click context menu on tree items for quick actions (open note, copy path, create/rename/delete notes and folders)
   - Remembers the last opened note per browser (localStorage)
 - No authentication or user accounts
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree

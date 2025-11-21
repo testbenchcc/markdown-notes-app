@@ -19,6 +19,7 @@ repository. Subfolders represent categories.
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Dict
 
@@ -52,6 +53,15 @@ class CreatePathRequest(BaseModel):
     content: str | None = None
 
 
+class RenamePathRequest(BaseModel):
+    old_path: str
+    new_path: str
+
+
+class DeletePathRequest(BaseModel):
+    path: str
+
+
 def ensure_notes_root() -> None:
     """Ensure the notes root directory exists."""
 
@@ -79,6 +89,19 @@ def _validate_relative_path(relative_path: str) -> str:
 
 def _resolve_relative_path(relative_path: str) -> Path:
     """Resolve a path under NOTES_ROOT and guard against traversal."""
+
+    safe_rel = _validate_relative_path(relative_path)
+    base = NOTES_ROOT.resolve()
+    full = (base / safe_rel).resolve()
+
+    if base not in full.parents and full != base:
+        raise HTTPException(status_code=400, detail="Path escapes notes root")
+
+    return full
+
+
+def _resolve_destination_path(relative_path: str) -> Path:
+    """Resolve a destination path under NOTES_ROOT without requiring it to exist."""
 
     safe_rel = _validate_relative_path(relative_path)
     base = NOTES_ROOT.resolve()
@@ -202,6 +225,61 @@ async def save_note(note_path: str, payload: SaveNoteRequest) -> Dict[str, Any]:
     rel_path = file_path.relative_to(NOTES_ROOT).as_posix()
 
     return {"ok": True, "path": rel_path, "name": file_path.name}
+
+
+@app.post("/api/rename")
+async def rename_path(payload: RenamePathRequest) -> Dict[str, Any]:
+    """Rename or move a note or folder within the notes root."""
+
+    ensure_notes_root()
+    if not payload.old_path.strip():
+        raise HTTPException(status_code=400, detail="Source path must not be empty")
+
+    src = _resolve_relative_path(payload.old_path)
+    dst = _resolve_destination_path(payload.new_path)
+
+    base = NOTES_ROOT.resolve()
+    if src == base:
+        raise HTTPException(status_code=400, detail="Cannot rename notes root")
+
+    if not src.exists():
+        raise HTTPException(status_code=404, detail="Source path not found")
+    if dst.exists():
+        raise HTTPException(status_code=400, detail="Destination already exists")
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    src.rename(dst)
+
+    rel_src = src.relative_to(NOTES_ROOT).as_posix()
+    rel_dst = dst.relative_to(NOTES_ROOT).as_posix()
+
+    return {"ok": True, "from": rel_src, "to": rel_dst}
+
+
+@app.post("/api/delete")
+async def delete_path(payload: DeletePathRequest) -> Dict[str, Any]:
+    """Delete a note or folder (recursively) under the notes root."""
+
+    ensure_notes_root()
+    if not payload.path.strip():
+        raise HTTPException(status_code=400, detail="Path must not be empty")
+
+    target = _resolve_relative_path(payload.path)
+    base = NOTES_ROOT.resolve()
+    if target == base:
+        raise HTTPException(status_code=400, detail="Cannot delete notes root")
+
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="Path not found")
+
+    if target.is_dir():
+        shutil.rmtree(target)
+    else:
+        target.unlink()
+
+    rel = target.relative_to(NOTES_ROOT).as_posix()
+
+    return {"ok": True, "path": rel}
 
 
 @app.post("/api/folders")
