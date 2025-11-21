@@ -396,6 +396,44 @@
     }
   }
 
+  function getVisibleTreeItems() {
+    if (!treeContainer) return [];
+    const items = Array.from(treeContainer.querySelectorAll(".tree-item"));
+    return items.filter((el) => el.offsetParent !== null);
+  }
+
+  function getSelectedTreeItem() {
+    return document.querySelector(".tree-item.selected");
+  }
+
+  function focusTreeItem(item) {
+    if (!item) return;
+    clearSelection();
+    item.classList.add("selected");
+    if (typeof item.scrollIntoView === "function") {
+      item.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function findParentFolder(item) {
+    if (!item) return null;
+    let parent = item.parentElement;
+    while (parent && parent !== treeContainer) {
+      if (parent.classList.contains("tree-children")) {
+        const folder = parent.previousElementSibling;
+        if (
+          folder &&
+          folder.classList.contains("tree-item") &&
+          folder.classList.contains("folder")
+        ) {
+          return folder;
+        }
+      }
+      parent = parent.parentElement;
+    }
+    return null;
+  }
+
   function renderNode(node, container, depth) {
     const item = document.createElement("div");
     item.classList.add("tree-item", node.type);
@@ -672,6 +710,130 @@
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       hideContextMenu();
+      return;
+    }
+
+    if (!treeContainer) return;
+
+    const active = document.activeElement;
+    if (active !== treeContainer) {
+      return;
+    }
+
+    if (
+      e.key !== "ArrowUp" &&
+      e.key !== "ArrowDown" &&
+      e.key !== "ArrowLeft" &&
+      e.key !== "ArrowRight" &&
+      e.key !== "Home" &&
+      e.key !== "End" &&
+      e.key !== "Enter" &&
+      e.key !== " "
+    ) {
+      return;
+    }
+
+    e.preventDefault();
+
+    const items = getVisibleTreeItems();
+    if (!items.length) {
+      return;
+    }
+
+    let current = getSelectedTreeItem();
+    if (!current) {
+      current = items[0];
+      focusTreeItem(current);
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        return;
+      }
+    }
+
+    const currentIndex = items.indexOf(current);
+
+    if (e.key === "ArrowDown") {
+      const next = items[currentIndex + 1];
+      if (next) {
+        focusTreeItem(next);
+      }
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      const prev = items[currentIndex - 1];
+      if (prev) {
+        focusTreeItem(prev);
+      }
+      return;
+    }
+
+    if (e.key === "Home") {
+      focusTreeItem(items[0]);
+      return;
+    }
+
+    if (e.key === "End") {
+      focusTreeItem(items[items.length - 1]);
+      return;
+    }
+
+    const isFolder = current.classList.contains("folder");
+    const isNote = current.classList.contains("note");
+
+    if (e.key === "ArrowRight") {
+      if (isFolder) {
+        const expanded = current.classList.contains("expanded");
+        const childrenContainer = current.nextElementSibling;
+        if (!expanded) {
+          current.classList.add("expanded");
+          if (
+            childrenContainer &&
+            childrenContainer.classList.contains("tree-children")
+          ) {
+            childrenContainer.style.display = "block";
+          }
+        } else {
+          const next = items[currentIndex + 1];
+          if (next) {
+            focusTreeItem(next);
+          }
+        }
+      }
+      return;
+    }
+
+    if (e.key === "ArrowLeft") {
+      if (isFolder && current.classList.contains("expanded")) {
+        const childrenContainer = current.nextElementSibling;
+        if (
+          childrenContainer &&
+          childrenContainer.classList.contains("tree-children")
+        ) {
+          childrenContainer.style.display = "none";
+        }
+        current.classList.remove("expanded");
+      } else {
+        const parentFolder = findParentFolder(current);
+        if (parentFolder) {
+          focusTreeItem(parentFolder);
+        }
+      }
+      return;
+    }
+
+    if (e.key === "Enter" || e.key === " ") {
+      if (isFolder) {
+        const childrenContainer = current.nextElementSibling;
+        const expanded = current.classList.toggle("expanded");
+        if (
+          childrenContainer &&
+          childrenContainer.classList.contains("tree-children")
+        ) {
+          childrenContainer.style.display = expanded ? "block" : "none";
+        }
+      } else if (isNote) {
+        current.click();
+      }
     }
   });
 

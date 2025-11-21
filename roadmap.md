@@ -27,8 +27,7 @@
 ## v2 – Search and UX
 
 - [x] Add simple text search across markdown files. (implemented)
-- [ ] Improve tree UX (keyboard navigation, better folder icons).
-- [ ] Optional dark mode.
+- [x] Improve tree UX (keyboard navigation, better folder icons). (implemented)
 - [x] Add context menu for tree items. (implemented)
 
 ## v3 – Advanced features (optional)
