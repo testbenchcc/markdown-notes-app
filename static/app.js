@@ -18,6 +18,7 @@
   const importBtn = document.getElementById("import-btn");
   const importFileInput = document.getElementById("import-file-input");
   const noteExportBtn = document.getElementById("note-export-btn");
+  const settingsBtn = document.getElementById("settings-btn");
 
   const contextMenuEl = document.createElement("div");
   contextMenuEl.id = "context-menu";
@@ -29,6 +30,281 @@
 
   let currentNote = null; // { path, name, content, html }
   let mode = "view"; // "view" | "edit"
+
+  const SETTINGS_STORAGE_KEY = "markdownNotesSettings";
+  let savedSettings = null;
+  let draftSettings = null;
+  let settingsOverlayEl = null;
+  let settingsInitialized = false;
+  let settingsEditorSpellcheckInput = null;
+
+  function getDefaultSettings() {
+    return {
+      editorSpellcheck: false,
+    };
+  }
+
+  function loadSettingsFromStorage() {
+    try {
+      const storage = window.localStorage;
+      if (!storage) {
+        return getDefaultSettings();
+      }
+      const raw = storage.getItem(SETTINGS_STORAGE_KEY);
+      if (!raw) {
+        return getDefaultSettings();
+      }
+      const parsed = JSON.parse(raw);
+      return {
+        ...getDefaultSettings(),
+        ...parsed,
+      };
+    } catch (e) {
+      return getDefaultSettings();
+    }
+  }
+
+  function saveSettingsToStorage(settings) {
+    try {
+      const storage = window.localStorage;
+      if (!storage) {
+        return;
+      }
+      storage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    } catch (e) {
+      // Ignore storage errors
+    }
+  }
+
+  function applySettings(settings) {
+    if (!settings) {
+      return;
+    }
+    if (editorEl) {
+      editorEl.spellcheck = !!settings.editorSpellcheck;
+    }
+  }
+
+  function setSettingsCategoryDirty(categoryId, dirty) {
+    if (!settingsOverlayEl) {
+      return;
+    }
+    const navItem = settingsOverlayEl.querySelector(
+      `.settings-nav-item[data-category="${categoryId}"]`
+    );
+    if (!navItem) {
+      return;
+    }
+    if (dirty) {
+      navItem.classList.add("settings-nav-item-dirty");
+    } else {
+      navItem.classList.remove("settings-nav-item-dirty");
+    }
+  }
+
+  function clearAllSettingsCategoryDirty() {
+    if (!settingsOverlayEl) {
+      return;
+    }
+    const dirtyItems = settingsOverlayEl.querySelectorAll(
+      ".settings-nav-item-dirty"
+    );
+    dirtyItems.forEach((el) => el.classList.remove("settings-nav-item-dirty"));
+  }
+
+  function updateGeneralCategoryDirty() {
+    if (!savedSettings || !draftSettings) {
+      return;
+    }
+    const dirty =
+      !!draftSettings.editorSpellcheck !== !!savedSettings.editorSpellcheck;
+    setSettingsCategoryDirty("general", dirty);
+  }
+
+  function syncSettingsControlsFromDraft() {
+    if (!settingsOverlayEl || !draftSettings) {
+      return;
+    }
+    if (settingsEditorSpellcheckInput) {
+      settingsEditorSpellcheckInput.checked = !!draftSettings.editorSpellcheck;
+    }
+  }
+
+  function attachSettingsModalHandlers(root) {
+    if (!root || settingsInitialized) {
+      return;
+    }
+
+    settingsOverlayEl = root;
+    const navItems = Array.from(root.querySelectorAll(".settings-nav-item"));
+    const panels = Array.from(
+      root.querySelectorAll(".settings-category-panel")
+    );
+    const saveButton = root.querySelector("#settings-save-btn");
+    const cancelButton = root.querySelector("#settings-cancel-btn");
+    const closeButton = root.querySelector("#settings-close-btn");
+
+    settingsEditorSpellcheckInput = root.querySelector(
+      "#settings-editor-spellcheck"
+    );
+
+    function selectCategory(categoryId) {
+      navItems.forEach((btn) => {
+        const id = btn.dataset.category || "";
+        if (id === categoryId) {
+          btn.classList.add("selected");
+        } else {
+          btn.classList.remove("selected");
+        }
+      });
+      panels.forEach((panel) => {
+        const id = panel.dataset.category || "";
+        if (id === categoryId) {
+          panel.classList.remove("hidden");
+        } else {
+          panel.classList.add("hidden");
+        }
+      });
+    }
+
+    navItems.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const categoryId = btn.dataset.category || "";
+        if (!categoryId) {
+          return;
+        }
+        selectCategory(categoryId);
+      });
+    });
+
+    if (settingsEditorSpellcheckInput) {
+      settingsEditorSpellcheckInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        draftSettings.editorSpellcheck = !!settingsEditorSpellcheckInput.checked;
+        updateGeneralCategoryDirty();
+      });
+    }
+
+    function saveSettingsAndClose() {
+      if (!draftSettings) {
+        draftSettings = savedSettings
+          ? { ...savedSettings }
+          : getDefaultSettings();
+      }
+      savedSettings = { ...draftSettings };
+      saveSettingsToStorage(savedSettings);
+      applySettings(savedSettings);
+      clearAllSettingsCategoryDirty();
+      closeSettingsModal();
+    }
+
+    function cancelSettingsAndClose() {
+      draftSettings = savedSettings
+        ? { ...savedSettings }
+        : getDefaultSettings();
+      syncSettingsControlsFromDraft();
+      clearAllSettingsCategoryDirty();
+      closeSettingsModal();
+    }
+
+    if (saveButton) {
+      saveButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        saveSettingsAndClose();
+      });
+    }
+
+    if (cancelButton) {
+      cancelButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        cancelSettingsAndClose();
+      });
+    }
+
+    if (closeButton) {
+      closeButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        cancelSettingsAndClose();
+      });
+    }
+
+    root.addEventListener("click", (e) => {
+      if (e.target === root) {
+        e.preventDefault();
+        cancelSettingsAndClose();
+      }
+    });
+
+    root.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cancelSettingsAndClose();
+      }
+    });
+
+    if (navItems.length) {
+      const initialCategory = navItems[0].dataset.category || "";
+      if (initialCategory) {
+        selectCategory(initialCategory);
+      }
+    }
+
+    settingsInitialized = true;
+  }
+
+  async function ensureSettingsModalLoaded() {
+    if (settingsOverlayEl) {
+      return;
+    }
+    try {
+      const res = await fetch("/static/settings-modal.html");
+      const text = await res.text();
+      if (!res.ok) {
+        throw new Error(text || "Unable to load settings UI.");
+      }
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = text.trim();
+      const root = wrapper.firstElementChild;
+      if (!root) {
+        throw new Error("Settings modal HTML is empty.");
+      }
+      document.body.appendChild(root);
+      attachSettingsModalHandlers(root);
+    } catch (err) {
+      showError(`Failed to open settings: ${err.message}`);
+    }
+  }
+
+  async function openSettingsModal() {
+    await ensureSettingsModalLoaded();
+    if (!settingsOverlayEl) {
+      return;
+    }
+    savedSettings = loadSettingsFromStorage();
+    draftSettings = { ...savedSettings };
+    syncSettingsControlsFromDraft();
+    clearAllSettingsCategoryDirty();
+    updateGeneralCategoryDirty();
+    settingsOverlayEl.classList.remove("hidden");
+    document.body.classList.add("settings-open");
+    const firstNav = settingsOverlayEl.querySelector(".settings-nav-item");
+    if (firstNav && typeof firstNav.focus === "function") {
+      firstNav.focus();
+    }
+  }
+
+  function closeSettingsModal() {
+    if (!settingsOverlayEl) {
+      return;
+    }
+    settingsOverlayEl.classList.add("hidden");
+    document.body.classList.remove("settings-open");
+  }
 
   async function fetchJSON(url, options) {
     const res = await fetch(url, {
@@ -1025,6 +1301,16 @@
       }
     });
   }
+
+  if (settingsBtn) {
+    settingsBtn.addEventListener("click", () => {
+      openSettingsModal();
+    });
+  }
+
+  savedSettings = loadSettingsFromStorage();
+  draftSettings = { ...savedSettings };
+  applySettings(savedSettings);
 
   setupSplitter();
   loadTree();

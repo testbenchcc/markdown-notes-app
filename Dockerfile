@@ -8,6 +8,7 @@ WORKDIR /app
 # Install system dependencies (if needed in future). Keep minimal for now.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
+    && apt-get install -y git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./

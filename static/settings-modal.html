@@ -1,0 +1,64 @@
+<div id="settings-overlay" class="settings-overlay hidden">
+  <div class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div class="settings-header">
+      <div class="settings-title-group">
+        <h2 id="settings-title" class="settings-title">Settings</h2>
+        <div class="settings-subtitle">Preferences are stored per browser on this device.</div>
+      </div>
+      <button
+        type="button"
+        id="settings-close-btn"
+        class="settings-header-close"
+        aria-label="Close settings"
+      >
+        &times;
+      </button>
+    </div>
+    <div class="settings-body">
+      <nav class="settings-nav" aria-label="Settings categories">
+        <button
+          type="button"
+          class="settings-nav-item selected"
+          data-category="general"
+        >
+          General
+        </button>
+        <button
+          type="button"
+          class="settings-nav-item"
+          data-category="appearance"
+        >
+          Appearance
+        </button>
+      </nav>
+      <div class="settings-content">
+        <section class="settings-category-panel" data-category="general">
+          <h3 class="settings-category-title">General</h3>
+          <div class="settings-field">
+            <label class="settings-field-label">
+              <input type="checkbox" id="settings-editor-spellcheck" />
+              Enable spellcheck in the editor
+            </label>
+            <p class="settings-field-description">
+              When enabled, the browser's built-in spellchecker will be active in the markdown editor.
+            </p>
+          </div>
+        </section>
+        <section class="settings-category-panel hidden" data-category="appearance">
+          <h3 class="settings-category-title">Appearance</h3>
+          <p class="settings-field-description">
+            Theme selection and additional appearance options will be added in a future release.
+          </p>
+        </section>
+      </div>
+    </div>
+    <div class="settings-footer">
+      <button type="button" id="settings-cancel-btn" class="settings-btn">
+        Cancel
+      </button>
+      <button type="button" id="settings-save-btn" class="settings-btn settings-btn-primary">
+        Save
+      </button>
+    </div>
+  </div>
+</div>
