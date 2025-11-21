@@ -84,4 +84,4 @@ See `main.py` for details.
 
 ## Roadmap
 
-See `roadmap.md` for planned enhancements (search, nicer styling, etc.).
+See `roadmap.md` for planned enhancements (search, nicer styling, context menu actions, bug fixes, etc.).

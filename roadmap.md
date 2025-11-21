@@ -22,12 +22,14 @@
 - Remember last selected note in `localStorage`. (implemented)
 - Optional environment variable to override the notes root folder.
 - Basic unit tests for filesystem operations.
+- Fix `New Note` creation so notes are saved with `.md` extension and immediately appear in the notes tree.
 
 ## v2 – Search and UX
 
 - Add simple text search across markdown files.
 - Improve tree UX (keyboard navigation, better folder icons).
 - Optional dark mode.
+- Add context menu for tree items.
 
 ## v3 – Advanced features (optional)
 
