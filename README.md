@@ -64,10 +64,11 @@ The container uses a bind mount of the project directory so that notes and code 
 
 ## Notes folder
 
-- All notes live under the `notes/` folder in this repo.
+- By default, all notes live under the `notes/` folder in this repo.
 - Subfolders represent categories.
 - Each `.md` file is a note.
 - The app treats the folder where `main.py` lives as the notebook root and uses a configurable `NOTES_ROOT` path defined near the top of `main.py`.
+- You can also override the notes root by setting a `NOTES_ROOT` environment variable. If it is a relative path, it is resolved against the application root (the folder containing `main.py`).
 
 To move or copy a notebook, copy or clone the entire repository folder (including `notes/`).
 

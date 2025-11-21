@@ -8,3 +8,15 @@ This is an example note stored as a plain `.md` file under the `notes/` folder.
 
 Because notes are just files, you can also edit them directly with any editor
 or manage them with Git.
+
+```python
+import os
+
+# Get current working directory
+cwd = os.getcwd()
+print("Current directory:", cwd)
+
+# List files in the current directory
+for item in os.listdir(cwd):
+    print("Found:", item)
+```

@@ -18,6 +18,7 @@ repository. Subfolders represent categories.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -32,7 +33,14 @@ APP_ROOT = Path(__file__).resolve().parent
 
 # Root folder where markdown notes are stored. Change this in one place if
 # you want to point the app at a different notes directory.
-NOTES_ROOT = APP_ROOT / "notes"
+_env_notes_root = os.getenv("NOTES_ROOT")
+if _env_notes_root:
+    _candidate_root = Path(_env_notes_root)
+    if not _candidate_root.is_absolute():
+        _candidate_root = (APP_ROOT / _candidate_root).resolve()
+    NOTES_ROOT = _candidate_root
+else:
+    NOTES_ROOT = APP_ROOT / "notes"
 
 
 class SaveNoteRequest(BaseModel):

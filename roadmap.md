@@ -20,7 +20,7 @@
 
 - Improve error messages in the UI (failed loads/saves, invalid paths). (implemented)
 - Remember last selected note in `localStorage`. (implemented)
-- Optional environment variable to override the notes root folder.
+- Optional environment variable to override the notes root folder. (implemented)
 - Basic unit tests for filesystem operations.
 - Fix `New Note` creation so notes are saved with `.md` extension and immediately appear in the notes tree.
 
