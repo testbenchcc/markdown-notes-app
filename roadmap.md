@@ -36,5 +36,6 @@
 - [x] Export/import utility (export and import notebook as zip file). (implemented)
   - Include: ./.git, ./notes, ./static, docker-compose.yml, Dockerfile, main.py, requirements.txt
 - [x] Export note to html document. (implemented)
+- [x] Improve coloring for markdown using @.\example files\Obsidian gruvbox. (implemented)
 
 This roadmap is intentionally simple and can be adjusted as the project evolves.
