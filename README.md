@@ -15,6 +15,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
   - Inline error banner for failed API operations
   - Remembers the last opened note per browser (localStorage)
 - No authentication or user accounts
+- "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
 
 ## Requirements
 

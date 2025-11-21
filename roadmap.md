@@ -22,7 +22,7 @@
 - Remember last selected note in `localStorage`. (implemented)
 - Optional environment variable to override the notes root folder. (implemented)
 - Basic unit tests for filesystem operations.
-- Fix `New Note` creation so notes are saved with `.md` extension and immediately appear in the notes tree.
+- Fix `New Note` creation so notes are saved with `.md` extension and immediately appear in the notes tree. (implemented)
 
 ## v2 – Search and UX
 

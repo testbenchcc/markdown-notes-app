@@ -228,7 +228,10 @@ async def create_note(payload: CreatePathRequest) -> Dict[str, Any]:
     """
 
     ensure_notes_root()
-    file_path = _resolve_relative_path(payload.path)
+    requested_path = payload.path
+    if not requested_path.lower().endswith(".md"):
+        requested_path = f"{requested_path}.md"
+    file_path = _resolve_relative_path(requested_path)
 
     if file_path.exists():
         raise HTTPException(status_code=400, detail="Note already exists")

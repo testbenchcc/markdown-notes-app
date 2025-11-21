@@ -223,10 +223,20 @@
   }
 
   async function promptNewNote() {
-    const path = window.prompt(
-      "New note path (relative to notes root, include .md, e.g. 'inbox.md' or 'work/todo.md')"
+    const input = window.prompt(
+      "New note path (relative to notes root, e.g. 'inbox' or 'work/todo'; '.md' will be added automatically)"
     );
-    if (!path) return;
+    if (!input) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    if (/[\\/\\]$/.test(trimmed)) {
+      showError("Note path must include a file name, not just a folder.");
+      return;
+    }
+    let path = trimmed;
+    if (!path.toLowerCase().endsWith(".md")) {
+      path = `${path}.md`;
+    }
     try {
       clearError();
       await fetchJSON("/api/notes", {
