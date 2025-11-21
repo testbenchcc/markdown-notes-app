@@ -17,6 +17,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
   - Keyboard navigation in the notes tree (arrow keys, Home/End, Enter/Space)
   - Remembers the last opened note per browser (localStorage)
 - Simple text search across markdown notes
+- Improved markdown rendering: fenced code blocks with syntax highlighting and tables with clear outlines
 - No authentication or user accounts
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
 

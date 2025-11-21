@@ -413,3 +413,45 @@ body.resizing {
   color: #9ca3af;
   margin-bottom: 0.5rem;
 }
+
+.content-view .codehilite {
+  background: #020617;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+}
+
+.content-view .codehilite pre {
+  margin: 0;
+}
+
+.content-view .codehilite code {
+  background: transparent;
+  padding: 0;
+}
+
+.content-view table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.content-view th,
+.content-view td {
+  border: 1px solid #1f2937;
+  padding: 0.35rem 0.5rem;
+}
+
+.content-view thead {
+  background: #020617;
+}
+
+.content-view tbody tr:nth-child(even) {
+  background: #020617;
+}
+
+.content-view tbody tr:hover {
+  background: #0b1120;
+}

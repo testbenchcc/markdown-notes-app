@@ -32,7 +32,7 @@
 
 ## v3 – Advanced features (optional)
 
-- [ ] Configurable markdown renderer options (extensions, safe mode).
+- [x] Improve markdown rendering. (Code rendering within ``` fences and table outlines) (implemented)
 - [ ] Export/import utilities (zip up notebook, import from another folder).
 
 This roadmap is intentionally simple and can be adjusted as the project evolves.

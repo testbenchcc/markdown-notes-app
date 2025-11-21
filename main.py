@@ -200,7 +200,11 @@ async def get_note(note_path: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Not a markdown file")
 
     raw = file_path.read_text(encoding="utf-8")
-    html = markdown.markdown(raw, extensions=["extra"])  # simple markdown renderer
+    html = markdown.markdown(
+        raw,
+        extensions=["extra", "codehilite"],
+        extension_configs={"codehilite": {"guess_lang": False, "noclasses": True}},
+    )
 
     rel_path = file_path.relative_to(NOTES_ROOT).as_posix()
 
