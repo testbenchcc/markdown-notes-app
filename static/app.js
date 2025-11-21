@@ -41,6 +41,10 @@
   let settingsThemeSelect = null;
   let settingsExportThemeSelect = null;
   let settingsAutoCommitNotesInput = null;
+  let settingsAutoPullNotesInput = null;
+  let settingsAutoPullIntervalInput = null;
+
+  let notesAutoPullTimerId = null;
 
   const THEME_DEFINITIONS = {
     "gruvbox-dark": {
@@ -79,6 +83,8 @@
       theme: DEFAULT_THEME_ID,
       exportTheme: "match-app-theme",
       autoCommitNotes: false,
+      autoPullNotes: false,
+      autoPullIntervalMinutes: 30,
     };
   }
 
@@ -157,10 +163,22 @@
     }
     const spellcheckDirty =
       !!draftSettings.editorSpellcheck !== !!savedSettings.editorSpellcheck;
+    setSettingsCategoryDirty("general", spellcheckDirty);
+  }
+
+  function updateVersioningCategoryDirty() {
+    if (!savedSettings || !draftSettings) {
+      return;
+    }
     const autoCommitDirty =
       !!draftSettings.autoCommitNotes !== !!savedSettings.autoCommitNotes;
-    const dirty = spellcheckDirty || autoCommitDirty;
-    setSettingsCategoryDirty("general", dirty);
+    const autoPullDirty =
+      !!draftSettings.autoPullNotes !== !!savedSettings.autoPullNotes;
+    const intervalDirty =
+      Number(draftSettings.autoPullIntervalMinutes || 0) !==
+      Number(savedSettings.autoPullIntervalMinutes || 0);
+    const dirty = autoCommitDirty || autoPullDirty || intervalDirty;
+    setSettingsCategoryDirty("versioning", dirty);
   }
 
   function syncSettingsControlsFromDraft() {
@@ -172,6 +190,13 @@
     }
     if (settingsAutoCommitNotesInput) {
       settingsAutoCommitNotesInput.checked = !!draftSettings.autoCommitNotes;
+    }
+    if (settingsAutoPullNotesInput) {
+      settingsAutoPullNotesInput.checked = !!draftSettings.autoPullNotes;
+    }
+    if (settingsAutoPullIntervalInput) {
+      const minutes = draftSettings.autoPullIntervalMinutes || 0;
+      settingsAutoPullIntervalInput.value = minutes > 0 ? String(minutes) : "";
     }
     if (settingsThemeSelect) {
       const themeId = draftSettings.theme || DEFAULT_THEME_ID;
@@ -204,6 +229,12 @@
     settingsExportThemeSelect = root.querySelector("#settings-export-theme");
     settingsAutoCommitNotesInput = root.querySelector(
       "#settings-auto-commit-notes"
+    );
+    settingsAutoPullNotesInput = root.querySelector(
+      "#settings-auto-pull-notes"
+    );
+    settingsAutoPullIntervalInput = root.querySelector(
+      "#settings-auto-pull-interval"
     );
 
     function selectCategory(categoryId) {
@@ -256,7 +287,36 @@
             : getDefaultSettings();
         }
         draftSettings.autoCommitNotes = !!settingsAutoCommitNotesInput.checked;
-        updateGeneralCategoryDirty();
+        updateVersioningCategoryDirty();
+      });
+    }
+
+    if (settingsAutoPullNotesInput) {
+      settingsAutoPullNotesInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        draftSettings.autoPullNotes = !!settingsAutoPullNotesInput.checked;
+        updateVersioningCategoryDirty();
+      });
+    }
+
+    if (settingsAutoPullIntervalInput) {
+      settingsAutoPullIntervalInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const raw = settingsAutoPullIntervalInput.value;
+        let minutes = parseInt(raw, 10);
+        if (!Number.isFinite(minutes) || minutes <= 0) {
+          minutes = 0;
+        }
+        draftSettings.autoPullIntervalMinutes = minutes;
+        updateVersioningCategoryDirty();
       });
     }
 
@@ -297,6 +357,7 @@
       saveSettingsToStorage(savedSettings);
       applySettings(savedSettings);
       clearAllSettingsCategoryDirty();
+      updateNotesAutoPullTimerFromSettings();
       closeSettingsModal();
     }
 
@@ -388,6 +449,7 @@
     syncSettingsControlsFromDraft();
     clearAllSettingsCategoryDirty();
     updateGeneralCategoryDirty();
+    updateVersioningCategoryDirty();
     settingsOverlayEl.classList.remove("hidden");
     document.body.classList.add("settings-open");
     const firstNav = settingsOverlayEl.querySelector(".settings-nav-item");
@@ -402,6 +464,25 @@
     }
     settingsOverlayEl.classList.add("hidden");
     document.body.classList.remove("settings-open");
+  }
+
+  function updateNotesAutoPullTimerFromSettings() {
+    if (notesAutoPullTimerId !== null) {
+      window.clearInterval(notesAutoPullTimerId);
+      notesAutoPullTimerId = null;
+    }
+    const settings = savedSettings || getDefaultSettings();
+    if (!settings.autoPullNotes) {
+      return;
+    }
+    const minutes = Number(settings.autoPullIntervalMinutes || 0);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return;
+    }
+    const intervalMs = minutes * 60 * 1000;
+    notesAutoPullTimerId = window.setInterval(() => {
+      triggerNotesAutoPull();
+    }, intervalMs);
   }
 
   async function fetchJSON(url, options) {
@@ -1036,6 +1117,21 @@
     }
   }
 
+  async function triggerNotesAutoPull() {
+    try {
+      const settings = savedSettings || getDefaultSettings();
+      if (!settings.autoPullNotes) {
+        return;
+      }
+      await fetchJSON("/api/versioning/notes/pull", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+    } catch (err) {
+      showError(`Failed to pull notes repository: ${err.message}`);
+    }
+  }
+
   async function saveCurrentNote() {
     if (!currentNote) return;
     try {
@@ -1436,6 +1532,7 @@
   savedSettings = loadSettingsFromStorage();
   draftSettings = { ...savedSettings };
   applySettings(savedSettings);
+  updateNotesAutoPullTimerFromSettings();
 
   setupSplitter();
   loadTree();

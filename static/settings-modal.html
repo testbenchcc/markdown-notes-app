@@ -26,6 +26,13 @@
         <button
           type="button"
           class="settings-nav-item"
+          data-category="versioning"
+        >
+          Versioning
+        </button>
+        <button
+          type="button"
+          class="settings-nav-item"
           data-category="appearance"
         >
           Appearance
@@ -43,6 +50,9 @@
               When enabled, the browser's built-in spellchecker will be active in the markdown editor.
             </p>
           </div>
+        </section>
+        <section class="settings-category-panel hidden" data-category="versioning">
+          <h3 class="settings-category-title">Versioning</h3>
           <div class="settings-field">
             <label class="settings-field-label">
               <input type="checkbox" id="settings-auto-commit-notes" />
@@ -50,6 +60,29 @@
             </label>
             <p class="settings-field-description">
               When enabled, saving a note will also commit and push changes in the notes Git repository.
+            </p>
+          </div>
+          <div class="settings-field">
+            <label class="settings-field-label">
+              <input type="checkbox" id="settings-auto-pull-notes" />
+              Automatically pull notes from the repository
+            </label>
+            <p class="settings-field-description">
+              When enabled, the app will periodically pull changes from the notes Git repository.
+            </p>
+          </div>
+          <div class="settings-field">
+            <label class="settings-field-label" for="settings-auto-pull-interval">
+              Auto-pull interval (minutes)
+            </label>
+            <input
+              type="number"
+              id="settings-auto-pull-interval"
+              class="settings-input-number"
+              min="1"
+            />
+            <p class="settings-field-description">
+              How often to check for and pull updates when automatic notes pulling is enabled.
             </p>
           </div>
         </section>

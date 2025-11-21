@@ -23,6 +23,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
 - No authentication or user accounts
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
 - Optional auto-commit and push of notes to a dedicated Git repository under `notes/` (when enabled in Settings)
+ - Optional periodic auto-pull of notes from the dedicated notes repository, using a configurable interval (when enabled in Settings)
 
 ## Requirements
 

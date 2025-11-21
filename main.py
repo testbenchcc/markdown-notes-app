@@ -251,6 +251,46 @@ def auto_commit_and_push_notes() -> Dict[str, Any]:
     return {"ok": True, "committed": True, "pushed": True, "reason": state}
 
 
+def auto_pull_notes() -> Dict[str, Any]:
+    ensure_notes_root()
+    _ensure_notes_repo_initialized()
+    # Always try to auto-commit and push local changes first. This helper
+    # already avoids pushing when the local branch is behind or diverged.
+    commit_result = auto_commit_and_push_notes()
+    reason = commit_result.get("reason")
+    if reason in {"behind", "diverged"}:
+        # Do not attempt to pull when the local branch is out of sync; manual
+        # intervention is required.
+        return {
+            "ok": False,
+            "pulled": False,
+            "reason": reason,
+            "commit_result": commit_result,
+        }
+    state_before = _notes_repo_sync_state()
+    if state_before == "no_upstream":
+        return {
+            "ok": False,
+            "pulled": False,
+            "reason": "no_upstream",
+            "commit_result": commit_result,
+        }
+    pull_result = _run_notes_git(["pull", "--ff-only"])
+    if pull_result.returncode != 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Failed to pull notes repository (non fast-forward or other error)",
+        )
+    state_after = _notes_repo_sync_state()
+    return {
+        "ok": True,
+        "pulled": True,
+        "before": state_before,
+        "after": state_after,
+        "commit_result": commit_result,
+    }
+
+
 def build_notes_tree() -> Dict[str, Any]:
     """Recursively build a tree of folders and notes under NOTES_ROOT.
 
@@ -754,3 +794,8 @@ async def import_notebook(
 @app.post("/api/versioning/notes/commit-and-push")
 async def versioning_notes_commit_and_push() -> Dict[str, Any]:
     return auto_commit_and_push_notes()
+
+
+@app.post("/api/versioning/notes/pull")
+async def versioning_notes_pull() -> Dict[str, Any]:
+    return auto_pull_notes()
