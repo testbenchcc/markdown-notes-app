@@ -7,7 +7,6 @@
   const editorWrapperEl = document.getElementById("editor-wrapper");
   const editorLineNumbersEl = document.getElementById("editor-line-numbers");
   const modeToggleBtn = document.getElementById("mode-toggle-btn");
-  const saveBtn = document.getElementById("save-btn");
   const errorBannerEl = document.getElementById("error-banner");
   const newFolderBtn = document.getElementById("new-folder-btn");
   const newNoteBtn = document.getElementById("new-note-btn");
@@ -51,11 +50,13 @@
   let settingsAutoCommitNotesInput = null;
   let settingsAutoPullNotesInput = null;
   let settingsAutoPullIntervalInput = null;
+  let settingsAutoSaveIntervalInput = null;
   let settingsImagesStoragePathInput = null;
   let settingsImagesMaxSizeMbInput = null;
   let settingsImagesCleanupBtn = null;
 
   let notesAutoPullTimerId = null;
+  let notesAutoSaveTimerId = null;
 
   let lastViewerScrollTop = 0;
   let lastEditorScrollTop = 0;
@@ -258,6 +259,7 @@
       autoCommitNotes: false,
       autoPullNotes: false,
       autoPullIntervalMinutes: 30,
+      autoSaveIntervalSeconds: 60,
       indexPageTitle: "NoteBooks",
       imageStoragePath: "images",
       imageMaxPasteBytes: 5 * 1024 * 1024,
@@ -400,6 +402,9 @@
     const titleDirty =
       (draftSettings.indexPageTitle || "") !==
       (savedSettings.indexPageTitle || "");
+    const autoSaveDraft = Number(draftSettings.autoSaveIntervalSeconds || 0);
+    const autoSaveSaved = Number(savedSettings.autoSaveIntervalSeconds || 0);
+    const autoSaveDirty = autoSaveDraft !== autoSaveSaved;
     const imagePathDraft = (draftSettings.imageStoragePath || "").trim();
     const imagePathSaved = (savedSettings.imageStoragePath || "").trim();
     const imagePathDirty = imagePathDraft !== imagePathSaved;
@@ -407,7 +412,11 @@
     const maxSaved = Number(savedSettings.imageMaxPasteBytes || 0);
     const imageMaxDirty = maxDraft !== maxSaved;
     const anyDirty =
-      spellcheckDirty || titleDirty || imagePathDirty || imageMaxDirty;
+      spellcheckDirty ||
+      titleDirty ||
+      autoSaveDirty ||
+      imagePathDirty ||
+      imageMaxDirty;
     setSettingsCategoryDirty("general", anyDirty);
   }
 
@@ -456,6 +465,11 @@
     }
     if (settingsIndexPageTitleInput) {
       settingsIndexPageTitleInput.value = draftSettings.indexPageTitle || "";
+    }
+    if (settingsAutoSaveIntervalInput) {
+      const seconds = Number(draftSettings.autoSaveIntervalSeconds || 0);
+      settingsAutoSaveIntervalInput.value =
+        seconds > 0 ? String(seconds) : "";
     }
     if (settingsImageDisplayModeSelect) {
       const mode = draftSettings.imageDisplayMode || "fit-width";
@@ -521,6 +535,9 @@
     );
     settingsIndexPageTitleInput = root.querySelector(
       "#settings-index-page-title"
+    );
+    settingsAutoSaveIntervalInput = root.querySelector(
+      "#settings-auto-save-interval"
     );
     settingsImageDisplayModeSelect = root.querySelector(
       "#settings-image-display-mode"
@@ -636,6 +653,23 @@
             : getDefaultSettings();
         }
         draftSettings.indexPageTitle = settingsIndexPageTitleInput.value || "";
+        updateGeneralCategoryDirty();
+      });
+    }
+
+    if (settingsAutoSaveIntervalInput) {
+      settingsAutoSaveIntervalInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const raw = settingsAutoSaveIntervalInput.value;
+        let seconds = parseInt(raw, 10);
+        if (!Number.isFinite(seconds) || seconds <= 0) {
+          seconds = 0;
+        }
+        draftSettings.autoSaveIntervalSeconds = seconds;
         updateGeneralCategoryDirty();
       });
     }
@@ -859,6 +893,8 @@
       applySettings(savedSettings);
       clearAllSettingsCategoryDirty();
       updateNotesAutoPullTimerFromSettings();
+      await saveCurrentNoteIfEditing();
+      updateAutoSaveTimerFromSettings();
       closeSettingsModal();
     }
 
@@ -1171,6 +1207,25 @@
     }, intervalMs);
   }
 
+  function updateAutoSaveTimerFromSettings() {
+    if (notesAutoSaveTimerId !== null) {
+      window.clearInterval(notesAutoSaveTimerId);
+      notesAutoSaveTimerId = null;
+    }
+    const settings = savedSettings || getDefaultSettings();
+    const seconds = Number(settings.autoSaveIntervalSeconds || 0);
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      return;
+    }
+    const intervalMs = seconds * 1000;
+    notesAutoSaveTimerId = window.setInterval(() => {
+      if (!currentNote || mode !== "edit") {
+        return;
+      }
+      autoSaveCurrentNote();
+    }, intervalMs);
+  }
+
   async function fetchJSON(url, options) {
     const res = await fetch(url, {
       headers: { "Content-Type": "application/json" },
@@ -1302,7 +1357,7 @@
               break;
             }
           }
-          await loadNote(path);
+          await openNotePath(path);
           if (!matched) {
             try {
               const storage = window.localStorage;
@@ -1633,24 +1688,20 @@
           clearSelection();
           targetEl.classList.add("selected");
         }
-        await loadNote(path);
+        await openNotePath(path);
       } else if (actionId === "edit-note" && path) {
         if (targetEl) {
           clearSelection();
           targetEl.classList.add("selected");
         }
-        if (!currentNote || currentNote.path !== path) {
-          await loadNote(path);
-        }
+        await openNotePath(path);
         setMode("edit");
       } else if (actionId === "export-note" && path) {
         if (targetEl) {
           clearSelection();
           targetEl.classList.add("selected");
         }
-        if (!currentNote || currentNote.path !== path) {
-          await loadNote(path);
-        }
+        await openNotePath(path);
         await downloadCurrentNoteHtml();
       } else if (actionId === "rename" && path) {
         await renameItem("note", path);
@@ -1664,7 +1715,6 @@
     mode = nextMode;
     if (!currentNote) {
       modeToggleBtn.disabled = true;
-      saveBtn.disabled = true;
       return;
     }
 
@@ -1684,7 +1734,6 @@
       }
       modeToggleBtn.setAttribute("aria-label", "Edit");
       modeToggleBtn.setAttribute("title", "Edit");
-      saveBtn.disabled = true;
 
       setScrollPercent(viewerEl, percent);
     } else {
@@ -1703,7 +1752,6 @@
       }
       modeToggleBtn.setAttribute("aria-label", "Reader");
       modeToggleBtn.setAttribute("title", "Reader");
-      saveBtn.disabled = false;
       editorEl.focus();
 
       setScrollPercent(editorEl, percent);
@@ -1844,7 +1892,7 @@
         if (el.dataset.path === lastPath) {
           clearSelection();
           el.classList.add("selected");
-          loadNote(lastPath);
+          openNotePath(lastPath);
           break;
         }
       }
@@ -1937,10 +1985,22 @@
         e.stopPropagation();
         clearSelection();
         item.classList.add("selected");
-        await loadNote(node.path);
+        await openNotePath(node.path);
       });
       container.appendChild(item);
     }
+  }
+
+  async function openNotePath(path) {
+    const nextPath = (path || "").trim();
+    if (!nextPath) {
+      return;
+    }
+    if (currentNote && currentNote.path === nextPath) {
+      return;
+    }
+    await saveCurrentNoteIfEditing();
+    await loadNote(nextPath);
   }
 
   async function loadNote(path) {
@@ -1986,7 +2046,6 @@
       updateEditorLineNumbers();
       currentNote = null;
       modeToggleBtn.disabled = true;
-      saveBtn.disabled = true;
       if (noteExportBtn) {
         noteExportBtn.disabled = true;
       }
@@ -2033,12 +2092,34 @@
         method: "PUT",
         body: JSON.stringify({ content: updatedContent }),
       });
-      // Reload to update rendered HTML
+      currentNote.content = updatedContent;
+      // Reload to update rendered HTML and reset to view mode
       await loadNote(currentNote.path);
       await triggerNotesAutoCommit();
     } catch (err) {
       showError(`Failed to save note: ${err.message}`);
     }
+  }
+
+  async function autoSaveCurrentNote() {
+    if (!currentNote) return;
+    try {
+      const updatedContent = editorEl.value;
+      await fetchJSON(`/api/notes/${encodeURIComponent(currentNote.path)}`, {
+        method: "PUT",
+        body: JSON.stringify({ content: updatedContent }),
+      });
+      currentNote.content = updatedContent;
+      await triggerNotesAutoCommit();
+    } catch (err) {
+      showError(`Failed to auto-save note: ${err.message}`);
+    }
+  }
+
+  async function saveCurrentNoteIfEditing() {
+    if (!currentNote) return;
+    if (mode !== "edit") return;
+    await saveCurrentNote();
   }
 
   async function uploadImageFileForNote(notePath, file) {
@@ -2169,6 +2250,7 @@
     }
     try {
       clearError();
+      await saveCurrentNoteIfEditing();
       await fetchJSON("/api/notes", {
         method: "POST",
         body: JSON.stringify({ path }),
@@ -2181,7 +2263,7 @@
         if (el.dataset.path === path) {
           clearSelection();
           el.classList.add("selected");
-          await loadNote(path);
+          await openNotePath(path);
           // Switch to edit mode for the new note
           setMode("edit");
           break;
@@ -2211,6 +2293,7 @@
 
     try {
       clearError();
+      await saveCurrentNoteIfEditing();
       await fetchJSON("/api/rename", {
         method: "POST",
         body: JSON.stringify({ old_path: currentPath, new_path: newPath }),
@@ -2245,6 +2328,7 @@
 
     try {
       clearError();
+      await saveCurrentNoteIfEditing();
       await fetchJSON("/api/delete", {
         method: "POST",
         body: JSON.stringify({ path }),
@@ -2260,7 +2344,6 @@
         updateEditorLineNumbers();
         currentNote = null;
         modeToggleBtn.disabled = true;
-        saveBtn.disabled = true;
         if (noteExportBtn) {
           noteExportBtn.disabled = true;
         }
@@ -2433,14 +2516,13 @@
   });
 
   // Wire up controls
-  modeToggleBtn.addEventListener("click", () => {
+  modeToggleBtn.addEventListener("click", async () => {
     if (!currentNote) return;
-    setMode(mode === "view" ? "edit" : "view");
-  });
-
-  saveBtn.addEventListener("click", () => {
-    if (!currentNote) return;
-    saveCurrentNote();
+    if (mode === "edit") {
+      await saveCurrentNote();
+      return;
+    }
+    setMode("edit");
   });
 
   if (noteExportBtn) {
@@ -2502,6 +2584,7 @@
     draftSettings = { ...savedSettings };
     applySettings(savedSettings);
     updateNotesAutoPullTimerFromSettings();
+    updateAutoSaveTimerFromSettings();
     setupSplitter();
     await loadTree();
     await refreshAppVersionSubtitle();

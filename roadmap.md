@@ -2,12 +2,7 @@
 
 - [ ] Allow user to view images in file tree, and view then in the right pane when selected.
 
-## v1.3.8 - Move env variable to settings modal
-
-- [ ] Move NOTES_ROOT into the settings modal
-- [ ] Move tab_length value to settings modal
-
-## 1.3.7 - Keyboard shortcuts
+## 1.3.8 - Keyboard shortcuts
 
 - [ ] Add tipical keyboard shortcuts when we are using the editor.
   - ctrl+s - manually trigger a save. Do not show the default save dialog moast browsers show.
@@ -15,11 +10,15 @@
   - ctrl+; - insert the current date (format set on settings page)
   - ctrl+shift+; - insert the current time (format set on settings page)
 
+## v1.3.7 - Move env variable to settings modal
+
+- [ ] Move NOTES_ROOT into the settings modal
+- [ ] Move tab_length value to settings modal
 
 ## v1.3.6 - Commit conditions
 
-- [ ] Our current save configuration leaves us suceptable to missing saves. Whatever the save button is doing now, I would like to do the same when we switch from the editor to the reader, when we change notes, when we delete something, when we rename something, when we save settings modal, and finally, when we create a new note. We should also auto save after a period (configurated in the settings modal) 
-- [ ] Remove the save button
+- [x] Our current save configuration leaves us suceptable to missing saves. Whatever the save button is doing now, I would like to do the same when we switch from the editor to the reader, when we change notes, when we delete something, when we rename something, when we save settings modal, and finally, when we create a new note. We should also auto save after a period (configurated in the settings modal) 
+- [x] Remove the save button
 
 ## v1.3.5 - Expand tree context menu
 

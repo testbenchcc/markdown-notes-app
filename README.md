@@ -14,7 +14,8 @@ This application was created with AI.
 - Web UI with:
   - Left pane: icon-based collapsible folder/note tree
   - Right pane: markdown note viewer/editor with line numbers in edit mode
-  - View/Edit toggle and Save button
+  - View/Edit toggle with automatic saving when leaving edit mode, changing notes, creating/renaming/deleting notes, and when applying settings
+  - Optional periodic auto-save while editing, configured via an auto-save interval in the Settings modal
   - Draggable vertical splitter between panes
   - View and edit modes keep scroll position aligned between the reader and editor when toggling
   - Markdown-aware syntax highlighting in the editor that mirrors the viewer for headings, bullets, task checkboxes, and fenced code blocks

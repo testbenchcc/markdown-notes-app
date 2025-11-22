@@ -72,6 +72,20 @@
             </p>
           </div>
           <div class="settings-field">
+            <label class="settings-field-label" for="settings-auto-save-interval">
+              Auto-save interval (seconds)
+            </label>
+            <input
+              type="number"
+              id="settings-auto-save-interval"
+              class="settings-input-number"
+              min="0"
+            />
+            <p class="settings-field-description">
+              When greater than 0, notes in edit mode are automatically saved at this interval. Leave blank or set to 0 to disable periodic auto-save.
+            </p>
+          </div>
+          <div class="settings-field">
             <label class="settings-field-label" for="settings-image-storage-path">
               Image storage subfolder
             </label>
