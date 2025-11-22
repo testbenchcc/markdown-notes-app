@@ -48,6 +48,7 @@ EXPORT_THEME_CSS_MAP: Dict[str, Path] = {
     "gruvbox-dark": BASE_THEME_CSS_PATH,
     "office": APP_ROOT / "static" / "styles-office.css",
     "high-contrast": APP_ROOT / "static" / "styles-high-contrast.css",
+    "midnight": APP_ROOT / "static" / "styles-midnight.css",
 }
 
 DEFAULT_EXPORT_THEME_ID = "gruvbox-dark"

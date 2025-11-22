@@ -1,0 +1,29 @@
+@import url("/static/styles.css");
+
+:root {
+  --md-bg: #0a0f1c;
+  --md-bg-alt: #111827;
+  --md-bg-alt-soft: #1f2937;
+  --md-border-subtle: #4b5563;
+  --md-text-main: #e5e7eb;
+  --md-text-muted: #9ca3af;
+
+  --md-red: #f87171;
+  --md-yellow: #fbbf24;
+  --md-green: #34d399;
+  --md-aqua: #22d3ee;
+  --md-blue: #60a5fa;
+  --md-purple: #c084fc;
+
+  --md-link: #60a5fa;
+  --md-link-hover: #fbbf24;
+  --md-code: #fb923c;
+}
+
+.tree-item.folder .label {
+  color: var(--md-blue);
+}
+
+.tree-item.note .label {
+  color: var(--md-text-main);
+}

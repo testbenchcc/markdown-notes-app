@@ -98,9 +98,12 @@
     "high-contrast": {
       href: "/static/styles-high-contrast.css",
     },
+    "midnight": {
+      href: "/static/styles-midnight.css",
+    },
   };
 
-  const DEFAULT_THEME_ID = "gruvbox-dark";
+  const DEFAULT_THEME_ID = "office";
 
   function applyTheme(themeId) {
     if (!themeLinkEl) {
