@@ -124,7 +124,14 @@
 - [x] Update the file tree to use icons. Use (static\icons\folder-closed.png) for the closed folders and  (static\icons\folder-open.png) open folders. Use (static\icons\file-single.png) for the files. 
 - [x] Make the files and folders different collors if possible. Subtle.
 
+## v1.3.0 - Small UI adjustment
+
+- [x] Reformat `Build 37 | Tag v1.2.9` in the tree pane footer with `<tag icon> <tag>.<build>`. I have added a new image `static\icons\tag.png`
+  - Related files: 
+    - static\index.html
+- [x] Change settings modal to always be 90vh, when content does not fit, use vertical scroll bars.
+
 ## - trouble items
 
-- [-] When switching between editor and reader modes, keep note scroll positions aligned
-- [-] When a new note is created, automatically switch to it and enter edit mode
+- [ ] When switching between editor and reader modes, keep note scroll positions aligned
+- [ ] When a new note is created, automatically switch to it and enter edit mode

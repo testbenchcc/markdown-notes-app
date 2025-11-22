@@ -22,10 +22,10 @@ This application was created with AI.
   - Remembers the last opened note per browser (localStorage)
   - Theme support with a Gruvbox-inspired dark default (based on Obsidian Gruvbox), plus Office and High Contrast themes
 - Simple text search across markdown notes
-- Settings modal (via the file tree footer Settings button with a gear icon) with per-browser preferences, including options to enable spellcheck in the editor, select the UI theme, choose a default theme for exported HTML notes, and access notebook export/import controls
+- Settings modal (via the file tree footer Settings button with a gear icon), sized to 80vw by 90vh with vertically scrollable content when needed, with per-browser preferences including options to enable spellcheck in the editor, select the UI theme, choose a default theme for exported HTML notes, and access notebook export/import controls
  - Notebook-level settings are stored in a JSON file under the notes root so they travel with exported/imported notebooks.
  - Dot-prefixed files and folders are automatically hidden from the notes tree and search results to keep the notebook view clean.
-- Configurable index page title and file tree footer status showing the current app build number and git tag (when available)
+- Configurable index page title and file tree footer status showing the current app build number and git tag (when available), displayed with a tag icon and `<tag>.<build>` text (for example `v1.2.9.37`)
 - Improved markdown rendering: fenced code blocks with syntax highlighting, tables with clear outlines, and task list checkboxes with proper indentation
 - Mermaid diagrams rendered from fenced code blocks labeled `mermaid` in the in-app viewer and in exported HTML notes
 - No authentication or user accounts

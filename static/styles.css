@@ -16,9 +16,9 @@ body {
   --md-border-subtle: #3c3836;
   --md-text-main: #ebdbb2;
   --md-text-muted: #bdae93;
-  --md-red: #cc241d;
-  --md-yellow: #d79921;
-  --md-green: #98971a;
+  --md-h1: #cc241d;
+  --md-h2: #d79921;
+  --md-h3: #98971a;
   --md-aqua: #8ec07c;
   --md-blue: #458588;
   --md-purple: #b16286;
@@ -73,7 +73,7 @@ body {
 
 .error-banner {
   padding: 0.4rem 1rem;
-  background: var(--md-red);
+  background: var(--md-h1);
   color: var(--md-text-main);
   font-size: 0.8rem;
   border-bottom: 1px solid var(--md-border-subtle);
@@ -133,11 +133,25 @@ body {
 }
 
 .nav-footer-build {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#build-tag-text {
   flex: 1 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.nav-footer-build .icon-btn-image {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
 }
 
 .nav-footer-actions {
@@ -234,8 +248,8 @@ body {
 }
 
 .icon-btn-image {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   display: block;
 }
 
@@ -475,21 +489,21 @@ body.resizing {
 .content-view h1 {
   font-size: 1.4rem;
   margin-bottom: 0.5rem;
-  color: var(--md-red);
+  color: var(--md-h1);
 }
 
 .content-view h2 {
   font-size: 1.2rem;
   margin-top: 1rem;
   margin-bottom: 0.4rem;
-  color: var(--md-yellow);
+  color: var(--md-h2);
 }
 
 .content-view h3 {
   font-size: 1rem;
   margin-top: 0.8rem;
   margin-bottom: 0.3rem;
-  color: var(--md-green);
+  color: var(--md-h3);
 }
 
 .content-view p {
@@ -553,7 +567,7 @@ body.resizing {
 }
 
 .content-view blockquote {
-  border-left: 3px solid var(--md-yellow);
+  border-left: 3px solid var(--md-h2);
   padding-left: 0.75rem;
   color: var(--md-text-muted);
   margin-bottom: 0.5rem;
@@ -617,6 +631,7 @@ body.resizing {
 
 .settings-modal {
   width: 80vw;
+  height: 90vh;
   max-width: 1100px;
   max-height: 90vh;
   display: flex;
@@ -668,8 +683,8 @@ body.resizing {
 
 .settings-body {
   display: flex;
-  min-height: 280px;
-  max-height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .settings-nav {
@@ -680,6 +695,7 @@ body.resizing {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  overflow-y: auto;
 }
 
 .settings-nav-item {
@@ -708,7 +724,7 @@ body.resizing {
 }
 
 .settings-nav-item-dirty {
-  color: var(--md-yellow);
+  color: var(--md-h2);
 }
 
 .settings-content {

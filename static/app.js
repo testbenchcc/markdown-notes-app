@@ -803,20 +803,23 @@
       const build =
         typeof data.build_number === "number" ? data.build_number : null;
       const tag = data.latest_tag || null;
-      const parts = [];
-      if (build !== null) {
-        parts.push(`Build ${build}`);
+      const textEl = navFooterBuildEl.querySelector("#build-tag-text");
+      if (textEl) {
+        if (tag && build !== null) {
+          textEl.textContent = `${tag}.${build}`;
+        } else if (tag) {
+          textEl.textContent = tag;
+        } else if (build !== null) {
+          textEl.textContent = `Build ${build}`;
+        } else {
+          textEl.textContent = "";
+        }
       }
-      if (tag) {
-        parts.push(`Tag ${tag}`);
-      }
-      if (!parts.length) {
-        navFooterBuildEl.textContent = "";
-        return;
-      }
-      navFooterBuildEl.textContent = parts.join(" | ");
     } catch (err) {
-      navFooterBuildEl.textContent = "";
+      const textEl = navFooterBuildEl.querySelector("#build-tag-text");
+      if (textEl) {
+        textEl.textContent = "";
+      }
     }
   }
 
