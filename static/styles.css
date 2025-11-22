@@ -19,6 +19,9 @@ body {
   --md-h1: #cc241d;
   --md-h2: #d79921;
   --md-h3: #98971a;
+  --md-h4: #458588;
+  --md-h5: #b16286;
+  --md-h6: #8ec07c;
   --md-aqua: #8ec07c;
   --md-blue: #458588;
   --md-purple: #b16286;
@@ -456,7 +459,7 @@ body.resizing {
 
 .editor-highlighter-content {
   min-height: 100%;
-  white-space: pre;
+  white-space: pre-wrap;
 }
 
 .editor-highlighter {
@@ -497,11 +500,20 @@ body.resizing {
   color: var(--md-h2);
 }
 
-.editor-highlighter .tok-h3,
-.editor-highlighter .tok-h4,
-.editor-highlighter .tok-h5,
-.editor-highlighter .tok-h6 {
+.editor-highlighter .tok-h3 {
   color: var(--md-h3);
+}
+
+.editor-highlighter .tok-h4 {
+  color: var(--md-h4);
+}
+
+.editor-highlighter .tok-h5 {
+  color: var(--md-h5);
+}
+
+.editor-highlighter .tok-h6 {
+  color: var(--md-h6);
 }
 
 .editor-highlighter .tok-bullet,
@@ -536,6 +548,10 @@ body.resizing {
 
 .editor-highlighter .tok-code-comment {
   color: var(--md-text-muted);
+}
+
+.editor-highlighter .tok-inline-code {
+  color: var(--md-code);
 }
 
 .content-edit {
@@ -591,6 +607,27 @@ body.resizing {
   margin-top: 0.8rem;
   margin-bottom: 0.3rem;
   color: var(--md-h3);
+}
+
+.content-view h4 {
+  font-size: 0.95rem;
+  margin-top: 0.7rem;
+  margin-bottom: 0.25rem;
+  color: var(--md-h4);
+}
+
+.content-view h5 {
+  font-size: 0.9rem;
+  margin-top: 0.6rem;
+  margin-bottom: 0.2rem;
+  color: var(--md-h5);
+}
+
+.content-view h6 {
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.2rem;
+  color: var(--md-h6);
 }
 
 .content-view p {

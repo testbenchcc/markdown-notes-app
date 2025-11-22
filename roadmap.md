@@ -146,3 +146,18 @@
 - [ ] Use a text based reference in the editor, and render the image in the reader.
 - [ ] Allow for an image label and alignment (for image) in the text reference. Place the label in the bottom center of the photo.
 - [ ] When an image is clicked, open it in a full screen modal so that it can be viewed in its entirety.
+
+## v1.3.5 - Expand tree context menu
+
+- [ ] Add an expand all in folder, expand all, and collapse all options. 
+
+## v1.3.6 - Commit conditions
+
+- [ ] Our current save configuration leaves us suceptable to missing saves. Whatever the save button is doing now, I would like to do the same when we switch from the editor to the reader, when we change notes, when we delete something, when we rename something, and finally, when we create a new note. We should also auto save after a period (configurated in the settings modal) 
+- [ ] Remove the save button
+
+## 1.3.7 - Keyboard shortcuts
+
+- [ ] Add tipical keyboard shortcuts when we are using the editor.
+  - ctrl+s: manually trigger a save. Do not show the default save dialog moast browsers show.
+  - tab: insert a tab. This currently being used for screen navigation by the system. 

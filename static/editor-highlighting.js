@@ -29,9 +29,48 @@
       .replace(/>/g, "&gt;");
   }
 
+  function highlightInlineCode(text) {
+    if (!text) {
+      return "";
+    }
+
+    const re = /`([^`]+)`/g;
+    let lastIndex = 0;
+    let result = "";
+    let match;
+
+    while ((match = re.exec(text)) !== null) {
+      const before = text.slice(lastIndex, match.index);
+      if (before) {
+        result += escapeHtml(before);
+      }
+      const codeWithDelimiters = match[0];
+      result += `<span class="tok-inline-code">${escapeHtml(codeWithDelimiters)}</span>`;
+      lastIndex = match.index + match[0].length;
+    }
+
+    const after = text.slice(lastIndex);
+    if (after) {
+      result += escapeHtml(after);
+    }
+
+    if (!result) {
+      result = escapeHtml(text);
+    }
+
+    return result;
+  }
+
   function highlightCodeTokens(line, fenceLang) {
     if (!line) {
       return "";
+    }
+
+    const trimmed = line.trim();
+    // If the line looks like a single filename / token (letters, digits, dot, dash, underscore),
+    // skip token-level highlighting so we don't introduce confusing markup into things like CSV names.
+    if (/^[A-Za-z0-9._-]+$/.test(trimmed)) {
+      return escapeHtml(line);
     }
 
     let escaped = escapeHtml(line);
@@ -105,9 +144,8 @@
       const headingMatch = rawLine.match(/^(#{1,6})\s+.*$/);
       if (headingMatch) {
         const level = headingMatch[1].length;
-        htmlLine = `<span class="tok-heading tok-h${level}">${escapeHtml(
-          rawLine
-        )}</span>`;
+        const headingHtml = highlightInlineCode(rawLine);
+        htmlLine = `<span class="tok-heading tok-h${level}">${headingHtml}</span>`;
         highlighted.push(htmlLine || "&nbsp;");
         continue;
       }
@@ -117,9 +155,10 @@
         const indent = taskMatch[1] || "";
         const box = taskMatch[2] || " ";
         const body = taskMatch[3] || "";
+        const bodyHtml = highlightInlineCode(body);
         htmlLine = `${escapeHtml(indent)}<span class="tok-bullet">-</span> <span class="tok-task-box">[${escapeHtml(
           box
-        )}]</span> <span class="tok-task-text">${escapeHtml(body)}</span>`;
+        )}]</span> <span class="tok-task-text">${bodyHtml}</span>`;
         highlighted.push(htmlLine || "&nbsp;");
         continue;
       }
@@ -128,13 +167,13 @@
       if (bulletMatch) {
         const indent = bulletMatch[1] || "";
         const body = bulletMatch[2] || "";
-        htmlLine = `${escapeHtml(indent)}<span class="tok-bullet">-</span> <span class="tok-bullet-text">${escapeHtml(
-          body
-        )}</span>`;
+        const bodyHtml = highlightInlineCode(body);
+        htmlLine = `${escapeHtml(indent)}<span class="tok-bullet">-</span> <span class="tok-bullet-text">${bodyHtml}</span>`;
         highlighted.push(htmlLine || "&nbsp;");
         continue;
       }
 
+      htmlLine = highlightInlineCode(rawLine);
       highlighted.push(htmlLine || "&nbsp;");
     }
 
