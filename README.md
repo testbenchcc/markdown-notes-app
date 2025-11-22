@@ -12,7 +12,7 @@ This application was created with AI.
 - Notes stored as plain `.md` files under the `notes/` folder
 - Folders are treated as categories
 - Web UI with:
-  - Left pane: collapsible folder/note tree
+  - Left pane: icon-based collapsible folder/note tree
   - Right pane: markdown note viewer/editor with line numbers in edit mode
   - View/Edit toggle and Save button
   - Draggable vertical splitter between panes

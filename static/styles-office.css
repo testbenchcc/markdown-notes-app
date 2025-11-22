@@ -17,3 +17,11 @@
   --md-link-hover: #1d4ed8;
   --md-code: #0f766e;
 }
+
+.tree-item.folder .label {
+  color: var(--md-blue);
+}
+
+.tree-item.note .label {
+  color: var(--md-text-main);
+}

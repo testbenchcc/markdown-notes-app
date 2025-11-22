@@ -118,6 +118,12 @@
 - [x] Markdown checkboxes are not rendering (implemented)
 - [x] Indentations are not rendering. Some indents are 2 spaces. (implemented)
 
+## v1.2.9 - New notes and file tree
+
+- [x] Creating a new and deleting notes closes all items in the file tree. The file tree items should only close after the page loads. 
+- [x] Update the file tree to use icons. Use (static\icons\folder-closed.png) for the closed folders and  (static\icons\folder-open.png) open folders. Use (static\icons\file-single.png) for the files. 
+- [x] Make the files and folders different collors if possible. Subtle.
+
 ## - trouble items
 
 - [-] When switching between editor and reader modes, keep note scroll positions aligned

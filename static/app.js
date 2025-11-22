@@ -53,6 +53,8 @@
   let lastViewerScrollTop = 0;
   let lastEditorScrollTop = 0;
 
+  let expandedFolderPaths = new Set();
+
   function updateEditorLineNumbers() {
     if (!editorEl || !editorLineNumbersEl) {
       return;
@@ -1327,12 +1329,46 @@
     try {
       clearError();
       hideContextMenu();
+      captureExpandedFolders();
       const tree = await fetchJSON("/api/tree");
       renderTree(tree);
     } catch (err) {
       treeContainer.textContent = "Failed to load tree.";
       showError(`Failed to load tree: ${err.message}`);
     }
+  }
+
+  function captureExpandedFolders() {
+    if (!treeContainer) return;
+    const items = treeContainer.querySelectorAll(".tree-item.folder.expanded");
+    const next = new Set();
+    items.forEach((item) => {
+      const path = item.dataset.path;
+      if (typeof path === "string" && path) {
+        next.add(path);
+      }
+    });
+    expandedFolderPaths = next;
+  }
+
+  function restoreExpandedFolders() {
+    if (!treeContainer || !expandedFolderPaths || expandedFolderPaths.size === 0) {
+      return;
+    }
+    const items = treeContainer.querySelectorAll(".tree-item.folder");
+    items.forEach((item) => {
+      const path = item.dataset.path;
+      if (typeof path === "string" && expandedFolderPaths.has(path)) {
+        const childrenContainer = item.nextElementSibling;
+        if (
+          childrenContainer &&
+          childrenContainer.classList.contains("tree-children")
+        ) {
+          item.classList.add("expanded");
+          childrenContainer.style.display = "block";
+        }
+      }
+    });
   }
 
   function renderTree(root) {
@@ -1348,6 +1384,7 @@
     root.children.forEach((child) => {
       renderNode(child, treeContainer, 0);
     });
+    restoreExpandedFolders();
     restoreLastSelection();
   }
 
@@ -1414,6 +1451,10 @@
     item.classList.add("tree-item", node.type);
 
     item.dataset.path = typeof node.path === "string" ? node.path : "";
+
+    const icon = document.createElement("span");
+    icon.classList.add("tree-icon");
+    item.appendChild(icon);
 
     const label = document.createElement("span");
     label.classList.add("label");
