@@ -58,9 +58,9 @@
 - [x] Initialize and connect a dedicated Git repository for the notes folder (`notes/`), using the remote `https://github.com/testbenchcc/markdown-notes.git`.
 - [x] Add a setting to automatically commit changes inside the notes folder and push them to the dedicated notes repository.
 - [x] Add a setting to automatically pull updates from the dedicated notes repository.
-- [] Add settings for the notes repository location (local path under `notes/` and remote URL) and the GitHub API key.
+- [x] Add settings for the notes repository location (local path under `notes/` and remote URL) and the GitHub API key.
   - Always commit and push local notes changes before pulling from the notes repository. Do not push if the local branch is out of sync with its remote. This should not happen since I am the only user, but the safeguard still needs to be there.
-- [] Add a setting to auto pull when a new version of the application is released. Include an interval setting for how often to check. Ensure that application auto-pull never overwrites the `notes/` folder, since it is now a separate, git-ignored notes repository. Usse the remote `https://github.com/testbenchcc/markdown-notes-app.git`
+- [x] Add a setting to auto pull when a new version of the application is released. Include an interval setting for how often to check. Ensure that application auto-pull never overwrites the `notes/` folder, since it is now a separate, git-ignored notes repository. Usse the remote `https://github.com/testbenchcc/markdown-notes-app.git`
 
 ## v1.1.8 - Update sub-title 
 

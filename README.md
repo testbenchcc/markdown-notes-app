@@ -24,6 +24,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
 - Optional auto-commit and push of notes to a dedicated Git repository under `notes/` (when enabled in Settings)
  - Optional periodic auto-pull of notes from the dedicated notes repository, using a configurable interval (when enabled in Settings)
+ - Optional periodic auto-pull of application updates from the app repository remote, using a configurable interval (when enabled in Settings)
 
 ## Requirements
 
@@ -113,4 +114,5 @@ See `roadmap.md` for a Markdown task-list of enhancements (search, dark mode, ex
 ## Needed APIs
 
 - If auto push is configured in the settings a Github fine-grained personal access token with Content read/write is needed.
+ - Environment variables are loaded from a local `.env` file (using `python-dotenv`). Define values such as `GITHUB_API_KEY`, `NOTES_REPO_REMOTE_URL`, and `APP_REPO_REMOTE_URL` there as needed.
 

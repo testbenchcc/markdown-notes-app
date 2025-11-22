@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any, Dict
 import html as html_module
 
+from dotenv import load_dotenv
 import markdown
 from fastapi import FastAPI, HTTPException, Query, File, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, HTMLResponse
@@ -37,6 +38,7 @@ from pydantic import BaseModel
 
 # Determine application root based on this file location.
 APP_ROOT = Path(__file__).resolve().parent
+load_dotenv()
 
 BASE_THEME_CSS_PATH = APP_ROOT / "static" / "styles.css"
 
@@ -61,6 +63,7 @@ else:
 
 
 NOTES_REPO_REMOTE_URL = os.getenv("NOTES_REPO_REMOTE_URL") or "https://github.com/testbenchcc/markdown-notes.git"
+APP_REPO_REMOTE_URL = os.getenv("APP_REPO_REMOTE_URL") or "https://github.com/testbenchcc/markdown-notes-app.git"
 
 
 class SaveNoteRequest(BaseModel):
@@ -189,6 +192,15 @@ def _ensure_notes_repo_initialized() -> None:
         add_remote = _run_notes_git(["remote", "add", "origin", NOTES_REPO_REMOTE_URL])
         if add_remote.returncode != 0:
             raise HTTPException(status_code=500, detail="Failed to configure notes git remote")
+    elif "origin" in names and NOTES_REPO_REMOTE_URL:
+        current_url_result = _run_notes_git(["remote", "get-url", "origin"])
+        if current_url_result.returncode == 0:
+            current_url_raw = current_url_result.stdout.strip()
+            current_url = current_url_raw.splitlines()[0] if current_url_raw else ""
+            if current_url == APP_REPO_REMOTE_URL:
+                set_result = _run_notes_git(["remote", "set-url", "origin", NOTES_REPO_REMOTE_URL])
+                if set_result.returncode != 0:
+                    raise HTTPException(status_code=500, detail="Failed to configure notes git remote")
 
 
 def _notes_repo_has_changes() -> bool:
@@ -288,6 +300,82 @@ def auto_pull_notes() -> Dict[str, Any]:
         "before": state_before,
         "after": state_after,
         "commit_result": commit_result,
+    }
+
+
+def _run_app_git(args: list[str]) -> subprocess.CompletedProcess:
+    try:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=str(APP_ROOT),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    except Exception:
+        raise HTTPException(status_code=500, detail="App git command failed")
+    return completed
+
+
+def _ensure_app_repo_initialized() -> None:
+    git_dir = APP_ROOT / ".git"
+    if not git_dir.is_dir():
+        raise HTTPException(status_code=500, detail="App git repository not found")
+    remotes_result = _run_app_git(["remote"])
+    if remotes_result.returncode == 0:
+        names = {line.strip() for line in remotes_result.stdout.splitlines() if line.strip()}
+    else:
+        names = set()
+    if "origin" not in names and APP_REPO_REMOTE_URL:
+        add_remote = _run_app_git(["remote", "add", "origin", APP_REPO_REMOTE_URL])
+        if add_remote.returncode != 0:
+            raise HTTPException(status_code=500, detail="Failed to configure app git remote")
+
+
+def _app_repo_sync_state() -> str:
+    head = _run_app_git(["rev-parse", "@"])  # type: ignore[list-item]
+    if head.returncode != 0:
+        return "unknown"
+    upstream = _run_app_git(["rev-parse", "@{u}"])
+    if upstream.returncode != 0:
+        return "no_upstream"
+    base = _run_app_git(["merge-base", "@", "@{u}"])
+    if base.returncode != 0:
+        return "unknown"
+    head_sha = head.stdout.strip()
+    upstream_sha = upstream.stdout.strip()
+    base_sha = base.stdout.strip()
+    if not head_sha or not upstream_sha or not base_sha:
+        return "unknown"
+    if head_sha == upstream_sha:
+        return "up_to_date"
+    if head_sha == base_sha:
+        return "behind"
+    if upstream_sha == base_sha:
+        return "ahead"
+    return "diverged"
+
+
+def auto_pull_app_repo() -> Dict[str, Any]:
+    _ensure_app_repo_initialized()
+    state_before = _app_repo_sync_state()
+    if state_before in {"diverged"}:
+        return {"ok": False, "pulled": False, "reason": state_before}
+    if state_before == "no_upstream":
+        return {"ok": False, "pulled": False, "reason": "no_upstream"}
+    pull_result = _run_app_git(["pull", "--ff-only"])
+    if pull_result.returncode != 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Failed to pull app repository (non fast-forward or other error)",
+        )
+    state_after = _app_repo_sync_state()
+    return {
+        "ok": True,
+        "pulled": True,
+        "before": state_before,
+        "after": state_after,
     }
 
 
@@ -799,3 +887,41 @@ async def versioning_notes_commit_and_push() -> Dict[str, Any]:
 @app.post("/api/versioning/notes/pull")
 async def versioning_notes_pull() -> Dict[str, Any]:
     return auto_pull_notes()
+
+
+@app.post("/api/versioning/app/pull")
+async def versioning_app_pull() -> Dict[str, Any]:
+    return auto_pull_app_repo()
+
+
+@app.get("/api/versioning/status")
+async def versioning_status() -> Dict[str, Any]:
+    ensure_notes_root()
+    _ensure_notes_repo_initialized()
+    notes_root_str = str(NOTES_ROOT.resolve())
+    notes_remote = None
+    try:
+        notes_remote_result = _run_notes_git(["remote", "get-url", "origin"])
+        if notes_remote_result.returncode == 0:
+            value = notes_remote_result.stdout.strip()
+            if value:
+                notes_remote = value.splitlines()[0]
+    except HTTPException:
+        notes_remote = None
+    app_remote = None
+    try:
+        app_remote_result = _run_app_git(["remote", "get-url", "origin"])
+        if app_remote_result.returncode == 0:
+            value = app_remote_result.stdout.strip()
+            if value:
+                app_remote = value.splitlines()[0]
+    except HTTPException:
+        app_remote = None
+    github_configured = bool(os.getenv("GITHUB_API_KEY"))
+    return {
+        "notes_root": notes_root_str,
+        "notes_remote_url": notes_remote or NOTES_REPO_REMOTE_URL,
+        "app_root": str(APP_ROOT),
+        "app_remote_url": app_remote or APP_REPO_REMOTE_URL,
+        "github_api_key_configured": github_configured,
+    }

@@ -85,6 +85,41 @@
               How often to check for and pull updates when automatic notes pulling is enabled.
             </p>
           </div>
+          <div class="settings-field">
+            <label class="settings-field-label">
+              <input type="checkbox" id="settings-auto-pull-app" />
+              Automatically pull application updates when a new version is available
+            </label>
+            <p class="settings-field-description">
+              When enabled, the app code repository will be periodically pulled from its remote to pick up new versions.
+            </p>
+          </div>
+          <div class="settings-field">
+            <label class="settings-field-label" for="settings-auto-pull-app-interval">
+              Application auto-pull interval (minutes)
+            </label>
+            <input
+              type="number"
+              id="settings-auto-pull-app-interval"
+              class="settings-input-number"
+              min="1"
+            />
+            <p class="settings-field-description">
+              How often to check for and pull application updates when automatic app pulling is enabled.
+            </p>
+          </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Repositories & GitHub API</div>
+            <p class="settings-field-description">
+              Notes repo path: <code id="versioning-notes-root">Loading…</code>
+            </p>
+            <p class="settings-field-description">
+              Notes remote URL: <code id="versioning-notes-remote-url">Loading…</code>
+            </p>
+            <p class="settings-field-description">
+              GitHub API key: <span id="versioning-github-api-key-status">Loading…</span>
+            </p>
+          </div>
         </section>
         <section class="settings-category-panel hidden" data-category="appearance">
           <h3 class="settings-category-title">Appearance</h3>

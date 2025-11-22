@@ -45,6 +45,13 @@
   let settingsAutoPullIntervalInput = null;
 
   let notesAutoPullTimerId = null;
+  let settingsAutoPullAppInput = null;
+  let settingsAutoPullAppIntervalInput = null;
+  let appAutoPullTimerId = null;
+
+  let versioningNotesRootEl = null;
+  let versioningNotesRemoteUrlEl = null;
+  let versioningGithubApiKeyStatusEl = null;
 
   const THEME_DEFINITIONS = {
     "gruvbox-dark": {
@@ -85,6 +92,8 @@
       autoCommitNotes: false,
       autoPullNotes: false,
       autoPullIntervalMinutes: 30,
+      autoPullAppOnRelease: false,
+      autoPullAppIntervalMinutes: 60,
     };
   }
 
@@ -177,7 +186,18 @@
     const intervalDirty =
       Number(draftSettings.autoPullIntervalMinutes || 0) !==
       Number(savedSettings.autoPullIntervalMinutes || 0);
-    const dirty = autoCommitDirty || autoPullDirty || intervalDirty;
+    const appAutoPullDirty =
+      !!draftSettings.autoPullAppOnRelease !==
+      !!savedSettings.autoPullAppOnRelease;
+    const appIntervalDirty =
+      Number(draftSettings.autoPullAppIntervalMinutes || 0) !==
+      Number(savedSettings.autoPullAppIntervalMinutes || 0);
+    const dirty =
+      autoCommitDirty ||
+      autoPullDirty ||
+      intervalDirty ||
+      appAutoPullDirty ||
+      appIntervalDirty;
     setSettingsCategoryDirty("versioning", dirty);
   }
 
@@ -197,6 +217,13 @@
     if (settingsAutoPullIntervalInput) {
       const minutes = draftSettings.autoPullIntervalMinutes || 0;
       settingsAutoPullIntervalInput.value = minutes > 0 ? String(minutes) : "";
+    }
+    if (settingsAutoPullAppInput) {
+      settingsAutoPullAppInput.checked = !!draftSettings.autoPullAppOnRelease;
+    }
+    if (settingsAutoPullAppIntervalInput) {
+      const minutes = draftSettings.autoPullAppIntervalMinutes || 0;
+      settingsAutoPullAppIntervalInput.value = minutes > 0 ? String(minutes) : "";
     }
     if (settingsThemeSelect) {
       const themeId = draftSettings.theme || DEFAULT_THEME_ID;
@@ -235,6 +262,17 @@
     );
     settingsAutoPullIntervalInput = root.querySelector(
       "#settings-auto-pull-interval"
+    );
+    settingsAutoPullAppInput = root.querySelector("#settings-auto-pull-app");
+    settingsAutoPullAppIntervalInput = root.querySelector(
+      "#settings-auto-pull-app-interval"
+    );
+    versioningNotesRootEl = root.querySelector("#versioning-notes-root");
+    versioningNotesRemoteUrlEl = root.querySelector(
+      "#versioning-notes-remote-url"
+    );
+    versioningGithubApiKeyStatusEl = root.querySelector(
+      "#versioning-github-api-key-status"
     );
 
     function selectCategory(categoryId) {
@@ -320,6 +358,36 @@
       });
     }
 
+    if (settingsAutoPullAppInput) {
+      settingsAutoPullAppInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        draftSettings.autoPullAppOnRelease =
+          !!settingsAutoPullAppInput.checked;
+        updateVersioningCategoryDirty();
+      });
+    }
+
+    if (settingsAutoPullAppIntervalInput) {
+      settingsAutoPullAppIntervalInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const raw = settingsAutoPullAppIntervalInput.value;
+        let minutes = parseInt(raw, 10);
+        if (!Number.isFinite(minutes) || minutes <= 0) {
+          minutes = 0;
+        }
+        draftSettings.autoPullAppIntervalMinutes = minutes;
+        updateVersioningCategoryDirty();
+      });
+    }
+
     if (settingsThemeSelect) {
       settingsThemeSelect.addEventListener("change", () => {
         if (!draftSettings) {
@@ -358,6 +426,7 @@
       applySettings(savedSettings);
       clearAllSettingsCategoryDirty();
       updateNotesAutoPullTimerFromSettings();
+      updateAppAutoPullTimerFromSettings();
       closeSettingsModal();
     }
 
@@ -450,6 +519,7 @@
     clearAllSettingsCategoryDirty();
     updateGeneralCategoryDirty();
     updateVersioningCategoryDirty();
+    refreshVersioningStatus();
     settingsOverlayEl.classList.remove("hidden");
     document.body.classList.add("settings-open");
     const firstNav = settingsOverlayEl.querySelector(".settings-nav-item");
@@ -464,6 +534,33 @@
     }
     settingsOverlayEl.classList.add("hidden");
     document.body.classList.remove("settings-open");
+  }
+
+  async function refreshVersioningStatus() {
+    try {
+      const data = await fetchJSON("/api/versioning/status");
+      if (versioningNotesRootEl) {
+        versioningNotesRootEl.textContent = data.notes_root || "Unknown";
+      }
+      if (versioningNotesRemoteUrlEl) {
+        versioningNotesRemoteUrlEl.textContent =
+          data.notes_remote_url || "Unknown";
+      }
+      if (versioningGithubApiKeyStatusEl) {
+        versioningGithubApiKeyStatusEl.textContent =
+          data.github_api_key_configured ? "Configured" : "Not configured";
+      }
+    } catch (err) {
+      if (versioningNotesRootEl) {
+        versioningNotesRootEl.textContent = "Unavailable";
+      }
+      if (versioningNotesRemoteUrlEl) {
+        versioningNotesRemoteUrlEl.textContent = "Unavailable";
+      }
+      if (versioningGithubApiKeyStatusEl) {
+        versioningGithubApiKeyStatusEl.textContent = "Unavailable";
+      }
+    }
   }
 
   function updateNotesAutoPullTimerFromSettings() {
@@ -482,6 +579,25 @@
     const intervalMs = minutes * 60 * 1000;
     notesAutoPullTimerId = window.setInterval(() => {
       triggerNotesAutoPull();
+    }, intervalMs);
+  }
+
+  function updateAppAutoPullTimerFromSettings() {
+    if (appAutoPullTimerId !== null) {
+      window.clearInterval(appAutoPullTimerId);
+      appAutoPullTimerId = null;
+    }
+    const settings = savedSettings || getDefaultSettings();
+    if (!settings.autoPullAppOnRelease) {
+      return;
+    }
+    const minutes = Number(settings.autoPullAppIntervalMinutes || 0);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return;
+    }
+    const intervalMs = minutes * 60 * 1000;
+    appAutoPullTimerId = window.setInterval(() => {
+      triggerAppAutoPullCheck();
     }, intervalMs);
   }
 
@@ -1132,6 +1248,21 @@
     }
   }
 
+  async function triggerAppAutoPullCheck() {
+    try {
+      const settings = savedSettings || getDefaultSettings();
+      if (!settings.autoPullAppOnRelease) {
+        return;
+      }
+      await fetchJSON("/api/versioning/app/pull", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+    } catch (err) {
+      showError(`Failed to pull application updates: ${err.message}`);
+    }
+  }
+
   async function saveCurrentNote() {
     if (!currentNote) return;
     try {
@@ -1533,6 +1664,7 @@
   draftSettings = { ...savedSettings };
   applySettings(savedSettings);
   updateNotesAutoPullTimerFromSettings();
+  updateAppAutoPullTimerFromSettings();
 
   setupSplitter();
   loadTree();
