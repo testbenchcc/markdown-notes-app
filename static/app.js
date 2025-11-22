@@ -844,6 +844,30 @@
     }
   }
 
+  function renderMermaidInViewer() {
+    if (!viewerEl) {
+      return;
+    }
+    const mermaidGlobal = window.mermaid;
+    if (!mermaidGlobal) {
+      return;
+    }
+    const targets = Array.from(viewerEl.querySelectorAll(".mermaid"));
+    if (!targets.length) {
+      return;
+    }
+    try {
+      if (typeof mermaidGlobal.initialize === "function") {
+        mermaidGlobal.initialize({ startOnLoad: false });
+      }
+      if (typeof mermaidGlobal.init === "function") {
+        mermaidGlobal.init(undefined, targets);
+      } else if (typeof mermaidGlobal.run === "function") {
+        mermaidGlobal.run({ nodes: targets });
+      }
+    } catch (e) {}
+  }
+
   async function downloadExport() {
     try {
       clearError();
@@ -1266,6 +1290,7 @@
       noteNameEl.textContent = note.name;
       notePathEl.textContent = note.path;
       viewerEl.innerHTML = note.html || "";
+      renderMermaidInViewer();
       editorEl.value = note.content || "";
       modeToggleBtn.disabled = false;
       if (noteExportBtn) {

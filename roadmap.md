@@ -98,14 +98,8 @@
 
 ## v1.2.4 - Markdown formating improvements
 
-- [] Markdown tables width should not expand to fit the window or panes width. Fit to the contents of the table.
-- [] When code is marked as mermaid 
-
-```
-```mermaid
-```
-
-Render the chart/graph in the notes
+- [x] Markdown tables width should not expand to fit the window or panes width. Fit to the contents of the table. (implemented)
+- [x] When code is marked as mermaid (a fenced code block starting with ```mermaid), render the chart/graph in the notes viewer. (implemented)
 
 ## - trouble items
 

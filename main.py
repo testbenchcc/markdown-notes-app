@@ -21,6 +21,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import zipfile
@@ -122,6 +123,25 @@ def _resolve_relative_path(relative_path: str) -> Path:
         raise HTTPException(status_code=400, detail="Path escapes notes root")
 
     return full
+
+
+def _preprocess_mermaid_fences(text: str) -> str:
+    """Rewrite ```mermaid fenced blocks into <div class="mermaid"> blocks.
+
+    This allows the frontend to simply run Mermaid on `.mermaid` elements
+    without needing to inspect markdown code blocks.
+    """
+
+    if not text:
+        return text
+
+    pattern = re.compile(r"```mermaid\s*\n(.*?)\n```", re.IGNORECASE | re.DOTALL)
+
+    def _replace(match: re.Match[str]) -> str:
+        body = match.group(1)
+        return f"<div class=\"mermaid\">\n{body}\n</div>"
+
+    return pattern.sub(_replace, text)
 
 
 class NotebookSettings(BaseModel):
@@ -533,8 +553,9 @@ async def get_note(note_path: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Not a markdown file")
 
     raw = file_path.read_text(encoding="utf-8")
+    processed = _preprocess_mermaid_fences(raw)
     html = markdown.markdown(
-        raw,
+        processed,
         extensions=["extra", "codehilite"],
         extension_configs={"codehilite": {"guess_lang": False, "noclasses": True}},
     )
@@ -562,8 +583,9 @@ async def export_note_html(note_path: str, theme: str | None = None) -> HTMLResp
         raise HTTPException(status_code=400, detail="Not a markdown file")
 
     raw = file_path.read_text(encoding="utf-8")
+    processed = _preprocess_mermaid_fences(raw)
     body_html = markdown.markdown(
-        raw,
+        processed,
         extensions=["extra", "codehilite"],
         extension_configs={"codehilite": {"guess_lang": False, "noclasses": True}},
     )
