@@ -32,6 +32,7 @@ import html as html_module
 
 from dotenv import load_dotenv
 import markdown
+import requests
 from fastapi import FastAPI, HTTPException, Query, File, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -376,7 +377,6 @@ def auto_pull_notes() -> Dict[str, Any]:
         "commit_result": commit_result,
     }
 
-
 def _run_app_git(args: list[str]) -> subprocess.CompletedProcess:
     try:
         completed = subprocess.run(
@@ -390,6 +390,114 @@ def _run_app_git(args: list[str]) -> subprocess.CompletedProcess:
     except Exception:
         raise HTTPException(status_code=500, detail="App git command failed")
     return completed
+
+
+GITHUB_API_URL = "https://api.github.com"
+
+
+def _make_github_session() -> requests.Session:
+    token = os.getenv("GITHUB_API_KEY")
+    if not token:
+        raise HTTPException(status_code=500, detail="GITHUB_API_KEY not configured")
+    session = requests.Session()
+    session.headers.update(
+        {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "MarkdownNotesApp-Git-Info",
+        }
+    )
+    return session
+
+
+def _parse_github_remote_url(remote_url: str) -> tuple[str, str]:
+    if not remote_url:
+        raise ValueError("Empty remote URL")
+    value = remote_url.strip()
+    if value.endswith(".git"):
+        value = value[:-4]
+    if value.startswith("git@github.com:"):
+        path = value.split(":", 1)[1]
+    elif "github.com/" in value:
+        path = value.split("github.com/", 1)[1]
+    else:
+        raise ValueError(f"Not a GitHub URL: {remote_url!r}")
+    parts = [p for p in path.split("/") if p]
+    if len(parts) < 2:
+        raise ValueError(f"Cannot parse GitHub owner/repo from: {remote_url!r}")
+    owner, repo = parts[0], parts[1]
+    return owner, repo
+
+
+def _fetch_github_commits(
+    session: requests.Session, owner: str, repo: str, per_page: int = 20
+) -> list[dict[str, Any]]:
+    url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/commits"
+    resp = session.get(url, params={"per_page": per_page})
+    resp.raise_for_status()
+    items: list[dict[str, Any]] = []
+    for c in resp.json():
+        sha = c.get("sha") or ""
+        commit = c.get("commit") or {}
+        msg = commit.get("message") or ""
+        lines = msg.splitlines() or [""]
+        items.append(
+            {
+                "short_sha": sha[:7],
+                "full_sha": sha,
+                "title": lines[0] if lines else "",
+                "message": msg,
+            }
+        )
+    return items
+
+
+def _fetch_github_releases(
+    session: requests.Session, owner: str, repo: str
+) -> list[dict[str, Any]]:
+    url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/releases"
+    resp = session.get(url)
+    resp.raise_for_status()
+    items: list[dict[str, Any]] = []
+    for r in resp.json():
+        items.append(
+            {
+                "tag_name": r.get("tag_name", "") or "",
+                "name": r.get("name", "") or "",
+                "body": r.get("body", "") or "",
+            }
+        )
+    return items
+
+
+def _fetch_github_tags_with_messages(
+    session: requests.Session, owner: str, repo: str
+) -> list[dict[str, Any]]:
+    url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/tags"
+    resp = session.get(url)
+    resp.raise_for_status()
+    tags = resp.json()
+    items: list[dict[str, Any]] = []
+    for t in tags:
+        tag_name = t.get("name", "") or ""
+        commit = t.get("commit") or {}
+        commit_sha = commit.get("sha", "") or ""
+        tag_message = ""
+        if commit_sha:
+            tag_url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/git/tags/{commit_sha}"
+            tag_resp = session.get(tag_url)
+            if tag_resp.status_code == 200:
+                tag_json = tag_resp.json()
+                tag_message = tag_json.get("message", "") or ""
+        items.append(
+            {
+                "name": tag_name,
+                "commit_sha": commit_sha,
+                "tag_message": tag_message,
+            }
+        )
+    return items
 
 
 def _ensure_app_repo_initialized() -> None:
@@ -1020,6 +1128,82 @@ async def versioning_notes_pull() -> Dict[str, Any]:
 @app.post("/api/versioning/app/pull")
 async def versioning_app_pull() -> Dict[str, Any]:
     return auto_pull_app_repo()
+
+
+@app.get("/api/versioning/app/history")
+async def versioning_app_history() -> Dict[str, Any]:
+    remote_url = APP_REPO_REMOTE_URL
+    if not remote_url:
+        try:
+            result = _run_app_git(["remote", "get-url", "origin"])
+        except HTTPException:
+            result = None
+        else:
+            if result.returncode == 0:
+                value = result.stdout.strip()
+                if value:
+                    remote_url = value.splitlines()[0]
+    if not remote_url:
+        raise HTTPException(status_code=500, detail="App remote URL for GitHub not configured")
+    try:
+        owner, repo = _parse_github_remote_url(remote_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    session = _make_github_session()
+    try:
+        commits = _fetch_github_commits(session, owner, repo)
+        releases = _fetch_github_releases(session, owner, repo)
+        tags = _fetch_github_tags_with_messages(session, owner, repo)
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except requests.RequestException:
+        raise HTTPException(status_code=502, detail="GitHub API request failed")
+    return {
+        "owner": owner,
+        "repo": repo,
+        "remote_url": remote_url,
+        "commits": commits,
+        "releases": releases,
+        "tags": tags,
+    }
+
+
+@app.get("/api/versioning/notes/history")
+async def versioning_notes_history() -> Dict[str, Any]:
+    remote_url = NOTES_REPO_REMOTE_URL
+    if not remote_url:
+        try:
+            result = _run_notes_git(["remote", "get-url", "origin"])
+        except HTTPException:
+            result = None
+        else:
+            if result.returncode == 0:
+                value = result.stdout.strip()
+                if value:
+                    remote_url = value.splitlines()[0]
+    if not remote_url:
+        raise HTTPException(status_code=500, detail="Notes remote URL for GitHub not configured")
+    try:
+        owner, repo = _parse_github_remote_url(remote_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    session = _make_github_session()
+    try:
+        commits = _fetch_github_commits(session, owner, repo)
+        releases = _fetch_github_releases(session, owner, repo)
+        tags = _fetch_github_tags_with_messages(session, owner, repo)
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except requests.RequestException:
+        raise HTTPException(status_code=502, detail="GitHub API request failed")
+    return {
+        "owner": owner,
+        "repo": repo,
+        "remote_url": remote_url,
+        "commits": commits,
+        "releases": releases,
+        "tags": tags,
+    }
 
 
 def get_app_version_info() -> Dict[str, Any]:

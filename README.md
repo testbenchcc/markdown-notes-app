@@ -32,6 +32,7 @@ This application was created with AI.
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
 - Optional auto-commit and push of notes to a dedicated Git repository under `notes/` (when enabled in Settings)
  - Optional periodic auto-pull of notes from the dedicated notes repository, using a configurable interval (when enabled in Settings)
+ - View recent commit history, releases, and tags for both the application and notes repositories from the Versioning section of the Settings modal (requires GitHub API configuration).
 
 ## Requirements
 

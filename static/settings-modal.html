@@ -123,6 +123,57 @@
               GitHub API key: <span id="versioning-github-api-key-status">Loading…</span>
             </p>
           </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Git history</div>
+            <div class="settings-field-description">
+              <button
+                type="button"
+                id="versioning-view-app-history-btn"
+                class="settings-btn"
+              >
+                View app repository history
+              </button>
+              <button
+                type="button"
+                id="versioning-view-notes-history-btn"
+                class="settings-btn"
+              >
+                View notes repository history
+              </button>
+            </div>
+            <div class="settings-field-description">
+              <div
+                id="versioning-git-history-popup"
+                class="settings-git-history-popup hidden"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="versioning-git-history-title"
+              >
+                <div class="settings-header">
+                  <div class="settings-title-group">
+                    <h3
+                      id="versioning-git-history-title"
+                      class="settings-title"
+                    >
+                      Git history
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    id="versioning-git-history-close-btn"
+                    class="settings-header-close"
+                    aria-label="Close git history"
+                  >
+                    &times;
+                  </button>
+                </div>
+                <div
+                  id="versioning-git-history-body"
+                  class="settings-field-description"
+                ></div>
+              </div>
+            </div>
+          </div>
         </section>
         <section class="settings-category-panel hidden" data-category="appearance">
           <h3 class="settings-category-title">Appearance</h3>

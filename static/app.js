@@ -79,6 +79,12 @@
   let versioningNotesRootEl = null;
   let versioningNotesRemoteUrlEl = null;
   let versioningGithubApiKeyStatusEl = null;
+  let versioningViewAppHistoryBtn = null;
+  let versioningViewNotesHistoryBtn = null;
+  let versioningGitHistoryPopupEl = null;
+  let versioningGitHistoryTitleEl = null;
+  let versioningGitHistoryBodyEl = null;
+  let versioningGitHistoryCloseBtn = null;
 
   const THEME_DEFINITIONS = {
     "gruvbox-dark": {
@@ -340,6 +346,24 @@
     versioningGithubApiKeyStatusEl = root.querySelector(
       "#versioning-github-api-key-status"
     );
+    versioningViewAppHistoryBtn = root.querySelector(
+      "#versioning-view-app-history-btn"
+    );
+    versioningViewNotesHistoryBtn = root.querySelector(
+      "#versioning-view-notes-history-btn"
+    );
+    versioningGitHistoryPopupEl = root.querySelector(
+      "#versioning-git-history-popup"
+    );
+    versioningGitHistoryTitleEl = root.querySelector(
+      "#versioning-git-history-title"
+    );
+    versioningGitHistoryBodyEl = root.querySelector(
+      "#versioning-git-history-body"
+    );
+    versioningGitHistoryCloseBtn = root.querySelector(
+      "#versioning-git-history-close-btn"
+    );
     const settingsExportNotebookBtn = root.querySelector(
       "#settings-export-notebook-btn"
     );
@@ -480,6 +504,27 @@
       settingsImportNotebookBtn.addEventListener("click", (e) => {
         e.preventDefault();
         triggerImportFilePicker();
+      });
+    }
+
+    if (versioningViewAppHistoryBtn) {
+      versioningViewAppHistoryBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await loadGitHistory("app");
+      });
+    }
+
+    if (versioningViewNotesHistoryBtn) {
+      versioningViewNotesHistoryBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await loadGitHistory("notes");
+      });
+    }
+
+    if (versioningGitHistoryCloseBtn && versioningGitHistoryPopupEl) {
+      versioningGitHistoryCloseBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        hideGitHistoryPopup();
       });
     }
 
@@ -633,6 +678,114 @@
       if (versioningGithubApiKeyStatusEl) {
         versioningGithubApiKeyStatusEl.textContent = "Unavailable";
       }
+    }
+  }
+
+  function hideGitHistoryPopup() {
+    if (!versioningGitHistoryPopupEl) {
+      return;
+    }
+    versioningGitHistoryPopupEl.classList.add("hidden");
+    if (versioningGitHistoryBodyEl) {
+      versioningGitHistoryBodyEl.innerHTML = "";
+    }
+  }
+
+  function showGitHistoryPopup(kind, data) {
+    if (
+      !versioningGitHistoryPopupEl ||
+      !versioningGitHistoryBodyEl ||
+      !versioningGitHistoryTitleEl
+    ) {
+      return;
+    }
+
+    const owner = data && data.owner ? data.owner : "";
+    const repo = data && data.repo ? data.repo : "";
+    const remote = data && data.remote_url ? data.remote_url : "";
+    const commits = Array.isArray(data && data.commits) ? data.commits : [];
+    const releases = Array.isArray(data && data.releases) ? data.releases : [];
+    const tags = Array.isArray(data && data.tags) ? data.tags : [];
+
+    const lines = [];
+    if (owner || repo) {
+      lines.push(`Repository: ${owner || "?"}/${repo || "?"}`);
+    }
+    if (remote) {
+      lines.push(`Remote: ${remote}`);
+    }
+    lines.push("");
+
+    if (commits.length) {
+      lines.push("Commits:");
+      commits.forEach((c) => {
+        const shortSha = c && c.short_sha ? c.short_sha : "";
+        const title = c && c.title ? c.title : "";
+        const message = c && c.message ? c.message : "";
+        lines.push(`- ${shortSha} ${title}`);
+        if (message && message !== title) {
+          lines.push(`    ${message}`);
+        }
+      });
+      lines.push("");
+    }
+
+    if (releases.length) {
+      lines.push("Releases:");
+      releases.forEach((r) => {
+        const tagName = r && r.tag_name ? r.tag_name : "";
+        const name = r && r.name ? r.name : "";
+        const body = r && r.body ? r.body : "";
+        lines.push(`- ${tagName} ${name}`);
+        if (body) {
+          lines.push(`    ${body}`);
+        }
+      });
+      lines.push("");
+    }
+
+    if (tags.length) {
+      lines.push("Tags:");
+      tags.forEach((t) => {
+        const name = t && t.name ? t.name : "";
+        const msg = t && t.tag_message ? t.tag_message : "";
+        lines.push(`- ${name} ${msg}`);
+      });
+      lines.push("");
+    }
+
+    if (!lines.length) {
+      lines.push("No history data available.");
+    }
+
+    const pre = document.createElement("pre");
+    pre.textContent = lines.join("\n");
+
+    versioningGitHistoryBodyEl.innerHTML = "";
+    versioningGitHistoryBodyEl.appendChild(pre);
+
+    if (kind === "app") {
+      versioningGitHistoryTitleEl.textContent =
+        "Application repository history";
+    } else {
+      versioningGitHistoryTitleEl.textContent = "Notes repository history";
+    }
+
+    versioningGitHistoryPopupEl.classList.remove("hidden");
+  }
+
+  async function loadGitHistory(kind) {
+    const url =
+      kind === "app"
+        ? "/api/versioning/app/history"
+        : "/api/versioning/notes/history";
+    try {
+      clearError();
+      const data = await fetchJSON(url);
+      showGitHistoryPopup(kind, data);
+    } catch (err) {
+      const label = kind === "app" ? "application" : "notes";
+      showError(`Failed to load ${label} repository history: ${err.message}`);
     }
   }
 
