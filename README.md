@@ -18,7 +18,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
   - Remembers the last opened note per browser (localStorage)
   - Theme support with a Gruvbox-inspired dark default (based on Obsidian Gruvbox), plus Office and High Contrast themes
 - Simple text search across markdown notes
-- Settings modal (via the header "Settings" button) with per-browser preferences, currently including options to enable spellcheck in the editor, select the UI theme, and choose a default theme for exported HTML notes
+- Settings modal (via the header "Settings" button) with per-browser preferences, including options to enable spellcheck in the editor, select the UI theme, choose a default theme for exported HTML notes, and access notebook export/import controls
  - Notebook-level settings are stored in a JSON file under the notes root so they travel with exported/imported notebooks.
  - Dot-prefixed files and folders are automatically hidden from the notes tree and search results to keep the notebook view clean.
 - Configurable index page title and header subtitle showing the current app build number and git tag (when available)
@@ -27,7 +27,6 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
 - Optional auto-commit and push of notes to a dedicated Git repository under `notes/` (when enabled in Settings)
  - Optional periodic auto-pull of notes from the dedicated notes repository, using a configurable interval (when enabled in Settings)
- - Optional periodic auto-pull of application updates from the app repository remote, using a configurable interval (when enabled in Settings)
 
 ## Requirements
 
@@ -88,7 +87,7 @@ To move or copy a notebook, you can either copy or clone the entire repository f
 
 ## Export / import
 
-- The UI includes `Export` and `Import` buttons in the top header bar (right side).
+- The Settings modal (General category) includes `Export Notebook` and `Import Notebook` buttons.
 - **Export** downloads a zip file that contains:
   - The notes folder (always under a top-level `notes/` entry in the archive, regardless of where `NOTES_ROOT` lives on disk).
   - Core project files: `.git` (if present), `static/`, `docker-compose.yml`, `Dockerfile`, `main.py`, `requirements.txt`.

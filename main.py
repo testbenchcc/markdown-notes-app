@@ -131,8 +131,6 @@ class NotebookSettings(BaseModel):
     autoCommitNotes: bool = False
     autoPullNotes: bool = False
     autoPullIntervalMinutes: int = 30
-    autoPullAppOnRelease: bool = False
-    autoPullAppIntervalMinutes: int = 60
     indexPageTitle: str = "NoteBooks"
 
     class Config:

@@ -64,6 +64,18 @@
               Sets the title shown in the header and browser tab on the index page.
             </p>
           </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Notebook export / import</div>
+            <button type="button" id="settings-export-notebook-btn" class="settings-btn">
+              Export Notebook
+            </button>
+            <button type="button" id="settings-import-notebook-btn" class="settings-btn">
+              Import Notebook
+            </button>
+            <p class="settings-field-description">
+              Export downloads a zip archive of the notebook (notes and core project files). Import restores notes into the current notebook from a previously exported zip.
+            </p>
+          </div>
         </section>
         <section class="settings-category-panel hidden" data-category="versioning">
           <h3 class="settings-category-title">Versioning</h3>
@@ -100,30 +112,7 @@
             </p>
           </div>
           <div class="settings-field">
-            <label class="settings-field-label">
-              <input type="checkbox" id="settings-auto-pull-app" />
-              Automatically pull application updates when a new version is available
-            </label>
-            <p class="settings-field-description">
-              When enabled, the app code repository will be periodically pulled from its remote to pick up new versions.
-            </p>
-          </div>
-          <div class="settings-field">
-            <label class="settings-field-label" for="settings-auto-pull-app-interval">
-              Application auto-pull interval (minutes)
-            </label>
-            <input
-              type="number"
-              id="settings-auto-pull-app-interval"
-              class="settings-input-number"
-              min="1"
-            />
-            <p class="settings-field-description">
-              How often to check for and pull application updates when automatic app pulling is enabled.
-            </p>
-          </div>
-          <div class="settings-field">
-            <div class="settings-field-label">Repositories & GitHub API</div>
+            <div class="settings-field-label">Repositories &amp; GitHub API<br></div>
             <p class="settings-field-description">
               Notes repo path: <code id="versioning-notes-root">Loading…</code>
             </p>

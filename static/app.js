@@ -14,8 +14,6 @@
   const mainEl = document.getElementById("main");
   const searchInputEl = document.getElementById("search-input");
   const searchResultsEl = document.getElementById("search-results");
-  const exportBtn = document.getElementById("export-btn");
-  const importBtn = document.getElementById("import-btn");
   const importFileInput = document.getElementById("import-file-input");
   const noteExportBtn = document.getElementById("note-export-btn");
   const settingsBtn = document.getElementById("settings-btn");
@@ -49,9 +47,9 @@
   let settingsAutoPullIntervalInput = null;
 
   let notesAutoPullTimerId = null;
-  let settingsAutoPullAppInput = null;
-  let settingsAutoPullAppIntervalInput = null;
-  let appAutoPullTimerId = null;
+
+  let lastViewerScrollTop = 0;
+  let lastEditorScrollTop = 0;
 
   let versioningNotesRootEl = null;
   let versioningNotesRemoteUrlEl = null;
@@ -96,8 +94,6 @@
       autoCommitNotes: false,
       autoPullNotes: false,
       autoPullIntervalMinutes: 30,
-      autoPullAppOnRelease: false,
-      autoPullAppIntervalMinutes: 60,
       indexPageTitle: "NoteBooks",
     };
   }
@@ -247,18 +243,7 @@
     const intervalDirty =
       Number(draftSettings.autoPullIntervalMinutes || 0) !==
       Number(savedSettings.autoPullIntervalMinutes || 0);
-    const appAutoPullDirty =
-      !!draftSettings.autoPullAppOnRelease !==
-      !!savedSettings.autoPullAppOnRelease;
-    const appIntervalDirty =
-      Number(draftSettings.autoPullAppIntervalMinutes || 0) !==
-      Number(savedSettings.autoPullAppIntervalMinutes || 0);
-    const dirty =
-      autoCommitDirty ||
-      autoPullDirty ||
-      intervalDirty ||
-      appAutoPullDirty ||
-      appIntervalDirty;
+    const dirty = autoCommitDirty || autoPullDirty || intervalDirty;
     setSettingsCategoryDirty("versioning", dirty);
   }
 
@@ -281,13 +266,6 @@
     if (settingsAutoPullIntervalInput) {
       const minutes = draftSettings.autoPullIntervalMinutes || 0;
       settingsAutoPullIntervalInput.value = minutes > 0 ? String(minutes) : "";
-    }
-    if (settingsAutoPullAppInput) {
-      settingsAutoPullAppInput.checked = !!draftSettings.autoPullAppOnRelease;
-    }
-    if (settingsAutoPullAppIntervalInput) {
-      const minutes = draftSettings.autoPullAppIntervalMinutes || 0;
-      settingsAutoPullAppIntervalInput.value = minutes > 0 ? String(minutes) : "";
     }
     if (settingsThemeSelect) {
       const themeId = draftSettings.theme || DEFAULT_THEME_ID;
@@ -330,16 +308,18 @@
     settingsAutoPullIntervalInput = root.querySelector(
       "#settings-auto-pull-interval"
     );
-    settingsAutoPullAppInput = root.querySelector("#settings-auto-pull-app");
-    settingsAutoPullAppIntervalInput = root.querySelector(
-      "#settings-auto-pull-app-interval"
-    );
     versioningNotesRootEl = root.querySelector("#versioning-notes-root");
     versioningNotesRemoteUrlEl = root.querySelector(
       "#versioning-notes-remote-url"
     );
     versioningGithubApiKeyStatusEl = root.querySelector(
       "#versioning-github-api-key-status"
+    );
+    const settingsExportNotebookBtn = root.querySelector(
+      "#settings-export-notebook-btn"
+    );
+    const settingsImportNotebookBtn = root.querySelector(
+      "#settings-import-notebook-btn"
     );
 
     function selectCategory(categoryId) {
@@ -437,36 +417,6 @@
       });
     }
 
-    if (settingsAutoPullAppInput) {
-      settingsAutoPullAppInput.addEventListener("change", () => {
-        if (!draftSettings) {
-          draftSettings = savedSettings
-            ? { ...savedSettings }
-            : getDefaultSettings();
-        }
-        draftSettings.autoPullAppOnRelease =
-          !!settingsAutoPullAppInput.checked;
-        updateVersioningCategoryDirty();
-      });
-    }
-
-    if (settingsAutoPullAppIntervalInput) {
-      settingsAutoPullAppIntervalInput.addEventListener("change", () => {
-        if (!draftSettings) {
-          draftSettings = savedSettings
-            ? { ...savedSettings }
-            : getDefaultSettings();
-        }
-        const raw = settingsAutoPullAppIntervalInput.value;
-        let minutes = parseInt(raw, 10);
-        if (!Number.isFinite(minutes) || minutes <= 0) {
-          minutes = 0;
-        }
-        draftSettings.autoPullAppIntervalMinutes = minutes;
-        updateVersioningCategoryDirty();
-      });
-    }
-
     if (settingsThemeSelect) {
       settingsThemeSelect.addEventListener("change", () => {
         if (!draftSettings) {
@@ -494,6 +444,20 @@
       });
     }
 
+    if (settingsExportNotebookBtn) {
+      settingsExportNotebookBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        downloadExport();
+      });
+    }
+
+    if (settingsImportNotebookBtn) {
+      settingsImportNotebookBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        triggerImportFilePicker();
+      });
+    }
+
     async function saveSettingsAndClose() {
       if (!draftSettings) {
         draftSettings = savedSettings
@@ -511,7 +475,6 @@
       applySettings(savedSettings);
       clearAllSettingsCategoryDirty();
       updateNotesAutoPullTimerFromSettings();
-      updateAppAutoPullTimerFromSettings();
       closeSettingsModal();
     }
 
@@ -688,25 +651,6 @@
     const intervalMs = minutes * 60 * 1000;
     notesAutoPullTimerId = window.setInterval(() => {
       triggerNotesAutoPull();
-    }, intervalMs);
-  }
-
-  function updateAppAutoPullTimerFromSettings() {
-    if (appAutoPullTimerId !== null) {
-      window.clearInterval(appAutoPullTimerId);
-      appAutoPullTimerId = null;
-    }
-    const settings = savedSettings || getDefaultSettings();
-    if (!settings.autoPullAppOnRelease) {
-      return;
-    }
-    const minutes = Number(settings.autoPullAppIntervalMinutes || 0);
-    if (!Number.isFinite(minutes) || minutes <= 0) {
-      return;
-    }
-    const intervalMs = minutes * 60 * 1000;
-    appAutoPullTimerId = window.setInterval(() => {
-      triggerAppAutoPullCheck();
     }, intervalMs);
   }
 
@@ -1141,16 +1085,28 @@
     }
 
     if (mode === "view") {
+      // Save editor scroll position before switching to view
+      lastEditorScrollTop = editorEl.scrollTop;
+
       viewerEl.classList.remove("hidden");
       editorEl.classList.add("hidden");
-      modeToggleBtn.textContent = "View";
+      modeToggleBtn.textContent = "Edit";
       saveBtn.disabled = true;
+
+      // Restore viewer scroll position
+      viewerEl.scrollTop = lastViewerScrollTop;
     } else {
+      // Save viewer scroll position before switching to edit
+      lastViewerScrollTop = viewerEl.scrollTop;
+
       viewerEl.classList.add("hidden");
       editorEl.classList.remove("hidden");
-      modeToggleBtn.textContent = "Edit";
+      modeToggleBtn.textContent = "Reader";
       saveBtn.disabled = false;
       editorEl.focus();
+
+      // Restore editor scroll position
+      editorEl.scrollTop = lastEditorScrollTop;
     }
   }
 
@@ -1259,9 +1215,9 @@
     });
 
     if (node.type === "folder") {
-      item.classList.add("expanded");
       const childrenContainer = document.createElement("div");
       childrenContainer.classList.add("tree-children");
+      childrenContainer.style.display = "none";
 
       label.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -1357,21 +1313,6 @@
     }
   }
 
-  async function triggerAppAutoPullCheck() {
-    try {
-      const settings = savedSettings || getDefaultSettings();
-      if (!settings.autoPullAppOnRelease) {
-        return;
-      }
-      await fetchJSON("/api/versioning/app/pull", {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
-    } catch (err) {
-      showError(`Failed to pull application updates: ${err.message}`);
-    }
-  }
-
   async function saveCurrentNote() {
     if (!currentNote) return;
     try {
@@ -1440,6 +1381,19 @@
         body: JSON.stringify({ path }),
       });
       await loadTree();
+      
+      // Find and select the newly created note
+      const treeItems = document.querySelectorAll(".tree-item.note");
+      for (const el of treeItems) {
+        if (el.dataset.path === path) {
+          clearSelection();
+          el.classList.add("selected");
+          await loadNote(path);
+          // Switch to edit mode for the new note
+          setMode("edit");
+          break;
+        }
+      }
     } catch (err) {
       showError(`Failed to create note: ${err.message}`);
     }
@@ -1730,18 +1684,6 @@
     promptNewNote("");
   });
 
-  if (exportBtn) {
-    exportBtn.addEventListener("click", () => {
-      downloadExport();
-    });
-  }
-
-  if (importBtn) {
-    importBtn.addEventListener("click", () => {
-      triggerImportFilePicker();
-    });
-  }
-
   if (importFileInput) {
     importFileInput.addEventListener("change", () => {
       const files = importFileInput.files;
@@ -1774,7 +1716,6 @@
     draftSettings = { ...savedSettings };
     applySettings(savedSettings);
     updateNotesAutoPullTimerFromSettings();
-    updateAppAutoPullTimerFromSettings();
     setupSplitter();
     await loadTree();
     await refreshAppVersionSubtitle();

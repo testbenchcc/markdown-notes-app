@@ -72,3 +72,47 @@
 - [x] Move the notebooks settings into the root notes folder as a JSON file. This way they travel with the notes. 
 - [x] Hide dot files from the file tree
 - [x] Make border around code windows (``` ```) thinner ~ 2 pixels
+
+## v1.2.0 - Tree and UI Alignment
+
+- [x] Close all tree items when the page initially loads
+
+## v1.2.1 - Settings Simplification
+
+- [x] Remove `Automatically pull application updates when a new version is available` from settings and code
+- [x] Remove `Application auto-pull interval (minutes)` from settings and code
+- [x] Move `Export Notebook` and `Import Notebook` buttons into the settings modal under the General section
+
+## v1.2.2 - File Tree Structure and Header Layout
+
+- [] Move the settings button to the right side of the file tree footer
+- [] Replace the `Notes` text in the file tree header with the Index page title
+- [] Remove the Index page title bar entirely
+- [] Move `Build | Tag: ...` to the left side of the file tree footer, mirroring the settings button position
+
+## v1.2.3 - Icon Updates and UI Polish
+
+- [] Replace `New Folder` button with a 16x16 folder icon (static/icons/folder.png)
+- [] Replace `New Note` button with a 16x16 file icon (static/icons/file.png)
+- [] Replace the `Settings` button text with a 16x16 settings icon (static/icons/settings.png)
+
+## v1.2.4 - Markdown formating improvements
+
+- [] Markdown tables width should not expand to fit the window or panes width. Fit to the contents of the table.
+- [] Add font selection for notes in the apperance settings category. 
+- [] Add font selection for the rest of the site
+
+## 1.2.5 - Render mermaid
+
+- [] When code is marked as mermaid 
+
+```
+```mermaid
+```
+
+Render the chart/graph in the notes
+
+## - trouble items
+
+- [-] When switching between editor and reader modes, keep note scroll positions aligned
+- [] When a new note is created, automatically switch to it and enter edit mode
