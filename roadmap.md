@@ -131,7 +131,8 @@
     - static\index.html
 - [x] Change settings modal to always be 90vh, when content does not fit, use vertical scroll bars.
 
-## - trouble items
+## v1.3.1 - Reader and Editor alignment
 
-- [ ] When switching between editor and reader modes, keep note scroll positions aligned
-- [ ] When a new note is created, automatically switch to it and enter edit mode
+- [x] When viewing a note, we need to align the reader and the editors with each other. Make sure they both have thier own scrool containers and, when we switch between them, copy the scroll position as a percentage from one to the other.
+
+## v1.3.2 - Syntax highlighting in the editor

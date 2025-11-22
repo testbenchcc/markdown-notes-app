@@ -78,6 +78,30 @@
     editorLineNumbersEl.scrollTop = editorEl.scrollTop;
   }
 
+  function getScrollPercent(el) {
+    if (!el) {
+      return 0;
+    }
+    const max = el.scrollHeight - el.clientHeight;
+    if (max <= 0) {
+      return 0;
+    }
+    return el.scrollTop / max;
+  }
+
+  function setScrollPercent(el, percent) {
+    if (!el) {
+      return;
+    }
+    const clamped = percent < 0 ? 0 : percent > 1 ? 1 : percent;
+    const max = el.scrollHeight - el.clientHeight;
+    if (max <= 0) {
+      el.scrollTop = 0;
+      return;
+    }
+    el.scrollTop = clamped * max;
+  }
+
   let versioningNotesRootEl = null;
   let versioningNotesRemoteUrlEl = null;
   let versioningGithubApiKeyStatusEl = null;
@@ -1297,8 +1321,7 @@
     }
 
     if (mode === "view") {
-      // Save editor scroll position before switching to view
-      lastEditorScrollTop = editorEl.scrollTop;
+      const percent = getScrollPercent(editorEl);
 
       viewerEl.classList.remove("hidden");
       if (editorWrapperEl) {
@@ -1315,11 +1338,9 @@
       modeToggleBtn.setAttribute("title", "Edit");
       saveBtn.disabled = true;
 
-      // Restore viewer scroll position
-      viewerEl.scrollTop = lastViewerScrollTop;
+      setScrollPercent(viewerEl, percent);
     } else {
-      // Save viewer scroll position before switching to edit
-      lastViewerScrollTop = viewerEl.scrollTop;
+      const percent = getScrollPercent(viewerEl);
 
       viewerEl.classList.add("hidden");
       if (editorWrapperEl) {
@@ -1337,8 +1358,7 @@
       saveBtn.disabled = false;
       editorEl.focus();
 
-      // Restore editor scroll position
-      editorEl.scrollTop = lastEditorScrollTop;
+      setScrollPercent(editorEl, percent);
       syncEditorLineNumbersScroll();
     }
   }

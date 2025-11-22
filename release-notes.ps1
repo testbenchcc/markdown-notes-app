@@ -150,6 +150,8 @@ Write-Host "Created tag '$newTag' with release notes." -ForegroundColor Green
 Write-Host ""
 $pushConfirm = Read-Host "Push current branch and tag '$newTag' to origin now? [y/N]"
 
+$tagPushed = $false
+
 if ($pushConfirm -in @("y","Y","yes","YES")) {
     # Get current branch name
     $currentBranch = (git rev-parse --abbrev-ref HEAD).Trim()
@@ -166,8 +168,7 @@ if ($pushConfirm -in @("y","Y","yes","YES")) {
     git push origin $currentBranch
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Failed to push branch '$currentBranch'. Tag is still only local."
-    } else
-    {
+    } else {
         Write-Host "Branch '$currentBranch' pushed successfully." -ForegroundColor Green
     }
 
@@ -177,9 +178,9 @@ if ($pushConfirm -in @("y","Y","yes","YES")) {
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Failed to push tag '$newTag'. You may need to push it manually with:"
         Write-Host "  git push origin $newTag"
-    } else
-    {
+    } else {
         Write-Host "Tag '$newTag' pushed successfully." -ForegroundColor Green
+        $tagPushed = $true
     }
 } else {
     Write-Host ""
@@ -187,4 +188,42 @@ if ($pushConfirm -in @("y","Y","yes","YES")) {
     Write-Host "You can push later with:" -ForegroundColor Cyan
     Write-Host "  git push origin <your-branch-name>"
     Write-Host "  git push origin $newTag"
+}
+
+# Optional GitHub release creation using gh CLI
+Write-Host ""
+$releaseConfirm = Read-Host "Create a GitHub release for tag '$newTag' using these notes now? [y/N]"
+
+if ($releaseConfirm -in @("y","Y","yes","YES")) {
+    $ghCmd = Get-Command gh -ErrorAction SilentlyContinue
+    if (-not $ghCmd) {
+        Write-Error "GitHub CLI 'gh' is not installed or not in PATH. Cannot create release automatically."
+        Write-Host "You can create a release manually in your hosting provider UI using these notes." -ForegroundColor Yellow
+        exit 0
+    }
+
+    if (-not $tagPushed) {
+        Write-Host ""
+        Write-Host "Warning: Tag '$newTag' does not appear to have been pushed to origin in this session." -ForegroundColor Yellow
+        $cont = Read-Host "Create the release anyway? The tag must exist on the remote for this to work. [y/N]"
+        if ($cont -notin @("y","Y","yes","YES")) {
+            Write-Host "Skipped creating release."
+            exit 0
+        }
+    }
+
+    $releaseTempFile = [System.IO.Path]::GetTempFileName()
+    $notes | Out-File -FilePath $releaseTempFile -Encoding UTF8
+
+    Write-Host ""
+    Write-Host "Creating GitHub release for '$newTag'..." -ForegroundColor Cyan
+    gh release create $newTag -F $releaseTempFile -t $newTag
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to create GitHub release with 'gh'."
+        Write-Host "You may need to create the release manually." -ForegroundColor Yellow
+    } else {
+        Write-Host "GitHub release for '$newTag' created successfully." -ForegroundColor Green
+    }
+
+    Remove-Item $releaseTempFile -ErrorAction SilentlyContinue
 }

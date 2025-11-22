@@ -16,6 +16,7 @@ This application was created with AI.
   - Right pane: markdown note viewer/editor with line numbers in edit mode
   - View/Edit toggle and Save button
   - Draggable vertical splitter between panes
+  - View and edit modes keep scroll position aligned between the reader and editor when toggling
   - Inline error banner for failed API operations
   - Right-click context menu on tree items for quick actions (open note, copy path, create/rename/delete notes and folders)
   - Keyboard navigation in the notes tree (arrow keys, Home/End, Enter/Space)
