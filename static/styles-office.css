@@ -25,3 +25,11 @@
 .tree-item.note .label {
   color: var(--md-text-main);
 }
+
+/* All icons that should invert */
+.tree-item.note .tree-icon,
+.tree-item.folder .tree-icon,
+.tree-item.folder.expanded .tree-icon,
+.icon-btn-image {
+  filter: invert(0);
+}

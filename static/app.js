@@ -1300,7 +1300,13 @@
       } else {
         editorEl.classList.add("hidden");
       }
-      modeToggleBtn.textContent = "Edit";
+      const modeIcon = modeToggleBtn.querySelector("img");
+      if (modeIcon) {
+        modeIcon.src = "/static/icons/edit.png";
+        modeIcon.alt = "Edit";
+      }
+      modeToggleBtn.setAttribute("aria-label", "Edit");
+      modeToggleBtn.setAttribute("title", "Edit");
       saveBtn.disabled = true;
 
       // Restore viewer scroll position
@@ -1315,7 +1321,13 @@
       } else {
         editorEl.classList.remove("hidden");
       }
-      modeToggleBtn.textContent = "Reader";
+      const modeIcon = modeToggleBtn.querySelector("img");
+      if (modeIcon) {
+        modeIcon.src = "/static/icons/reader.png";
+        modeIcon.alt = "Reader";
+      }
+      modeToggleBtn.setAttribute("aria-label", "Reader");
+      modeToggleBtn.setAttribute("title", "Reader");
       saveBtn.disabled = false;
       editorEl.focus();
 
