@@ -62,6 +62,9 @@ else:
     NOTES_ROOT = APP_ROOT / "notes"
 
 
+SETTINGS_FILE_NAME = ".notebook-settings.json"
+
+
 NOTES_REPO_REMOTE_URL = os.getenv("NOTES_REPO_REMOTE_URL")
 APP_REPO_REMOTE_URL = os.getenv("APP_REPO_REMOTE_URL")
 
@@ -119,6 +122,58 @@ def _resolve_relative_path(relative_path: str) -> Path:
         raise HTTPException(status_code=400, detail="Path escapes notes root")
 
     return full
+
+
+class NotebookSettings(BaseModel):
+    editorSpellcheck: bool = False
+    theme: str = "gruvbox-dark"
+    exportTheme: str = "match-app-theme"
+    autoCommitNotes: bool = False
+    autoPullNotes: bool = False
+    autoPullIntervalMinutes: int = 30
+    autoPullAppOnRelease: bool = False
+    autoPullAppIntervalMinutes: int = 60
+    indexPageTitle: str = "NoteBooks"
+
+    class Config:
+        extra = "ignore"
+
+
+def _get_settings_file_path() -> Path:
+    ensure_notes_root()
+    return NOTES_ROOT / SETTINGS_FILE_NAME
+
+
+def load_notebook_settings() -> Dict[str, Any]:
+    base = NotebookSettings().dict()
+    path = _get_settings_file_path()
+    if not path.is_file():
+        return base
+    try:
+        raw = path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+    except Exception:
+        return base
+    if isinstance(data, dict):
+        try:
+            model = NotebookSettings(**data)
+        except Exception:
+            return base
+        merged = {**base, **model.dict()}
+        return merged
+    return base
+
+
+def save_notebook_settings(data: Dict[str, Any]) -> Dict[str, Any]:
+    base = NotebookSettings().dict()
+    try:
+        model = NotebookSettings(**data)
+        merged = {**base, **model.dict()}
+    except Exception:
+        merged = base
+    path = _get_settings_file_path()
+    path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+    return merged
 
 
 def _resolve_destination_path(relative_path: str) -> Path:
@@ -398,6 +453,9 @@ def build_notes_tree() -> Dict[str, Any]:
         if path.is_dir():
             children = []
             for child in sorted(path.iterdir(), key=lambda p: (p.is_file(), p.name.lower())):
+                name = child.name
+                if name.startswith("."):
+                    continue
                 # Only include markdown files and directories.
                 if child.is_dir() or (child.is_file() and child.suffix.lower() == ".md"):
                     child_rel = rel / child.name if rel != Path("") else Path(child.name)
@@ -421,6 +479,18 @@ def build_notes_tree() -> Dict[str, Any]:
 
 
 app = FastAPI(title="Markdown Notes App", version="1.0.0")
+
+
+@app.get("/api/settings")
+async def get_notebook_settings() -> Dict[str, Any]:
+    return load_notebook_settings()
+
+
+@app.put("/api/settings")
+async def update_notebook_settings(payload: NotebookSettings) -> Dict[str, Any]:
+    data = payload.dict()
+    saved = save_notebook_settings(data)
+    return saved
 
 
 @app.on_event("startup")
@@ -595,6 +665,9 @@ async def search_notes(q: str = Query(..., min_length=1, max_length=200)) -> Dic
 
     for path in NOTES_ROOT.rglob("*.md"):
         if not path.is_file():
+            continue
+        rel_parts = path.relative_to(NOTES_ROOT).parts
+        if any(part.startswith(".") for part in rel_parts):
             continue
         try:
             text = path.read_text(encoding="utf-8")

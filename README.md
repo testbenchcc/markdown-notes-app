@@ -19,6 +19,8 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
   - Theme support with a Gruvbox-inspired dark default (based on Obsidian Gruvbox), plus Office and High Contrast themes
 - Simple text search across markdown notes
 - Settings modal (via the header "Settings" button) with per-browser preferences, currently including options to enable spellcheck in the editor, select the UI theme, and choose a default theme for exported HTML notes
+ - Notebook-level settings are stored in a JSON file under the notes root so they travel with exported/imported notebooks.
+ - Dot-prefixed files and folders are automatically hidden from the notes tree and search results to keep the notebook view clean.
 - Configurable index page title and header subtitle showing the current app build number and git tag (when available)
 - Improved markdown rendering: fenced code blocks with syntax highlighting and tables with clear outlines
 - No authentication or user accounts

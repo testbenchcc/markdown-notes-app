@@ -62,12 +62,13 @@
   - Always commit and push local notes changes before pulling from the notes repository. Do not push if the local branch is out of sync with its remote. This should not happen since I am the only user, but the safeguard still needs to be there.
 - [x] Add a setting to auto pull when a new version of the application is released. Include an interval setting for how often to check. Ensure that application auto-pull never overwrites the `notes/` folder, since it is now a separate, git-ignored notes repository. Usse the remote `https://github.com/testbenchcc/markdown-notes-app.git`
 
-## v1.1.8 - Update sub-title 
+## v1.1.8 - Update sub-title on index page with version
 
-- [] Add a setting for the index page title which is currently hard coded to `NoteBooks`.
-- [] Set the build number (number of commits) and tag (if it exists) for the top-bar-subtitle text on the index page. Use github api key configured in .env.
+- [x] Add a setting for the index page title which is currently hard coded to `NoteBooks`.
+- [x] Set the build number (number of commits) and tag (if it exists) for the top-bar-subtitle text on the index page. Use github api key configured in .env.
 
 ## v1.1.9 - Move stored settings into notes folder
 
-- [] Move the notebooks settings into the root notes folder as a JSON file. This way they travel with the notes. 
-- [] Hide dot files from the file tree
+- [x] Move the notebooks settings into the root notes folder as a JSON file. This way they travel with the notes. 
+- [x] Hide dot files from the file tree
+- [x] Make border around code windows (``` ```) thinner ~ 2 pixels

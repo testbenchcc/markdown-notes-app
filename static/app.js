@@ -134,6 +134,44 @@
     }
   }
 
+  async function loadSettingsFromServerOrStorage() {
+    try {
+      const remote = await fetchJSON("/api/settings");
+      const merged = {
+        ...getDefaultSettings(),
+        ...(remote && typeof remote === "object" ? remote : {}),
+      };
+      saveSettingsToStorage(merged);
+      return merged;
+    } catch (e) {
+      return loadSettingsFromStorage();
+    }
+  }
+
+  async function saveSettingsToServer(settings) {
+    const base = getDefaultSettings();
+    const input = settings && typeof settings === "object" ? settings : {};
+    try {
+      const remote = await fetchJSON("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify(input),
+      });
+      const merged = {
+        ...base,
+        ...(remote && typeof remote === "object" ? remote : {}),
+      };
+      saveSettingsToStorage(merged);
+      return merged;
+    } catch (e) {
+      const merged = {
+        ...base,
+        ...input,
+      };
+      saveSettingsToStorage(merged);
+      throw e;
+    }
+  }
+
   function applySettings(settings) {
     if (!settings) {
       return;
@@ -456,14 +494,20 @@
       });
     }
 
-    function saveSettingsAndClose() {
+    async function saveSettingsAndClose() {
       if (!draftSettings) {
         draftSettings = savedSettings
           ? { ...savedSettings }
           : getDefaultSettings();
       }
-      savedSettings = { ...draftSettings };
-      saveSettingsToStorage(savedSettings);
+      let nextSettings = { ...draftSettings };
+      try {
+        const saved = await saveSettingsToServer(nextSettings);
+        nextSettings = { ...saved };
+      } catch (err) {
+        showError(`Failed to sync settings to notebook: ${err.message}`);
+      }
+      savedSettings = nextSettings;
       applySettings(savedSettings);
       clearAllSettingsCategoryDirty();
       updateNotesAutoPullTimerFromSettings();
@@ -554,7 +598,7 @@
     if (!settingsOverlayEl) {
       return;
     }
-    savedSettings = loadSettingsFromStorage();
+    savedSettings = await loadSettingsFromServerOrStorage();
     draftSettings = { ...savedSettings };
     syncSettingsControlsFromDraft();
     clearAllSettingsCategoryDirty();
@@ -1725,13 +1769,16 @@
     });
   }
 
-  savedSettings = loadSettingsFromStorage();
-  draftSettings = { ...savedSettings };
-  applySettings(savedSettings);
-  updateNotesAutoPullTimerFromSettings();
-  updateAppAutoPullTimerFromSettings();
+  async function initApp() {
+    savedSettings = await loadSettingsFromServerOrStorage();
+    draftSettings = { ...savedSettings };
+    applySettings(savedSettings);
+    updateNotesAutoPullTimerFromSettings();
+    updateAppAutoPullTimerFromSettings();
+    setupSplitter();
+    await loadTree();
+    await refreshAppVersionSubtitle();
+  }
 
-  setupSplitter();
-  loadTree();
-  refreshAppVersionSubtitle();
+  initApp();
 })();

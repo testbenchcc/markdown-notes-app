@@ -428,7 +428,7 @@ body.resizing {
   border-radius: 4px;
   padding: 0.5rem 0.75rem;
   overflow-x: auto;
-  border: 1px solid var(--md-border-subtle);
+  border: 2px solid var(--md-border-subtle);
   color: var(--md-code);
 }
 
@@ -467,7 +467,7 @@ body.resizing {
   padding: 0.5rem 0.75rem;
   overflow-x: auto;
   margin-bottom: 0.75rem;
-  border: 1px solid var(--md-border-subtle);
+  border: 2px solid var(--md-border-subtle);
 }
 
 .content-view .codehilite pre {
