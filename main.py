@@ -147,6 +147,19 @@ def _preprocess_mermaid_fences(text: str) -> str:
     return pattern.sub(_replace, text)
 
 
+def _render_markdown_html(text: str) -> str:
+    processed = _preprocess_mermaid_fences(text)
+    return markdown.markdown(
+        processed,
+        extensions=["extra", "codehilite", "pymdownx.tasklist"],
+        extension_configs={
+            "codehilite": {"guess_lang": False, "noclasses": True},
+            "pymdownx.tasklist": {"clickable_checkbox": False},
+        },
+        tab_length=2,
+    )
+
+
 class NotebookSettings(BaseModel):
     editorSpellcheck: bool = False
     theme: str = "gruvbox-dark"
@@ -663,12 +676,7 @@ async def get_note(note_path: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Not a markdown file")
 
     raw = file_path.read_text(encoding="utf-8")
-    processed = _preprocess_mermaid_fences(raw)
-    html = markdown.markdown(
-        processed,
-        extensions=["extra", "codehilite"],
-        extension_configs={"codehilite": {"guess_lang": False, "noclasses": True}},
-    )
+    html = _render_markdown_html(raw)
 
     rel_path = file_path.relative_to(NOTES_ROOT).as_posix()
 
@@ -694,12 +702,7 @@ async def export_note_html(note_path: str, theme: str | None = None) -> HTMLResp
         raise HTTPException(status_code=400, detail="Not a markdown file")
 
     raw = file_path.read_text(encoding="utf-8")
-    processed = _preprocess_mermaid_fences(raw)
-    body_html = markdown.markdown(
-        processed,
-        extensions=["extra", "codehilite"],
-        extension_configs={"codehilite": {"guess_lang": False, "noclasses": True}},
-    )
+    body_html = _render_markdown_html(raw)
 
     title = file_path.stem or file_path.name
     safe_title = html_module.escape(title, quote=True)

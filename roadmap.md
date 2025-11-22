@@ -115,8 +115,8 @@
 
 ## v1.2.8 - Markdown formatting
 
-- [] Markdown checkboxes are not rendering
-- [] Indentations are not rendering. Some indents are 2 spaces.
+- [x] Markdown checkboxes are not rendering (implemented)
+- [x] Indentations are not rendering. Some indents are 2 spaces. (implemented)
 
 ## - trouble items
 

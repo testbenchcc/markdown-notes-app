@@ -26,7 +26,7 @@ This application was created with AI.
  - Notebook-level settings are stored in a JSON file under the notes root so they travel with exported/imported notebooks.
  - Dot-prefixed files and folders are automatically hidden from the notes tree and search results to keep the notebook view clean.
 - Configurable index page title and file tree footer status showing the current app build number and git tag (when available)
-- Improved markdown rendering: fenced code blocks with syntax highlighting and tables with clear outlines
+- Improved markdown rendering: fenced code blocks with syntax highlighting, tables with clear outlines, and task list checkboxes with proper indentation
 - Mermaid diagrams rendered from fenced code blocks labeled `mermaid` in the in-app viewer and in exported HTML notes
 - No authentication or user accounts
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
