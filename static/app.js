@@ -1496,6 +1496,13 @@
       }
       items.push({ separator: true });
       items.push({
+        id: "expand-folder-all",
+        label: "Expand all in folder",
+      });
+      items.push({ id: "expand-all", label: "Expand all" });
+      items.push({ id: "collapse-all", label: "Collapse all" });
+      items.push({ separator: true });
+      items.push({
         id: "copy-path",
         label: isRoot ? "Copy notebook root path" : "Copy folder path",
       });
@@ -1598,6 +1605,14 @@
         await renameItem("folder", path || "");
       } else if (actionId === "delete") {
         await deleteItem("folder", path || "");
+      } else if (actionId === "expand-folder-all") {
+        if (targetEl && targetEl.classList.contains("folder")) {
+          expandAllInFolder(targetEl);
+        }
+      } else if (actionId === "expand-all") {
+        expandAllFolders();
+      } else if (actionId === "collapse-all") {
+        collapseAllFolders();
       }
       return;
     }
@@ -1694,6 +1709,24 @@
     expandedFolderPaths = next;
   }
 
+  function setFolderExpanded(folderItem, expanded) {
+    if (!folderItem) return;
+    const childrenContainer = folderItem.nextElementSibling;
+    if (
+      !childrenContainer ||
+      !childrenContainer.classList.contains("tree-children")
+    ) {
+      return;
+    }
+    if (expanded) {
+      folderItem.classList.add("expanded");
+      childrenContainer.style.display = "block";
+    } else {
+      childrenContainer.style.display = "none";
+      folderItem.classList.remove("expanded");
+    }
+  }
+
   function restoreExpandedFolders() {
     if (!treeContainer || !expandedFolderPaths || expandedFolderPaths.size === 0) {
       return;
@@ -1702,15 +1735,40 @@
     items.forEach((item) => {
       const path = item.dataset.path;
       if (typeof path === "string" && expandedFolderPaths.has(path)) {
-        const childrenContainer = item.nextElementSibling;
-        if (
-          childrenContainer &&
-          childrenContainer.classList.contains("tree-children")
-        ) {
-          item.classList.add("expanded");
-          childrenContainer.style.display = "block";
-        }
+        setFolderExpanded(item, true);
       }
+    });
+  }
+
+  function expandAllInFolder(folderItem) {
+    if (!folderItem || !treeContainer) return;
+    const baseContainer = folderItem.nextElementSibling;
+    if (
+      !baseContainer ||
+      !baseContainer.classList.contains("tree-children")
+    ) {
+      return;
+    }
+    setFolderExpanded(folderItem, true);
+    const folders = baseContainer.querySelectorAll(".tree-item.folder");
+    folders.forEach((el) => {
+      setFolderExpanded(el, true);
+    });
+  }
+
+  function expandAllFolders() {
+    if (!treeContainer) return;
+    const folders = treeContainer.querySelectorAll(".tree-item.folder");
+    folders.forEach((item) => {
+      setFolderExpanded(item, true);
+    });
+  }
+
+  function collapseAllFolders() {
+    if (!treeContainer) return;
+    const folders = treeContainer.querySelectorAll(".tree-item.folder");
+    folders.forEach((item) => {
+      setFolderExpanded(item, false);
     });
   }
 
@@ -1818,12 +1876,8 @@
 
       label.addEventListener("click", (e) => {
         e.stopPropagation();
-        const expanded = item.classList.toggle("expanded");
-        if (expanded) {
-          childrenContainer.style.display = "block";
-        } else {
-          childrenContainer.style.display = "none";
-        }
+        const expanded = item.classList.contains("expanded");
+        setFolderExpanded(item, !expanded);
       });
 
       container.appendChild(item);
@@ -2294,15 +2348,8 @@
     if (e.key === "ArrowRight") {
       if (isFolder) {
         const expanded = current.classList.contains("expanded");
-        const childrenContainer = current.nextElementSibling;
         if (!expanded) {
-          current.classList.add("expanded");
-          if (
-            childrenContainer &&
-            childrenContainer.classList.contains("tree-children")
-          ) {
-            childrenContainer.style.display = "block";
-          }
+          setFolderExpanded(current, true);
         } else {
           const next = items[currentIndex + 1];
           if (next) {
@@ -2315,14 +2362,7 @@
 
     if (e.key === "ArrowLeft") {
       if (isFolder && current.classList.contains("expanded")) {
-        const childrenContainer = current.nextElementSibling;
-        if (
-          childrenContainer &&
-          childrenContainer.classList.contains("tree-children")
-        ) {
-          childrenContainer.style.display = "none";
-        }
-        current.classList.remove("expanded");
+        setFolderExpanded(current, false);
       } else {
         const parentFolder = findParentFolder(current);
         if (parentFolder) {
@@ -2334,14 +2374,8 @@
 
     if (e.key === "Enter" || e.key === " ") {
       if (isFolder) {
-        const childrenContainer = current.nextElementSibling;
-        const expanded = current.classList.toggle("expanded");
-        if (
-          childrenContainer &&
-          childrenContainer.classList.contains("tree-children")
-        ) {
-          childrenContainer.style.display = expanded ? "block" : "none";
-        }
+        const expanded = current.classList.contains("expanded");
+        setFolderExpanded(current, !expanded);
       } else if (isNote) {
         current.click();
       }
