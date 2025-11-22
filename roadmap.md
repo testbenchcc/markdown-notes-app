@@ -64,9 +64,10 @@
 
 ## v1.1.8 - Update sub-title 
 
-- [] Add a setting for the page title which is currently hard coded to `NoteBooks`.
-- [] Set the build number (number of commits) and tag (if it exists) for the top-bar-subtitle text. use github api key configured in settings.
+- [] Add a setting for the index page title which is currently hard coded to `NoteBooks`.
+- [] Set the build number (number of commits) and tag (if it exists) for the top-bar-subtitle text on the index page. Use github api key configured in .env.
 
 ## v1.1.9 - Move stored settings into notes folder
 
 - [] Move the notebooks settings into the root notes folder as a JSON file. This way they travel with the notes. 
+- [] Hide dot files from the file tree

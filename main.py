@@ -62,9 +62,8 @@ else:
     NOTES_ROOT = APP_ROOT / "notes"
 
 
-NOTES_REPO_REMOTE_URL = os.getenv("NOTES_REPO_REMOTE_URL") or "https://github.com/testbenchcc/markdown-notes.git"
-APP_REPO_REMOTE_URL = os.getenv("APP_REPO_REMOTE_URL") or "https://github.com/testbenchcc/markdown-notes-app.git"
-
+NOTES_REPO_REMOTE_URL = os.getenv("NOTES_REPO_REMOTE_URL")
+APP_REPO_REMOTE_URL = os.getenv("APP_REPO_REMOTE_URL")
 
 class SaveNoteRequest(BaseModel):
     content: str
@@ -892,6 +891,48 @@ async def versioning_notes_pull() -> Dict[str, Any]:
 @app.post("/api/versioning/app/pull")
 async def versioning_app_pull() -> Dict[str, Any]:
     return auto_pull_app_repo()
+
+
+def get_app_version_info() -> Dict[str, Any]:
+    git_dir = APP_ROOT / ".git"
+    if not git_dir.is_dir():
+        return {
+            "build_number": None,
+            "latest_tag": None,
+            "git_available": False,
+        }
+
+    build_number: int | None = None
+    try:
+        count_proc = _run_app_git(["rev-list", "--count", "HEAD"])  # type: ignore[list-item]
+        raw_count = count_proc.stdout.strip()
+        if raw_count:
+            build_number = int(raw_count.splitlines()[0])
+    except Exception:
+        build_number = None
+
+    latest_tag: str | None = None
+    try:
+        describe_proc = _run_app_git(["describe", "--tags", "--abbrev=0"])  # type: ignore[list-item]
+        if describe_proc.returncode == 0:
+            raw_tag = describe_proc.stdout.strip()
+            if raw_tag:
+                latest_tag = raw_tag.splitlines()[0]
+    except Exception:
+        latest_tag = None
+
+    return {
+        "build_number": build_number,
+        "latest_tag": latest_tag,
+        "git_available": True,
+    }
+
+
+@app.get("/api/versioning/app/info")
+async def versioning_app_info() -> Dict[str, Any]:
+    info = get_app_version_info()
+    info["github_api_key_configured"] = bool(os.getenv("GITHUB_API_KEY"))
+    return info
 
 
 @app.get("/api/versioning/status")

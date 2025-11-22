@@ -20,6 +20,9 @@
   const noteExportBtn = document.getElementById("note-export-btn");
   const settingsBtn = document.getElementById("settings-btn");
   const themeLinkEl = document.getElementById("theme-stylesheet");
+  const pageTitleEl = document.querySelector("title");
+  const topBarTitleEl = document.getElementById("top-bar-title");
+  const topBarSubtitleEl = document.getElementById("top-bar-subtitle");
 
   const contextMenuEl = document.createElement("div");
   contextMenuEl.id = "context-menu";
@@ -38,6 +41,7 @@
   let settingsOverlayEl = null;
   let settingsInitialized = false;
   let settingsEditorSpellcheckInput = null;
+  let settingsIndexPageTitleInput = null;
   let settingsThemeSelect = null;
   let settingsExportThemeSelect = null;
   let settingsAutoCommitNotesInput = null;
@@ -94,6 +98,7 @@
       autoPullIntervalMinutes: 30,
       autoPullAppOnRelease: false,
       autoPullAppIntervalMinutes: 60,
+      indexPageTitle: "NoteBooks",
     };
   }
 
@@ -137,6 +142,21 @@
       editorEl.spellcheck = !!settings.editorSpellcheck;
     }
     applyTheme(settings.theme);
+    applyIndexTitle(settings);
+  }
+
+  function applyIndexTitle(settings) {
+    const value = (settings && settings.indexPageTitle) || "NoteBooks";
+    if (topBarTitleEl) {
+      topBarTitleEl.textContent = value;
+    }
+    if (pageTitleEl) {
+      if (pageTitleEl.textContent !== value) {
+        pageTitleEl.textContent = value;
+      }
+    } else if (document && document.title !== value) {
+      document.title = value;
+    }
   }
 
   function setSettingsCategoryDirty(categoryId, dirty) {
@@ -172,7 +192,10 @@
     }
     const spellcheckDirty =
       !!draftSettings.editorSpellcheck !== !!savedSettings.editorSpellcheck;
-    setSettingsCategoryDirty("general", spellcheckDirty);
+    const titleDirty =
+      (draftSettings.indexPageTitle || "") !==
+      (savedSettings.indexPageTitle || "");
+    setSettingsCategoryDirty("general", spellcheckDirty || titleDirty);
   }
 
   function updateVersioningCategoryDirty() {
@@ -207,6 +230,9 @@
     }
     if (settingsEditorSpellcheckInput) {
       settingsEditorSpellcheckInput.checked = !!draftSettings.editorSpellcheck;
+    }
+    if (settingsIndexPageTitleInput) {
+      settingsIndexPageTitleInput.value = draftSettings.indexPageTitle || "";
     }
     if (settingsAutoCommitNotesInput) {
       settingsAutoCommitNotesInput.checked = !!draftSettings.autoCommitNotes;
@@ -251,6 +277,9 @@
 
     settingsEditorSpellcheckInput = root.querySelector(
       "#settings-editor-spellcheck"
+    );
+    settingsIndexPageTitleInput = root.querySelector(
+      "#settings-index-page-title"
     );
     settingsThemeSelect = root.querySelector("#settings-theme");
     settingsExportThemeSelect = root.querySelector("#settings-export-theme");
@@ -313,6 +342,18 @@
             : getDefaultSettings();
         }
         draftSettings.editorSpellcheck = !!settingsEditorSpellcheckInput.checked;
+        updateGeneralCategoryDirty();
+      });
+    }
+
+    if (settingsIndexPageTitleInput) {
+      settingsIndexPageTitleInput.addEventListener("input", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        draftSettings.indexPageTitle = settingsIndexPageTitleInput.value || "";
         updateGeneralCategoryDirty();
       });
     }
@@ -560,6 +601,30 @@
       if (versioningGithubApiKeyStatusEl) {
         versioningGithubApiKeyStatusEl.textContent = "Unavailable";
       }
+    }
+  }
+
+  async function refreshAppVersionSubtitle() {
+    if (!topBarSubtitleEl) {
+      return;
+    }
+    try {
+      const data = await fetchJSON("/api/versioning/app/info");
+      const build =
+        typeof data.build_number === "number" ? data.build_number : null;
+      const tag = data.latest_tag || null;
+      const parts = [];
+      if (build !== null) {
+        parts.push(`Build ${build}`);
+      }
+      if (tag) {
+        parts.push(`Tag ${tag}`);
+      }
+      if (!parts.length) {
+        return;
+      }
+      topBarSubtitleEl.textContent = parts.join(" | ");
+    } catch (err) {
     }
   }
 
@@ -1668,4 +1733,5 @@
 
   setupSplitter();
   loadTree();
+  refreshAppVersionSubtitle();
 })();

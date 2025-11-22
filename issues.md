@@ -1,2 +1,0 @@
-- There is no way to interact with the `Notes` panel tree items. Please create a basic context menu for deleting, moving, editing, and creating new folders, notes, and files.
-- I created some notes using the `New Note` button. The notes are not appearing in the tree. The files are being created without the `.md` extention. 
