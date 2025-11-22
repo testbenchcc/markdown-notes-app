@@ -554,6 +554,10 @@ body.resizing {
   color: var(--md-code);
 }
 
+.editor-highlighter .tok-link {
+  color: var(--md-link);
+}
+
 .content-edit {
   position: relative;
   z-index: 1;
@@ -632,6 +636,11 @@ body.resizing {
 
 .content-view p {
   margin-bottom: 0.5rem;
+}
+
+.content-view img {
+  max-width: 100%;
+  height: auto;
 }
 
 .content-view ul,

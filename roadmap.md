@@ -141,11 +141,13 @@
 
 ## v1.3.4 - Images in notes
 
-- [ ] Create a setting for image storage location within the notes repository
-- [ ] Allow pasting of images into notes. Save the images into the set location.
-- [ ] Use a text based reference in the editor, and render the image in the reader.
-- [ ] Allow for an image label and alignment (for image) in the text reference. Place the label in the bottom center of the photo.
-- [ ] When an image is clicked, open it in a full screen modal so that it can be viewed in its entirety.
+- [x] Auto rename new files using datetime.
+- [x] periodic cleanup. If the image is not referenced, get rid of it.
+- [x] Support only support paste in.
+- [x] Add a textual reference to the image, much like other markdown editors (`![image desc](./configured/path/to/image.png)`).
+- [x] Validate image formats (png, gif, jpeg, svg, jpg, webp). Avoid accidental unsupported files.
+- [x] Add a setting for max image size on paste, confirm with user to bypass when pasted if we exceed the max.
+- [x] Add a setting for storage location. It must be within the notes folder.
 
 ## v1.3.5 - Expand tree context menu
 
@@ -153,7 +155,7 @@
 
 ## v1.3.6 - Commit conditions
 
-- [ ] Our current save configuration leaves us suceptable to missing saves. Whatever the save button is doing now, I would like to do the same when we switch from the editor to the reader, when we change notes, when we delete something, when we rename something, and finally, when we create a new note. We should also auto save after a period (configurated in the settings modal) 
+- [ ] Our current save configuration leaves us suceptable to missing saves. Whatever the save button is doing now, I would like to do the same when we switch from the editor to the reader, when we change notes, when we delete something, when we rename something, when we save settings modal, and finally, when we create a new note. We should also auto save after a period (configurated in the settings modal) 
 - [ ] Remove the save button
 
 ## 1.3.7 - Keyboard shortcuts
@@ -161,3 +163,11 @@
 - [ ] Add tipical keyboard shortcuts when we are using the editor.
   - ctrl+s: manually trigger a save. Do not show the default save dialog moast browsers show.
   - tab: insert a tab. This currently being used for screen navigation by the system. 
+
+## v1.3.8 - Move env variable to settings modal
+
+- [ ] Move NOTES_ROOT into the settings modal
+
+## v1.3.9 - Allow viewing of images
+
+- [ ] Allow user to view images in file tree, and view then in the right pane when selected.

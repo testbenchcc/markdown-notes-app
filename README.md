@@ -24,6 +24,7 @@ This application was created with AI.
   - Remembers the last opened note per browser (localStorage)
   - Theme support with a Gruvbox-inspired dark default (based on Obsidian Gruvbox), plus Office and High Contrast themes
 - Simple text search across markdown notes
+- Paste images directly into notes; images are saved under a configurable subfolder inside the notebook (default `images/`) and referenced using standard markdown image syntax via a `/files/...` path. An Images section in the Settings modal controls the storage folder, a soft max paste size, and a cleanup action that removes unreferenced images, while a File handling section controls how images are displayed in the viewer (fit to width vs max width/height and a default alignment of left/center/right).
 - Settings modal (via the file tree footer Settings button with a gear icon), sized to 80vw by 90vh with vertically scrollable content when needed, with per-browser preferences including options to enable spellcheck in the editor, select the UI theme, choose a default theme for exported HTML notes, and access notebook export/import controls
  - Notebook-level settings are stored in a JSON file under the notes root so they travel with exported/imported notebooks.
  - Dot-prefixed files and folders are automatically hidden from the notes tree and search results to keep the notebook view clean.

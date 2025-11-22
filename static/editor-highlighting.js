@@ -29,6 +29,38 @@
       .replace(/>/g, "&gt;");
   }
 
+  function highlightLinksAndEscape(text) {
+    if (!text) {
+      return "";
+    }
+
+    const re = /(!?\[[^\]]*\]\([^\)]+\))/g;
+    let lastIndex = 0;
+    let result = "";
+    let match;
+
+    while ((match = re.exec(text)) !== null) {
+      const before = text.slice(lastIndex, match.index);
+      if (before) {
+        result += escapeHtml(before);
+      }
+      const token = match[0];
+      result += `<span class="tok-link">${escapeHtml(token)}</span>`;
+      lastIndex = match.index + token.length;
+    }
+
+    const after = text.slice(lastIndex);
+    if (after) {
+      result += escapeHtml(after);
+    }
+
+    if (!result) {
+      result = escapeHtml(text);
+    }
+
+    return result;
+  }
+
   function highlightInlineCode(text) {
     if (!text) {
       return "";
@@ -42,7 +74,7 @@
     while ((match = re.exec(text)) !== null) {
       const before = text.slice(lastIndex, match.index);
       if (before) {
-        result += escapeHtml(before);
+        result += highlightLinksAndEscape(before);
       }
       const codeWithDelimiters = match[0];
       result += `<span class="tok-inline-code">${escapeHtml(codeWithDelimiters)}</span>`;
@@ -51,11 +83,11 @@
 
     const after = text.slice(lastIndex);
     if (after) {
-      result += escapeHtml(after);
+      result += highlightLinksAndEscape(after);
     }
 
     if (!result) {
-      result = escapeHtml(text);
+      result = highlightLinksAndEscape(text);
     }
 
     return result;

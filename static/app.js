@@ -42,11 +42,18 @@
   let settingsInitialized = false;
   let settingsEditorSpellcheckInput = null;
   let settingsIndexPageTitleInput = null;
+  let settingsImageDisplayModeSelect = null;
+  let settingsImageMaxWidthInput = null;
+  let settingsImageMaxHeightInput = null;
+  let settingsImageDefaultAlignmentSelect = null;
   let settingsThemeSelect = null;
   let settingsExportThemeSelect = null;
   let settingsAutoCommitNotesInput = null;
   let settingsAutoPullNotesInput = null;
   let settingsAutoPullIntervalInput = null;
+  let settingsImagesStoragePathInput = null;
+  let settingsImagesMaxSizeMbInput = null;
+  let settingsImagesCleanupBtn = null;
 
   let notesAutoPullTimerId = null;
 
@@ -69,6 +76,73 @@
       }
     }
     editorLineNumbersEl.textContent = lines;
+  }
+
+  function applyImageDisplaySettingsInViewer(settings) {
+    if (!viewerEl) {
+      return;
+    }
+    const baseSettings =
+      (settings && typeof settings === "object" && settings) ||
+      savedSettings ||
+      getDefaultSettings();
+
+    const mode = (baseSettings.imageDisplayMode || "fit-width").trim();
+    const maxWidth = Number(baseSettings.imageMaxDisplayWidth || 0);
+    const maxHeight = Number(baseSettings.imageMaxDisplayHeight || 0);
+    const align = (baseSettings.imageDefaultAlignment || "left").trim();
+
+    const images = viewerEl.querySelectorAll("img");
+    images.forEach((img) => {
+      if (!img) return;
+
+      img.style.maxWidth = "";
+      img.style.maxHeight = "";
+      img.style.width = "";
+      img.style.height = "";
+      img.style.marginLeft = "";
+      img.style.marginRight = "";
+
+      if (mode === "fit-width") {
+        img.style.width = "100%";
+        img.style.height = "auto";
+        if (maxWidth > 0) {
+          img.style.maxWidth = `${maxWidth}px`;
+        }
+        if (maxHeight > 0) {
+          img.style.maxHeight = `${maxHeight}px`;
+        }
+      } else if (mode === "max-size") {
+        img.style.height = "auto";
+        if (maxWidth > 0) {
+          img.style.maxWidth = `${maxWidth}px`;
+        }
+        if (maxHeight > 0) {
+          img.style.maxHeight = `${maxHeight}px`;
+        }
+      }
+
+      let block = img;
+      const parent = img.parentElement;
+      if (
+        parent &&
+        parent.tagName === "P" &&
+        parent.children.length === 1 &&
+        parent.querySelector("img") === img
+      ) {
+        block = parent;
+      }
+
+      block.style.textAlign = "";
+
+      if (align === "center") {
+        block.style.textAlign = "center";
+      } else if (align === "right") {
+        block.style.textAlign = "right";
+      } else {
+        block.style.textAlign = "left";
+      }
+    });
   }
 
   function syncEditorLineNumbersScroll() {
@@ -100,6 +174,36 @@
       return;
     }
     el.scrollTop = clamped * max;
+  }
+
+  function insertTextAtCursor(textarea, text) {
+    if (!textarea) {
+      return;
+    }
+    const value = textarea.value || "";
+    const start =
+      typeof textarea.selectionStart === "number"
+        ? textarea.selectionStart
+        : value.length;
+    const end =
+      typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : start;
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+    const nextValue = before + text + after;
+    textarea.value = nextValue;
+    const nextPos = start + text.length;
+    try {
+      textarea.selectionStart = nextPos;
+      textarea.selectionEnd = nextPos;
+    } catch (e) {
+      // Ignore selection errors
+    }
+    if (
+      window.markdownEditorHighlighter &&
+      typeof window.markdownEditorHighlighter.refresh === "function"
+    ) {
+      window.markdownEditorHighlighter.refresh();
+    }
   }
 
   let versioningNotesRootEl = null;
@@ -155,6 +259,12 @@
       autoPullNotes: false,
       autoPullIntervalMinutes: 30,
       indexPageTitle: "NoteBooks",
+      imageStoragePath: "images",
+      imageMaxPasteBytes: 5 * 1024 * 1024,
+      imageDisplayMode: "fit-width",
+      imageMaxDisplayWidth: 0,
+      imageMaxDisplayHeight: 0,
+      imageDefaultAlignment: "left",
     };
   }
 
@@ -237,6 +347,7 @@
     }
     applyTheme(settings.theme);
     applyIndexTitle(settings);
+    applyImageDisplaySettingsInViewer(settings);
   }
 
   function applyIndexTitle(settings) {
@@ -289,7 +400,36 @@
     const titleDirty =
       (draftSettings.indexPageTitle || "") !==
       (savedSettings.indexPageTitle || "");
-    setSettingsCategoryDirty("general", spellcheckDirty || titleDirty);
+    const imagePathDraft = (draftSettings.imageStoragePath || "").trim();
+    const imagePathSaved = (savedSettings.imageStoragePath || "").trim();
+    const imagePathDirty = imagePathDraft !== imagePathSaved;
+    const maxDraft = Number(draftSettings.imageMaxPasteBytes || 0);
+    const maxSaved = Number(savedSettings.imageMaxPasteBytes || 0);
+    const imageMaxDirty = maxDraft !== maxSaved;
+    const anyDirty =
+      spellcheckDirty || titleDirty || imagePathDirty || imageMaxDirty;
+    setSettingsCategoryDirty("general", anyDirty);
+  }
+
+  function updateFileHandlingCategoryDirty() {
+    if (!savedSettings || !draftSettings) {
+      return;
+    }
+    const modeDraft = (draftSettings.imageDisplayMode || "fit-width").trim();
+    const modeSaved = (savedSettings.imageDisplayMode || "fit-width").trim();
+    const maxWidthDraft = Number(draftSettings.imageMaxDisplayWidth || 0);
+    const maxWidthSaved = Number(savedSettings.imageMaxDisplayWidth || 0);
+    const maxHeightDraft = Number(draftSettings.imageMaxDisplayHeight || 0);
+    const maxHeightSaved = Number(savedSettings.imageMaxDisplayHeight || 0);
+    const alignDraft = (draftSettings.imageDefaultAlignment || "left").trim();
+    const alignSaved = (savedSettings.imageDefaultAlignment || "left").trim();
+
+    const dirty =
+      modeDraft !== modeSaved ||
+      maxWidthDraft !== maxWidthSaved ||
+      maxHeightDraft !== maxHeightSaved ||
+      alignDraft !== alignSaved;
+    setSettingsCategoryDirty("file-handling", dirty);
   }
 
   function updateVersioningCategoryDirty() {
@@ -316,6 +456,31 @@
     }
     if (settingsIndexPageTitleInput) {
       settingsIndexPageTitleInput.value = draftSettings.indexPageTitle || "";
+    }
+    if (settingsImageDisplayModeSelect) {
+      const mode = draftSettings.imageDisplayMode || "fit-width";
+      settingsImageDisplayModeSelect.value = mode;
+    }
+    if (settingsImageMaxWidthInput) {
+      const width = Number(draftSettings.imageMaxDisplayWidth || 0);
+      settingsImageMaxWidthInput.value = width > 0 ? String(width) : "";
+    }
+    if (settingsImageMaxHeightInput) {
+      const height = Number(draftSettings.imageMaxDisplayHeight || 0);
+      settingsImageMaxHeightInput.value = height > 0 ? String(height) : "";
+    }
+    if (settingsImageDefaultAlignmentSelect) {
+      const align = draftSettings.imageDefaultAlignment || "left";
+      settingsImageDefaultAlignmentSelect.value = align;
+    }
+    if (settingsImagesStoragePathInput) {
+      settingsImagesStoragePathInput.value =
+        draftSettings.imageStoragePath || "images";
+    }
+    if (settingsImagesMaxSizeMbInput) {
+      const bytes = Number(draftSettings.imageMaxPasteBytes || 0);
+      settingsImagesMaxSizeMbInput.value =
+        bytes > 0 ? String(Math.round(bytes / (1024 * 1024))) : "";
     }
     if (settingsAutoCommitNotesInput) {
       settingsAutoCommitNotesInput.checked = !!draftSettings.autoCommitNotes;
@@ -356,6 +521,27 @@
     );
     settingsIndexPageTitleInput = root.querySelector(
       "#settings-index-page-title"
+    );
+    settingsImageDisplayModeSelect = root.querySelector(
+      "#settings-image-display-mode"
+    );
+    settingsImageMaxWidthInput = root.querySelector(
+      "#settings-image-max-width"
+    );
+    settingsImageMaxHeightInput = root.querySelector(
+      "#settings-image-max-height"
+    );
+    settingsImageDefaultAlignmentSelect = root.querySelector(
+      "#settings-image-default-alignment"
+    );
+    settingsImagesStoragePathInput = root.querySelector(
+      "#settings-image-storage-path"
+    );
+    settingsImagesMaxSizeMbInput = root.querySelector(
+      "#settings-image-max-size-mb"
+    );
+    settingsImagesCleanupBtn = root.querySelector(
+      "#settings-images-cleanup-btn"
     );
     settingsThemeSelect = root.querySelector("#settings-theme");
     settingsExportThemeSelect = root.querySelector("#settings-export-theme");
@@ -454,6 +640,98 @@
       });
     }
 
+    if (settingsImageDisplayModeSelect) {
+      settingsImageDisplayModeSelect.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const value = settingsImageDisplayModeSelect.value || "fit-width";
+        draftSettings.imageDisplayMode = value;
+        updateFileHandlingCategoryDirty();
+      });
+    }
+
+    if (settingsImageMaxWidthInput) {
+      settingsImageMaxWidthInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const raw = settingsImageMaxWidthInput.value;
+        let px = parseInt(raw, 10);
+        if (!Number.isFinite(px) || px <= 0) {
+          px = 0;
+        }
+        draftSettings.imageMaxDisplayWidth = px;
+        updateFileHandlingCategoryDirty();
+      });
+    }
+
+    if (settingsImageMaxHeightInput) {
+      settingsImageMaxHeightInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const raw = settingsImageMaxHeightInput.value;
+        let px = parseInt(raw, 10);
+        if (!Number.isFinite(px) || px <= 0) {
+          px = 0;
+        }
+        draftSettings.imageMaxDisplayHeight = px;
+        updateFileHandlingCategoryDirty();
+      });
+    }
+
+    if (settingsImageDefaultAlignmentSelect) {
+      settingsImageDefaultAlignmentSelect.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const value =
+          settingsImageDefaultAlignmentSelect.value || "left";
+        draftSettings.imageDefaultAlignment = value;
+        updateFileHandlingCategoryDirty();
+      });
+    }
+
+    if (settingsImagesStoragePathInput) {
+      settingsImagesStoragePathInput.addEventListener("input", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const value = settingsImagesStoragePathInput.value || "";
+        draftSettings.imageStoragePath = value.trim();
+        updateGeneralCategoryDirty();
+      });
+    }
+
+    if (settingsImagesMaxSizeMbInput) {
+      settingsImagesMaxSizeMbInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const raw = settingsImagesMaxSizeMbInput.value;
+        let mb = parseInt(raw, 10);
+        if (!Number.isFinite(mb) || mb <= 0) {
+          draftSettings.imageMaxPasteBytes = 0;
+        } else {
+          draftSettings.imageMaxPasteBytes = mb * 1024 * 1024;
+        }
+        updateGeneralCategoryDirty();
+      });
+    }
+
     if (settingsAutoCommitNotesInput) {
       settingsAutoCommitNotesInput.addEventListener("change", () => {
         if (!draftSettings) {
@@ -533,6 +811,13 @@
       settingsImportNotebookBtn.addEventListener("click", (e) => {
         e.preventDefault();
         triggerImportFilePicker();
+      });
+    }
+
+    if (settingsImagesCleanupBtn) {
+      settingsImagesCleanupBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await runImageCleanup();
       });
     }
 
@@ -666,6 +951,7 @@
     clearAllSettingsCategoryDirty();
     updateGeneralCategoryDirty();
     updateVersioningCategoryDirty();
+    updateFileHandlingCategoryDirty();
     refreshVersioningStatus();
     settingsOverlayEl.classList.remove("hidden");
     document.body.classList.add("settings-open");
@@ -707,6 +993,25 @@
       if (versioningGithubApiKeyStatusEl) {
         versioningGithubApiKeyStatusEl.textContent = "Unavailable";
       }
+    }
+  }
+
+  async function runImageCleanup() {
+    try {
+      clearError();
+      const result = await fetchJSON("/api/images/cleanup", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      const total = typeof result.total === "number" ? result.total : 0;
+      const deleted = Array.isArray(result.deleted)
+        ? result.deleted.length
+        : 0;
+      showError(
+        `Image cleanup completed: deleted ${deleted} of ${total} file(s).`
+      );
+    } catch (err) {
+      showError(`Failed to cleanup images: ${err.message}`);
     }
   }
 
@@ -1556,6 +1861,7 @@
       noteNameEl.textContent = note.name;
       notePathEl.textContent = note.path;
       viewerEl.innerHTML = note.html || "";
+      applyImageDisplaySettingsInViewer();
       renderMermaidInViewer();
       editorEl.value = note.content || "";
       if (
@@ -1635,6 +1941,88 @@
     } catch (err) {
       showError(`Failed to save note: ${err.message}`);
     }
+  }
+
+  async function uploadImageFileForNote(notePath, file) {
+    if (!file) return null;
+    const formData = new FormData();
+    formData.append("note_path", notePath || "");
+    formData.append("file", file);
+    const res = await fetch("/api/images/paste", {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Request failed (${res.status}): ${text}`);
+    }
+    return res.json();
+  }
+
+  async function handleEditorPaste(e) {
+    if (!editorEl) return;
+    const dt = e.clipboardData;
+    if (!dt || !dt.items || !dt.items.length) {
+      return;
+    }
+
+    const imageFiles = [];
+    for (let i = 0; i < dt.items.length; i++) {
+      const item = dt.items[i];
+      if (!item) continue;
+      if (item.kind === "file" && item.type && item.type.indexOf("image/") === 0) {
+        const file = item.getAsFile && item.getAsFile();
+        if (file) {
+          imageFiles.push(file);
+        }
+      }
+    }
+
+    if (!imageFiles.length) {
+      return;
+    }
+
+    if (!currentNote || !currentNote.path) {
+      showError("Paste images is only available when a note is selected.");
+      e.preventDefault();
+      return;
+    }
+
+    e.preventDefault();
+
+    const settings = savedSettings || getDefaultSettings();
+    const maxBytes = Number(settings.imageMaxPasteBytes || 0);
+
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
+      if (!file) continue;
+      const size = typeof file.size === "number" ? file.size : 0;
+
+      if (maxBytes > 0 && size > maxBytes) {
+        const sizeMb = size / (1024 * 1024);
+        const limitMb = maxBytes / (1024 * 1024);
+        const message =
+          `Image is ${sizeMb.toFixed(2)} MB, limit is ${limitMb.toFixed(
+            2
+          )} MB. Paste anyway?`;
+        const proceed = window.confirm(message);
+        if (!proceed) {
+          continue;
+        }
+      }
+
+      try {
+        const result = await uploadImageFileForNote(currentNote.path, file);
+        if (result && result.markdown) {
+          const text = String(result.markdown || "") + "\n";
+          insertTextAtCursor(editorEl, text);
+        }
+      } catch (err) {
+        showError(`Failed to upload image: ${err.message}`);
+      }
+    }
+
+    updateEditorLineNumbers();
   }
 
   async function promptNewFolder(parentFolderPath) {
@@ -1990,6 +2378,9 @@
     });
     editorEl.addEventListener("scroll", () => {
       syncEditorLineNumbersScroll();
+    });
+    editorEl.addEventListener("paste", (e) => {
+      handleEditorPaste(e);
     });
   }
 

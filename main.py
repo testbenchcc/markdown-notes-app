@@ -22,6 +22,7 @@ import io
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import zipfile
@@ -33,7 +34,7 @@ import html as html_module
 from dotenv import load_dotenv
 import markdown
 import requests
-from fastapi import FastAPI, HTTPException, Query, File, UploadFile
+from fastapi import FastAPI, HTTPException, Query, File, UploadFile, Form
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -51,9 +52,19 @@ EXPORT_THEME_CSS_MAP: Dict[str, Path] = {
     "midnight": APP_ROOT / "static" / "styles-midnight.css",
 }
 
-DEFAULT_EXPORT_THEME_ID = "gruvbox-dark"
+DEFAULT_EXPORT_THEME_ID = "office"
 
 MERMAID_JS_PATH = APP_ROOT / "static" / "mermaid.min.js"
+
+ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+ALLOWED_IMAGE_MIME_TYPES: Dict[str, str] = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+}
 
 # Root folder where markdown notes are stored. Change this in one place if
 # you want to point the app at a different notes directory.
@@ -169,6 +180,12 @@ class NotebookSettings(BaseModel):
     autoPullNotes: bool = False
     autoPullIntervalMinutes: int = 30
     indexPageTitle: str = "NoteBooks"
+    imageStoragePath: str = "images"
+    imageMaxPasteBytes: int = 5 * 1024 * 1024
+    imageDisplayMode: str = "fit-width"
+    imageMaxDisplayWidth: int = 0
+    imageMaxDisplayHeight: int = 0
+    imageDefaultAlignment: str = "left"
 
     class Config:
         extra = "ignore"
@@ -222,6 +239,11 @@ def _resolve_destination_path(relative_path: str) -> Path:
         raise HTTPException(status_code=400, detail="Path escapes notes root")
 
     return full
+
+
+def _guess_image_mime_type(path: Path) -> str:
+    ext = path.suffix.lower()
+    return ALLOWED_IMAGE_MIME_TYPES.get(ext, "application/octet-stream")
 
 
 def get_git_last_commit_timestamp(path: Path) -> int | None:
@@ -952,6 +974,154 @@ async def create_note(payload: CreatePathRequest) -> Dict[str, Any]:
     rel_path = file_path.relative_to(NOTES_ROOT).as_posix()
 
     return {"ok": True, "path": rel_path, "name": file_path.name}
+
+
+@app.get("/files/{file_rel_path:path}", include_in_schema=False)
+async def get_note_file(file_rel_path: str) -> FileResponse:
+    ensure_notes_root()
+    try:
+        file_path = _resolve_relative_path(file_rel_path)
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if file_path.suffix.lower() not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Unsupported file type")
+
+    media_type = _guess_image_mime_type(file_path)
+    return FileResponse(file_path, media_type=media_type)
+
+
+@app.post("/api/images/paste")
+async def upload_pasted_image(
+    note_path: str = Form(...),
+    file: UploadFile = File(...),
+) -> Dict[str, Any]:
+    ensure_notes_root()
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="File is required")
+
+    original_name = file.filename
+    ext = Path(original_name).suffix.lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Unsupported image format")
+
+    settings = load_notebook_settings()
+    storage_rel_raw = "images"
+    if isinstance(settings, dict):
+        value = settings.get("imageStoragePath")
+        if isinstance(value, str) and value.strip():
+            storage_rel_raw = value.strip()
+
+    try:
+        storage_rel = _validate_relative_path(storage_rel_raw)
+    except HTTPException:
+        storage_rel = "images"
+
+    timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d-%H%M%S")
+    random_suffix = secrets.token_hex(2)
+    filename = f"img-{timestamp}-{random_suffix}{ext}"
+    relative_path = f"{storage_rel}/{filename}"
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="File is empty")
+
+    full_path = _resolve_destination_path(relative_path)
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+    full_path.write_bytes(data)
+
+    rel_for_markdown = full_path.relative_to(NOTES_ROOT).as_posix()
+    markdown = f"![image](/files/{rel_for_markdown})"
+
+    return {
+        "ok": True,
+        "path": rel_for_markdown,
+        "markdown": markdown,
+        "original_filename": original_name,
+        "note_path": note_path,
+    }
+
+
+@app.post("/api/images/cleanup")
+async def cleanup_images() -> Dict[str, Any]:
+    ensure_notes_root()
+
+    settings = load_notebook_settings()
+    storage_rel_raw = "images"
+    if isinstance(settings, dict):
+        value = settings.get("imageStoragePath")
+        if isinstance(value, str) and value.strip():
+            storage_rel_raw = value.strip()
+
+    try:
+        storage_rel = _validate_relative_path(storage_rel_raw)
+    except HTTPException:
+        raise HTTPException(status_code=400, detail="Invalid image storage path")
+
+    storage_root = _resolve_destination_path(storage_rel)
+    if not storage_root.is_dir():
+        return {"ok": True, "deleted": [], "kept": [], "total": 0}
+
+    all_images: dict[str, Path] = {}
+    for path in storage_root.rglob("*"):
+        if path.is_file() and path.suffix.lower() in ALLOWED_IMAGE_EXTENSIONS:
+            rel = path.relative_to(NOTES_ROOT).as_posix()
+            all_images[rel] = path
+
+    if not all_images:
+        return {"ok": True, "deleted": [], "kept": [], "total": 0}
+
+    pattern = re.compile(r"!\[[^\]]*]\(([^)]+)\)")
+    referenced: set[str] = set()
+
+    for note_path in NOTES_ROOT.rglob("*.md"):
+        if not note_path.is_file():
+            continue
+
+        rel_parts = note_path.relative_to(NOTES_ROOT).parts
+        if any(part.startswith(".") for part in rel_parts):
+            continue
+
+        try:
+            text = note_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        for match in pattern.finditer(text):
+            url = (match.group(1) or "").strip()
+            if not url:
+                continue
+
+            if url.startswith("/files/"):
+                candidate = url[len("/files/") :]
+            else:
+                continue
+
+            try:
+                safe_rel = _validate_relative_path(candidate)
+            except HTTPException:
+                continue
+
+            if safe_rel in all_images:
+                referenced.add(safe_rel)
+
+    deleted: list[str] = []
+    for rel, path in list(all_images.items()):
+        if rel in referenced:
+            continue
+        try:
+            path.unlink()
+            deleted.append(rel)
+        except Exception:
+            continue
+
+    kept = sorted(rel for rel in all_images.keys() if rel not in deleted)
+
+    return {"ok": True, "deleted": sorted(deleted), "kept": kept, "total": len(all_images)}
 
 
 @app.get("/api/export")
