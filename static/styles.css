@@ -439,6 +439,35 @@ body.resizing {
   background: var(--md-bg-alt);
 }
 
+.editor-visual-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.editor-highlighter {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  color: var(--md-text-main);
+  pointer-events: none;
+}
+
+.editor-highlighter-content {
+  min-height: 100%;
+  white-space: pre;
+}
+
+.editor-highlighter {
+  scrollbar-width: none;
+}
+
+.editor-highlighter::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .editor-line-numbers {
   flex: 0 0 auto;
   padding: 0.75rem 0.5rem 0.75rem 0.75rem;
@@ -457,6 +486,77 @@ body.resizing {
 .content-view,
 .content-edit {
   flex: 1;
+  color: var(--md-text-main);
+}
+
+.editor-highlighter .tok-h1 {
+  color: var(--md-h1);
+}
+
+.editor-highlighter .tok-h2 {
+  color: var(--md-h2);
+}
+
+.editor-highlighter .tok-h3,
+.editor-highlighter .tok-h4,
+.editor-highlighter .tok-h5,
+.editor-highlighter .tok-h6 {
+  color: var(--md-h3);
+}
+
+.editor-highlighter .tok-bullet,
+.editor-highlighter .tok-task-box {
+  color: var(--md-aqua);
+}
+
+.editor-highlighter .tok-task-text,
+.editor-highlighter .tok-bullet-text {
+  color: var(--md-text-main);
+}
+
+.editor-highlighter .tok-fence {
+  color: var(--md-text-muted);
+}
+
+.editor-highlighter .tok-code-line {
+  color: var(--md-code);
+}
+
+.editor-highlighter .tok-code-kw {
+  color: var(--md-purple);
+}
+
+.editor-highlighter .tok-code-str {
+  color: var(--md-aqua);
+}
+
+.editor-highlighter .tok-code-num {
+  color: var(--md-h2);
+}
+
+.editor-highlighter .tok-code-comment {
+  color: var(--md-text-muted);
+}
+
+.content-edit {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  resize: none;
+  color: transparent;
+  caret-color: var(--md-text-main);
+  line-height: 1.4;
+}
+
+.content-edit:focus {
+  outline: none;
+}
+
+.content-view,
+.content-edit {
+  flex: 1;
   padding: 0.75rem 1rem;
   overflow-y: auto;
   font-size: 0.9rem;
@@ -465,19 +565,6 @@ body.resizing {
 .content-view {
   line-height: 1.6;
   color: var(--md-text-main);
-}
-
-.content-edit {
-  background: var(--md-bg-alt);
-  border: none;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  resize: none;
-  color: var(--md-text-main);
-  line-height: 1.4;
-}
-
-.content-edit:focus {
-  outline: none;
 }
 
 .hidden {

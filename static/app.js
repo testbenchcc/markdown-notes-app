@@ -1558,6 +1558,12 @@
       viewerEl.innerHTML = note.html || "";
       renderMermaidInViewer();
       editorEl.value = note.content || "";
+      if (
+        window.markdownEditorHighlighter &&
+        typeof window.markdownEditorHighlighter.refresh === "function"
+      ) {
+        window.markdownEditorHighlighter.refresh();
+      }
       updateEditorLineNumbers();
       modeToggleBtn.disabled = false;
       if (noteExportBtn) {
@@ -1567,6 +1573,12 @@
     } catch (err) {
       viewerEl.textContent = "Failed to load note.";
       editorEl.value = "";
+      if (
+        window.markdownEditorHighlighter &&
+        typeof window.markdownEditorHighlighter.refresh === "function"
+      ) {
+        window.markdownEditorHighlighter.refresh();
+      }
       updateEditorLineNumbers();
       currentNote = null;
       modeToggleBtn.disabled = true;

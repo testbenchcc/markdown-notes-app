@@ -17,6 +17,7 @@ This application was created with AI.
   - View/Edit toggle and Save button
   - Draggable vertical splitter between panes
   - View and edit modes keep scroll position aligned between the reader and editor when toggling
+  - Markdown-aware syntax highlighting in the editor that mirrors the viewer for headings, bullets, task checkboxes, and fenced code blocks
   - Inline error banner for failed API operations
   - Right-click context menu on tree items for quick actions (open note, copy path, create/rename/delete notes and folders)
   - Keyboard navigation in the notes tree (arrow keys, Home/End, Enter/Space)

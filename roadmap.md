@@ -131,8 +131,18 @@
     - static\index.html
 - [x] Change settings modal to always be 90vh, when content does not fit, use vertical scroll bars.
 
-## v1.3.1 - Reader and Editor alignment
+## v1.3.2 - Reader and Editor alignment (skipped v1.3.1) ☉ ‿ ⚆
 
 - [x] When viewing a note, we need to align the reader and the editors with each other. Make sure they both have thier own scrool containers and, when we switch between them, copy the scroll position as a percentage from one to the other.
 
-## v1.3.2 - Syntax highlighting in the editor
+## v1.3.3 - Syntax highlighting in the editor
+
+- [x] Add color formatting to the editor. It should match the reader, only the text size will not change in the editor. Markdown bullets `- [ ]` and normall bullets `- ` should be colored. Code within ``` ``` should have syntax highlighting. 
+
+## v1.3.4 - Images in notes
+
+- [ ] Create a setting for image storage location within the notes repository
+- [ ] Allow pasting of images into notes. Save the images into the set location.
+- [ ] Use a text based reference in the editor, and render the image in the reader.
+- [ ] Allow for an image label and alignment (for image) in the text reference. Place the label in the bottom center of the photo.
+- [ ] When an image is clicked, open it in a full screen modal so that it can be viewed in its entirety.
