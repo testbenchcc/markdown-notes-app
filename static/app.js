@@ -1499,6 +1499,10 @@
         id: "expand-folder-all",
         label: "Expand all in folder",
       });
+      items.push({
+        id: "collapse-folder-all",
+        label: "Collapse all in folder",
+      });
       items.push({ id: "expand-all", label: "Expand all" });
       items.push({ id: "collapse-all", label: "Collapse all" });
       items.push({ separator: true });
@@ -1508,6 +1512,8 @@
       });
     } else if (target.type === "note") {
       items.push({ id: "open-note", label: "Open note" });
+      items.push({ id: "edit-note", label: "Edit note" });
+      items.push({ id: "export-note", label: "Export note" });
       items.push({ id: "rename", label: "Rename note" });
       items.push({ id: "delete", label: "Delete note" });
       items.push({ separator: true });
@@ -1609,6 +1615,10 @@
         if (targetEl && targetEl.classList.contains("folder")) {
           expandAllInFolder(targetEl);
         }
+      } else if (actionId === "collapse-folder-all") {
+        if (targetEl && targetEl.classList.contains("folder")) {
+          collapseAllInFolder(targetEl);
+        }
       } else if (actionId === "expand-all") {
         expandAllFolders();
       } else if (actionId === "collapse-all") {
@@ -1624,6 +1634,24 @@
           targetEl.classList.add("selected");
         }
         await loadNote(path);
+      } else if (actionId === "edit-note" && path) {
+        if (targetEl) {
+          clearSelection();
+          targetEl.classList.add("selected");
+        }
+        if (!currentNote || currentNote.path !== path) {
+          await loadNote(path);
+        }
+        setMode("edit");
+      } else if (actionId === "export-note" && path) {
+        if (targetEl) {
+          clearSelection();
+          targetEl.classList.add("selected");
+        }
+        if (!currentNote || currentNote.path !== path) {
+          await loadNote(path);
+        }
+        await downloadCurrentNoteHtml();
       } else if (actionId === "rename" && path) {
         await renameItem("note", path);
       } else if (actionId === "delete" && path) {
@@ -1754,6 +1782,22 @@
     folders.forEach((el) => {
       setFolderExpanded(el, true);
     });
+  }
+
+  function collapseAllInFolder(folderItem) {
+    if (!folderItem || !treeContainer) return;
+    const baseContainer = folderItem.nextElementSibling;
+    if (
+      !baseContainer ||
+      !baseContainer.classList.contains("tree-children")
+    ) {
+      return;
+    }
+    const folders = baseContainer.querySelectorAll(".tree-item.folder");
+    folders.forEach((el) => {
+      setFolderExpanded(el, false);
+    });
+    setFolderExpanded(folderItem, false);
   }
 
   function expandAllFolders() {

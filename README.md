@@ -19,7 +19,7 @@ This application was created with AI.
   - View and edit modes keep scroll position aligned between the reader and editor when toggling
   - Markdown-aware syntax highlighting in the editor that mirrors the viewer for headings, bullets, task checkboxes, and fenced code blocks
   - Inline error banner for failed API operations
-  - Right-click context menu on tree items for quick actions (open note, copy path, create/rename/delete notes and folders, expand all in a folder, expand all, and collapse all)
+  - Right-click context menu on tree items for quick actions (open/edit/export notes, copy path, create/rename/delete notes and folders, expand all in a folder, collapse all in a folder, expand all, and collapse all)
   - Keyboard navigation in the notes tree (arrow keys, Home/End, Enter/Space)
   - Remembers the last opened note per browser (localStorage)
   - Theme support with a Gruvbox-inspired dark default (based on Obsidian Gruvbox), plus Office and High Contrast themes
