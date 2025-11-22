@@ -92,18 +92,13 @@
 
 ## v1.2.3 - Icon Updates and UI Polish
 
-- [] Replace `New Folder` button with a 16x16 folder icon (static/icons/folder.png)
-- [] Replace `New Note` button with a 16x16 file icon (static/icons/file.png)
-- [] Replace the `Settings` button text with a 16x16 settings icon (static/icons/settings.png)
+- [x] Replace `New Folder` button with a 16x16 folder icon (static/icons/folder.png)
+- [x] Replace `New Note` button with a 16x16 file icon (static/icons/file.png)
+- [x] Replace the `Settings` button text with a 16x16 settings icon (static/icons/settings.png)
 
 ## v1.2.4 - Markdown formating improvements
 
 - [] Markdown tables width should not expand to fit the window or panes width. Fit to the contents of the table.
-- [] Add font and size (small, med, large) selection for notes in the apperance settings category. 
-- [] Add font selection for the rest of the site
-
-## 1.2.5 - Render mermaid
-
 - [] When code is marked as mermaid 
 
 ```
