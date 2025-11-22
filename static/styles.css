@@ -120,6 +120,33 @@ body {
   gap: 0.25rem;
 }
 
+.nav-footer {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  border-top: 1px solid var(--md-border-subtle);
+  background: var(--md-bg-alt-soft);
+  font-size: 0.75rem;
+}
+
+.nav-footer-build {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-footer-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.25rem;
+  margin-left: 0.5rem;
+}
+
 .search-input {
   width: 100%;
   padding: 0.2rem 0.4rem;

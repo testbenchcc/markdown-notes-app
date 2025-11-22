@@ -19,8 +19,8 @@
   const settingsBtn = document.getElementById("settings-btn");
   const themeLinkEl = document.getElementById("theme-stylesheet");
   const pageTitleEl = document.querySelector("title");
-  const topBarTitleEl = document.getElementById("top-bar-title");
-  const topBarSubtitleEl = document.getElementById("top-bar-subtitle");
+  const navTitleEl = document.getElementById("nav-title");
+  const navFooterBuildEl = document.getElementById("nav-footer-build");
 
   const contextMenuEl = document.createElement("div");
   contextMenuEl.id = "context-menu";
@@ -181,8 +181,8 @@
 
   function applyIndexTitle(settings) {
     const value = (settings && settings.indexPageTitle) || "NoteBooks";
-    if (topBarTitleEl) {
-      topBarTitleEl.textContent = value;
+    if (navTitleEl) {
+      navTitleEl.textContent = value;
     }
     if (pageTitleEl) {
       if (pageTitleEl.textContent !== value) {
@@ -612,7 +612,7 @@
   }
 
   async function refreshAppVersionSubtitle() {
-    if (!topBarSubtitleEl) {
+    if (!navFooterBuildEl) {
       return;
     }
     try {
@@ -628,10 +628,12 @@
         parts.push(`Tag ${tag}`);
       }
       if (!parts.length) {
+        navFooterBuildEl.textContent = "";
         return;
       }
-      topBarSubtitleEl.textContent = parts.join(" | ");
+      navFooterBuildEl.textContent = parts.join(" | ");
     } catch (err) {
+      navFooterBuildEl.textContent = "";
     }
   }
 

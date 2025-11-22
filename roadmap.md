@@ -85,10 +85,10 @@
 
 ## v1.2.2 - File Tree Structure and Header Layout
 
-- [] Move the settings button to the right side of the file tree footer
-- [] Replace the `Notes` text in the file tree header with the Index page title
-- [] Remove the Index page title bar entirely
-- [] Move `Build | Tag: ...` to the left side of the file tree footer, mirroring the settings button position
+- [x] Move the settings button to the right side of the file tree footer
+- [x] Replace the `Notes` text in the file tree header with the Index page title
+- [x] Move `Build | Tag: ...` to the left side of the file tree footer, mirroring the settings button position
+- [x] Remove the Index page title bar entirely
 
 ## v1.2.3 - Icon Updates and UI Polish
 
@@ -99,7 +99,7 @@
 ## v1.2.4 - Markdown formating improvements
 
 - [] Markdown tables width should not expand to fit the window or panes width. Fit to the contents of the table.
-- [] Add font selection for notes in the apperance settings category. 
+- [] Add font and size (small, med, large) selection for notes in the apperance settings category. 
 - [] Add font selection for the rest of the site
 
 ## 1.2.5 - Render mermaid
@@ -115,4 +115,4 @@ Render the chart/graph in the notes
 ## - trouble items
 
 - [-] When switching between editor and reader modes, keep note scroll positions aligned
-- [] When a new note is created, automatically switch to it and enter edit mode
+- [-] When a new note is created, automatically switch to it and enter edit mode
