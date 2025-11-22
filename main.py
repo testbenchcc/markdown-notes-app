@@ -51,6 +51,8 @@ EXPORT_THEME_CSS_MAP: Dict[str, Path] = {
 
 DEFAULT_EXPORT_THEME_ID = "gruvbox-dark"
 
+MERMAID_JS_PATH = APP_ROOT / "static" / "mermaid.min.js"
+
 # Root folder where markdown notes are stored. Change this in one place if
 # you want to point the app at a different notes directory.
 _env_notes_root = os.getenv("NOTES_ROOT")
@@ -568,7 +570,8 @@ async def get_note(note_path: str) -> Dict[str, Any]:
         "content": raw,
         "html": html,
     }
- 
+
+
 @app.get("/api/export-note/{note_path:path}")
 async def export_note_html(note_path: str, theme: str | None = None) -> HTMLResponse:
     """Export a single markdown note as a standalone HTML document."""
@@ -621,6 +624,12 @@ async def export_note_html(note_path: str, theme: str | None = None) -> HTMLResp
 
     css_text = "\n\n".join(css_parts)
 
+    mermaid_js_text = ""
+    try:
+        mermaid_js_text = MERMAID_JS_PATH.read_text(encoding="utf-8")
+    except Exception:
+        mermaid_js_text = ""
+
     full_html = f"""<!doctype html>
     <html lang="en">
       <head>
@@ -629,11 +638,38 @@ async def export_note_html(note_path: str, theme: str | None = None) -> HTMLResp
         <style>
     {css_text}
         </style>
+        <script>
+    {mermaid_js_text}
+        </script>
       </head>
       <body>
         <div class="content-view">
     {body_html}
         </div>
+        <script>
+    (function() {{
+      var mermaidGlobal = window.mermaid;
+      if (!mermaidGlobal) {{
+        return;
+      }}
+      try {{
+        if (typeof mermaidGlobal.initialize === "function") {{
+          mermaidGlobal.initialize({{ startOnLoad: false }});
+        }}
+        var targets = Array.prototype.slice.call(
+          document.querySelectorAll(".mermaid")
+        );
+        if (!targets.length) {{
+          return;
+        }}
+        if (typeof mermaidGlobal.init === "function") {{
+          mermaidGlobal.init(undefined, targets);
+        }} else if (typeof mermaidGlobal.run === "function") {{
+          mermaidGlobal.run({{ nodes: targets }});
+        }}
+      }} catch (e) {{}}
+    }})();
+        </script>
       </body>
     </html>
     """

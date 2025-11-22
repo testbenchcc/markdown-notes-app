@@ -2,6 +2,10 @@
 
 A self-contained FastAPI markdown notes application. Clone the repo, run the app, and edit `.md` files that live alongside the code.
 
+## Disclamer
+
+This application was created with AI.
+
 ## Features (v1)
 
 - Simple FastAPI backend (no database, file-system only)
@@ -9,7 +13,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
 - Folders are treated as categories
 - Web UI with:
   - Left pane: collapsible folder/note tree
-  - Right pane: markdown note viewer/editor
+  - Right pane: markdown note viewer/editor with line numbers in edit mode
   - View/Edit toggle and Save button
   - Draggable vertical splitter between panes
   - Inline error banner for failed API operations
@@ -23,7 +27,7 @@ A self-contained FastAPI markdown notes application. Clone the repo, run the app
  - Dot-prefixed files and folders are automatically hidden from the notes tree and search results to keep the notebook view clean.
 - Configurable index page title and file tree footer status showing the current app build number and git tag (when available)
 - Improved markdown rendering: fenced code blocks with syntax highlighting and tables with clear outlines
-- Mermaid diagrams rendered from fenced code blocks labeled `mermaid` in the in-app viewer
+- Mermaid diagrams rendered from fenced code blocks labeled `mermaid` in the in-app viewer and in exported HTML notes
 - No authentication or user accounts
 - "New Note" dialog automatically appends `.md` if missing so new notes always appear in the tree
 - Optional auto-commit and push of notes to a dedicated Git repository under `notes/` (when enabled in Settings)

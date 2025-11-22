@@ -402,6 +402,28 @@ body.resizing {
   background: var(--md-bg);
 }
 
+.content-edit-wrapper {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: var(--md-bg-alt);
+}
+
+.editor-line-numbers {
+  flex: 0 0 auto;
+  padding: 0.75rem 0.5rem 0.75rem 0.75rem;
+  background: var(--md-bg-alt-soft);
+  border-right: 1px solid var(--md-border-subtle);
+  color: var(--md-text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-align: right;
+  white-space: pre;
+  user-select: none;
+  overflow: hidden;
+}
+
 .content-view,
 .content-edit {
   flex: 1;
@@ -421,6 +443,7 @@ body.resizing {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   resize: none;
   color: var(--md-text-main);
+  line-height: 1.4;
 }
 
 .content-edit:focus {

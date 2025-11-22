@@ -4,6 +4,8 @@
   const notePathEl = document.getElementById("note-path");
   const viewerEl = document.getElementById("viewer");
   const editorEl = document.getElementById("editor");
+  const editorWrapperEl = document.getElementById("editor-wrapper");
+  const editorLineNumbersEl = document.getElementById("editor-line-numbers");
   const modeToggleBtn = document.getElementById("mode-toggle-btn");
   const saveBtn = document.getElementById("save-btn");
   const errorBannerEl = document.getElementById("error-banner");
@@ -50,6 +52,29 @@
 
   let lastViewerScrollTop = 0;
   let lastEditorScrollTop = 0;
+
+  function updateEditorLineNumbers() {
+    if (!editorEl || !editorLineNumbersEl) {
+      return;
+    }
+    const value = editorEl.value || "";
+    const lineCount = value ? value.split("\n").length : 1;
+    let lines = "";
+    for (let i = 1; i <= lineCount; i++) {
+      lines += i;
+      if (i < lineCount) {
+        lines += "\n";
+      }
+    }
+    editorLineNumbersEl.textContent = lines;
+  }
+
+  function syncEditorLineNumbersScroll() {
+    if (!editorEl || !editorLineNumbersEl) {
+      return;
+    }
+    editorLineNumbersEl.scrollTop = editorEl.scrollTop;
+  }
 
   let versioningNotesRootEl = null;
   let versioningNotesRemoteUrlEl = null;
@@ -1115,7 +1140,11 @@
       lastEditorScrollTop = editorEl.scrollTop;
 
       viewerEl.classList.remove("hidden");
-      editorEl.classList.add("hidden");
+      if (editorWrapperEl) {
+        editorWrapperEl.classList.add("hidden");
+      } else {
+        editorEl.classList.add("hidden");
+      }
       modeToggleBtn.textContent = "Edit";
       saveBtn.disabled = true;
 
@@ -1126,13 +1155,18 @@
       lastViewerScrollTop = viewerEl.scrollTop;
 
       viewerEl.classList.add("hidden");
-      editorEl.classList.remove("hidden");
+      if (editorWrapperEl) {
+        editorWrapperEl.classList.remove("hidden");
+      } else {
+        editorEl.classList.remove("hidden");
+      }
       modeToggleBtn.textContent = "Reader";
       saveBtn.disabled = false;
       editorEl.focus();
 
       // Restore editor scroll position
       editorEl.scrollTop = lastEditorScrollTop;
+      syncEditorLineNumbersScroll();
     }
   }
 
@@ -1292,6 +1326,7 @@
       viewerEl.innerHTML = note.html || "";
       renderMermaidInViewer();
       editorEl.value = note.content || "";
+      updateEditorLineNumbers();
       modeToggleBtn.disabled = false;
       if (noteExportBtn) {
         noteExportBtn.disabled = false;
@@ -1300,6 +1335,7 @@
     } catch (err) {
       viewerEl.textContent = "Failed to load note.";
       editorEl.value = "";
+      updateEditorLineNumbers();
       currentNote = null;
       modeToggleBtn.disabled = true;
       saveBtn.disabled = true;
@@ -1491,6 +1527,7 @@
       ) {
         viewerEl.textContent = "";
         editorEl.value = "";
+        updateEditorLineNumbers();
         currentNote = null;
         modeToggleBtn.disabled = true;
         saveBtn.disabled = true;
@@ -1700,6 +1737,15 @@
     noteExportBtn.addEventListener("click", () => {
       if (!currentNote) return;
       downloadCurrentNoteHtml();
+    });
+  }
+
+  if (editorEl) {
+    editorEl.addEventListener("input", () => {
+      updateEditorLineNumbers();
+    });
+    editorEl.addEventListener("scroll", () => {
+      syncEditorLineNumbersScroll();
     });
   }
 

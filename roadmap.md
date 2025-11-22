@@ -101,6 +101,18 @@
 - [x] Markdown tables width should not expand to fit the window or panes width. Fit to the contents of the table. (implemented)
 - [x] When code is marked as mermaid (a fenced code block starting with ```mermaid), render the chart/graph in the notes viewer. (implemented)
 
+## v1.2.5 - Export improvements
+
+- [x] Mermaid graphs are not rendered correctly when notes are exported. Example explort: `example files\mermaid.html` (implemented)
+
+## v1.2.6 - Line numbers
+
+- [x] Add line numbers to the note editor (implemented)
+
+## v1.2.7 - View git info
+
+- [] On the settings versioning category add buttons to view commit info (short hash, title, message), and release/tags (tag names, and descriptions). I think a popup would be best. That goes for both the application, and notes repositories.
+
 ## - trouble items
 
 - [-] When switching between editor and reader modes, keep note scroll positions aligned
