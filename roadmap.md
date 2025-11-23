@@ -1,8 +1,8 @@
 ## v1.4.3 - Notes git automation without local git CLI
 
-- [ ] Decide on a strategy for notes auto-commit and auto-pull that does not rely on the git CLI (disable, make optional, or reimplement using the GitHub API only).
-- [ ] Implement the chosen notes synchronization approach and remove direct git CLI usage from notes auto-commit and auto-pull helpers.
-- [ ] Update settings and documentation text to describe the new notes synchronization behavior.
+- [x] Decide on a strategy for notes auto-commit and auto-pull that does not rely on the git CLI (disable, make optional, or reimplement using the GitHub API only).
+- [x] Implement the chosen notes synchronization approach and remove direct git CLI usage from notes auto-commit and auto-pull helpers.
+- [ ] Update README.md to describe the new GitHub API-based notes synchronization behavior (settings text has been updated).
 
 
 ## v1.4.2 - Remove git CLI from app metadata

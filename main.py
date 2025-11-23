@@ -24,7 +24,8 @@ import os
 import re
 import secrets
 import shutil
-import subprocess
+import base64
+import hashlib
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -78,9 +79,7 @@ if _env_notes_root:
 else:
     NOTES_ROOT = APP_ROOT / "notes"
 
-
 SETTINGS_FILE_NAME = ".notebook-settings.json"
-
 
 NOTES_REPO_REMOTE_URL = os.getenv("NOTES_REPO_REMOTE_URL")
 APP_REPO_REMOTE_URL = os.getenv("APP_REPO_REMOTE_URL")
@@ -222,6 +221,9 @@ def load_notebook_settings() -> Dict[str, Any]:
         return base
     try:
         raw = path.read_text(encoding="utf-8")
+    except Exception:
+        return base
+    try:
         data = json.loads(raw)
     except Exception:
         return base
@@ -265,209 +267,345 @@ def _guess_image_mime_type(path: Path) -> str:
     return ALLOWED_IMAGE_MIME_TYPES.get(ext, "application/octet-stream")
 
 
-def get_git_last_commit_timestamp(path: Path) -> int | None:
-    rel_path: str | None = None
-    remote_url: str | None = None
+def _is_managed_notes_rel_path(rel_path: str) -> bool:
+    """Return True if the given NOTES_ROOT-relative path should be synced via GitHub.
 
-    try:
-        rel_notes = path.relative_to(NOTES_ROOT)
-    except ValueError:
-        rel_notes = None
-    else:
-        if NOTES_REPO_REMOTE_URL:
-            rel_path = rel_notes.as_posix()
-            remote_url = NOTES_REPO_REMOTE_URL
+    We include markdown notes, allowed image formats, and a small set of
+    configuration files (.notebook-settings.json, .gitignore, .gitkeep).
+    Files under hidden directories (e.g. .git) are excluded.
+    """
 
-    if rel_path is None:
+    rel = rel_path.strip().lstrip("/\\")
+    if not rel:
+        return False
+
+    parts = [p for p in rel.split("/") if p]
+    if not parts:
+        return False
+
+    name = parts[-1]
+    if name in {SETTINGS_FILE_NAME, ".gitignore", ".gitkeep"}:
+        return True
+
+    suffix = Path(name).suffix.lower()
+    if suffix != ".md" and suffix not in ALLOWED_IMAGE_EXTENSIONS:
+        return False
+
+    for part in parts[:-1]:
+        if part.startswith("."):
+            return False
+
+    return True
+
+
+def _iter_local_notes_sync_paths() -> list[tuple[Path, str]]:
+    """Return a list of (path, rel_path) for local notes files we manage via sync."""
+
+    ensure_notes_root()
+    base = NOTES_ROOT.resolve()
+    results: list[tuple[Path, str]] = []
+
+    for path in base.rglob("*"):
+        if not path.is_file():
+            continue
         try:
-            rel_app = path.relative_to(APP_ROOT)
-        except ValueError:
-            return None
-        if not APP_REPO_REMOTE_URL:
-            return None
-        rel_path = rel_app.as_posix()
-        remote_url = APP_REPO_REMOTE_URL
+            rel = path.relative_to(base).as_posix()
+        except Exception:
+            continue
+        if not _is_managed_notes_rel_path(rel):
+            continue
+        results.append((path, rel))
 
-    if not remote_url or not rel_path:
-        return None
+    return results
+
+
+def _get_notes_repo_info(session: requests.Session) -> tuple[str, str, str]:
+    """Resolve notes repo owner, name, and default branch from the remote URL."""
+
+    remote_url = NOTES_REPO_REMOTE_URL
+    if not remote_url:
+        raise HTTPException(status_code=500, detail="Notes remote URL for GitHub not configured")
 
     try:
         owner, repo = _parse_github_remote_url(remote_url)
-    except ValueError:
-        return None
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
+    repo_url = f"{GITHUB_API_URL}/repos/{owner}/{repo}"
     try:
-        session = _make_github_session()
-    except HTTPException:
-        return None
-
-    try:
-        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/commits"
-        resp = session.get(url, params={"per_page": 1, "path": rel_path})
+        resp = session.get(repo_url)
         resp.raise_for_status()
-        body = resp.json()
-        if not isinstance(body, list) or not body:
-            return None
-        commit = body[0].get("commit") or {}
-        committer = commit.get("committer") or {}
-        date_str = (committer.get("date") or "").strip()
-        if not date_str:
-            author = commit.get("author") or {}
-            date_str = (author.get("date") or "").strip()
-        if not date_str:
-            return None
-        if date_str.endswith("Z"):
-            date_str = date_str[:-1] + "+00:00"
-        try:
-            dt = datetime.fromisoformat(date_str)
-        except Exception:
-            return None
-        return int(dt.timestamp())
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
     except requests.RequestException:
-        return None
-    except Exception:
-        return None
+        raise HTTPException(status_code=502, detail="GitHub API request failed")
+
+    data = resp.json()
+    default_branch = (data.get("default_branch") or "main").strip() or "main"
+    return owner, repo, default_branch
 
 
-def _run_notes_git(args: list[str]) -> subprocess.CompletedProcess:
-    ensure_notes_root()
+def _fetch_github_tree_for_branch(
+    session: requests.Session, owner: str, repo: str, branch: str
+) -> dict[str, str]:
+    """Fetch a mapping of path -> blob sha for the given branch.
+
+    Only includes files that we manage for notes sync.
+    """
+
+    url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/git/trees/{branch}"
     try:
-        completed = subprocess.run(
-            ["git", *args],
-            cwd=str(NOTES_ROOT),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-        )
-    except Exception:
-        raise HTTPException(status_code=500, detail="Notes git command failed")
-    return completed
+        resp = session.get(url, params={"recursive": 1})
+        resp.raise_for_status()
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except requests.RequestException:
+        raise HTTPException(status_code=502, detail="GitHub API request failed")
+
+    body = resp.json()
+    tree = body.get("tree") or []
+    items: dict[str, str] = {}
+
+    for entry in tree:
+        if not isinstance(entry, dict):
+            continue
+        if (entry.get("type") or "") != "blob":
+            continue
+        path = (entry.get("path") or "").strip()
+        if not path or not _is_managed_notes_rel_path(path):
+            continue
+        sha = (entry.get("sha") or "").strip()
+        if not sha:
+            continue
+        items[path] = sha
+
+    return items
 
 
-def _ensure_notes_repo_initialized() -> None:
-    ensure_notes_root()
-    git_dir = NOTES_ROOT / ".git"
-    if not git_dir.is_dir():
-        init_result = _run_notes_git(["init"])
-        if init_result.returncode != 0:
-            raise HTTPException(status_code=500, detail="Failed to initialize notes git repository")
-    remotes_result = _run_notes_git(["remote"])
-    if remotes_result.returncode == 0:
-        names = {line.strip() for line in remotes_result.stdout.splitlines() if line.strip()}
-    else:
-        names = set()
-    if "origin" not in names and NOTES_REPO_REMOTE_URL:
-        add_remote = _run_notes_git(["remote", "add", "origin", NOTES_REPO_REMOTE_URL])
-        if add_remote.returncode != 0:
-            raise HTTPException(status_code=500, detail="Failed to configure notes git remote")
-    elif "origin" in names and NOTES_REPO_REMOTE_URL:
-        current_url_result = _run_notes_git(["remote", "get-url", "origin"])
-        if current_url_result.returncode == 0:
-            current_url_raw = current_url_result.stdout.strip()
-            current_url = current_url_raw.splitlines()[0] if current_url_raw else ""
-            if current_url == APP_REPO_REMOTE_URL:
-                set_result = _run_notes_git(["remote", "set-url", "origin", NOTES_REPO_REMOTE_URL])
-                if set_result.returncode != 0:
-                    raise HTTPException(status_code=500, detail="Failed to configure notes git remote")
+def _compute_git_blob_sha(content: bytes) -> str:
+    """Compute the Git blob SHA1 for the given content."""
 
-
-def _notes_repo_has_changes() -> bool:
-    status_result = _run_notes_git(["status", "--porcelain"])
-    if status_result.returncode != 0:
-        raise HTTPException(status_code=500, detail="Failed to read notes git status")
-    return bool(status_result.stdout.strip())
-
-
-def _notes_repo_sync_state() -> str:
-    head = _run_notes_git(["rev-parse", "@"])
-    if head.returncode != 0:
-        return "unknown"
-    upstream = _run_notes_git(["rev-parse", "@{u}"])
-    if upstream.returncode != 0:
-        return "no_upstream"
-    base = _run_notes_git(["merge-base", "@", "@{u}"])
-    if base.returncode != 0:
-        return "unknown"
-    head_sha = head.stdout.strip()
-    upstream_sha = upstream.stdout.strip()
-    base_sha = base.stdout.strip()
-    if not head_sha or not upstream_sha or not base_sha:
-        return "unknown"
-    if head_sha == upstream_sha:
-        return "up_to_date"
-    if head_sha == base_sha:
-        return "behind"
-    if upstream_sha == base_sha:
-        return "ahead"
-    return "diverged"
+    header = f"blob {len(content)}\0".encode("utf-8")
+    return hashlib.sha1(header + content).hexdigest()
 
 
 def auto_commit_and_push_notes() -> Dict[str, Any]:
+    """Synchronise local notes changes to the GitHub notes repository.
+
+    Uses the GitHub Contents API instead of the local git CLI. All changes are
+    committed directly to the repository's default branch.
+    """
+
     ensure_notes_root()
-    _ensure_notes_repo_initialized()
-    if not _notes_repo_has_changes():
+
+    session = _make_github_session()
+    owner, repo, branch = _get_notes_repo_info(session)
+    remote_files = _fetch_github_tree_for_branch(session, owner, repo, branch)
+
+    local_entries = _iter_local_notes_sync_paths()
+    local_index: dict[str, tuple[Path, str]] = {}
+
+    for path, rel in local_entries:
+        try:
+            data = path.read_bytes()
+        except Exception:
+            continue
+        sha = _compute_git_blob_sha(data)
+        local_index[rel] = (path, sha)
+
+    to_create: list[tuple[str, bytes]] = []
+    to_update: list[tuple[str, bytes, str]] = []
+
+    for rel, (path, local_sha) in local_index.items():
+        remote_sha = remote_files.get(rel)
+        if remote_sha is None:
+            try:
+                data = path.read_bytes()
+            except Exception:
+                continue
+            to_create.append((rel, data))
+        elif remote_sha != local_sha:
+            try:
+                data = path.read_bytes()
+            except Exception:
+                continue
+            to_update.append((rel, data, remote_sha))
+
+    to_delete: list[tuple[str, str]] = []
+    for rel, remote_sha in remote_files.items():
+        if rel not in local_index:
+            to_delete.append((rel, remote_sha))
+
+    if not to_create and not to_update and not to_delete:
         return {"ok": True, "committed": False, "pushed": False, "reason": "no_changes"}
-    add_result = _run_notes_git(["add", "."])
-    if add_result.returncode != 0:
-        raise HTTPException(status_code=500, detail="Failed to stage notes changes")
-    message = f"Auto-commit notes at {datetime.now(tz=timezone.utc).isoformat()}"
-    commit_result = _run_notes_git(["commit", "-m", message])
-    output = (commit_result.stdout or "") + (commit_result.stderr or "")
-    if commit_result.returncode != 0:
-        lowered = output.lower()
-        if "nothing to commit" in lowered:
-            return {"ok": True, "committed": False, "pushed": False, "reason": "no_changes"}
-        raise HTTPException(status_code=500, detail="Failed to commit notes changes")
-    state = _notes_repo_sync_state()
-    if state in {"behind", "diverged"}:
-        return {"ok": True, "committed": True, "pushed": False, "reason": state}
-    if state == "no_upstream":
-        push_args = ["push", "-u", "origin", "HEAD"]
-    else:
-        push_args = ["push"]
-    push_result = _run_notes_git(push_args)
-    if push_result.returncode != 0:
-        raise HTTPException(status_code=500, detail="Failed to push notes changes")
-    return {"ok": True, "committed": True, "pushed": True, "reason": state}
+
+    commit_message = f"Auto-commit notes at {datetime.now(tz=timezone.utc).isoformat()}"
+    created = 0
+    updated = 0
+    deleted = 0
+
+    for rel, data in to_create:
+        encoded = base64.b64encode(data).decode("ascii")
+        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/contents/{rel}"
+        try:
+            resp = session.put(
+                url,
+                json={
+                    "message": commit_message,
+                    "content": encoded,
+                    "branch": branch,
+                },
+            )
+        except requests.RequestException:
+            raise HTTPException(status_code=502, detail="GitHub API request failed")
+        if resp.status_code == 201:
+            created += 1
+            continue
+        if resp.status_code == 409:
+            raise HTTPException(
+                status_code=409,
+                detail="Failed to commit notes changes due to a conflict",
+            )
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail="GitHub API request failed")
+
+    for rel, data, remote_sha in to_update:
+        encoded = base64.b64encode(data).decode("ascii")
+        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/contents/{rel}"
+        try:
+            resp = session.put(
+                url,
+                json={
+                    "message": commit_message,
+                    "content": encoded,
+                    "sha": remote_sha,
+                    "branch": branch,
+                },
+            )
+        except requests.RequestException:
+            raise HTTPException(status_code=502, detail="GitHub API request failed")
+        if resp.status_code in (200, 201):
+            updated += 1
+            continue
+        if resp.status_code == 409:
+            raise HTTPException(
+                status_code=409,
+                detail="Failed to commit notes changes due to a conflict",
+            )
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail="GitHub API request failed")
+
+    for rel, remote_sha in to_delete:
+        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/contents/{rel}"
+        try:
+            resp = session.delete(
+                url,
+                json={
+                    "message": commit_message,
+                    "sha": remote_sha,
+                    "branch": branch,
+                },
+            )
+        except requests.RequestException:
+            raise HTTPException(status_code=502, detail="GitHub API request failed")
+        if resp.status_code in (200, 204):
+            deleted += 1
+            continue
+        if resp.status_code == 409:
+            raise HTTPException(
+                status_code=409,
+                detail="Failed to remove notes files due to a conflict",
+            )
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail="GitHub API request failed")
+
+    return {
+        "ok": True,
+        "committed": True,
+        "pushed": True,
+        "reason": "github_api",
+        "stats": {
+            "created": created,
+            "updated": updated,
+            "deleted": deleted,
+        },
+    }
 
 
 def auto_pull_notes() -> Dict[str, Any]:
+    """Pull latest notes from the GitHub notes repository into the local tree."""
+
     ensure_notes_root()
-    _ensure_notes_repo_initialized()
-    # Always try to auto-commit and push local changes first. This helper
-    # already avoids pushing when the local branch is behind or diverged.
+
     commit_result = auto_commit_and_push_notes()
-    reason = commit_result.get("reason")
-    if reason in {"behind", "diverged"}:
-        # Do not attempt to pull when the local branch is out of sync; manual
-        # intervention is required.
-        return {
-            "ok": False,
-            "pulled": False,
-            "reason": reason,
-            "commit_result": commit_result,
-        }
-    state_before = _notes_repo_sync_state()
-    if state_before == "no_upstream":
-        return {
-            "ok": False,
-            "pulled": False,
-            "reason": "no_upstream",
-            "commit_result": commit_result,
-        }
-    pull_result = _run_notes_git(["pull", "--ff-only"])
-    if pull_result.returncode != 0:
-        raise HTTPException(
-            status_code=409,
-            detail="Failed to pull notes repository (non fast-forward or other error)",
-        )
-    state_after = _notes_repo_sync_state()
+
+    session = _make_github_session()
+    owner, repo, branch = _get_notes_repo_info(session)
+    remote_files = _fetch_github_tree_for_branch(session, owner, repo, branch)
+
+    local_entries = _iter_local_notes_sync_paths()
+    local_paths: dict[str, Path] = {rel: path for (path, rel) in local_entries}
+
+    updated = 0
+    deleted_local = 0
+
+    for rel, remote_sha in remote_files.items():
+        dest = _resolve_destination_path(rel)
+        current_sha: str | None = None
+        if dest.exists() and dest.is_file():
+            try:
+                current_data = dest.read_bytes()
+            except Exception:
+                current_data = b""
+            current_sha = _compute_git_blob_sha(current_data)
+        if current_sha == remote_sha:
+            continue
+
+        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/contents/{rel}"
+        try:
+            resp = session.get(url, params={"ref": branch})
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        except requests.RequestException:
+            raise HTTPException(status_code=502, detail="GitHub API request failed")
+
+        body = resp.json()
+        encoded = (body.get("content") or "").strip()
+        if not encoded:
+            continue
+        try:
+            data = base64.b64decode(encoded, validate=False)
+        except Exception:
+            continue
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(data)
+        updated += 1
+
+    for rel, path in local_paths.items():
+        if rel in remote_files:
+            continue
+        try:
+            path.unlink()
+            deleted_local += 1
+        except Exception:
+            continue
+
     return {
         "ok": True,
         "pulled": True,
-        "before": state_before,
-        "after": state_after,
+        "updated": updated,
+        "deleted_local": deleted_local,
         "commit_result": commit_result,
     }
 
@@ -497,20 +635,6 @@ def _write_notes_gitignore_lines(lines: list[str]) -> None:
     if not text.endswith("\n"):
         text += "\n"
     path.write_text(text, encoding="utf-8")
-
-def _run_app_git(args: list[str]) -> subprocess.CompletedProcess:
-    try:
-        completed = subprocess.run(
-            ["git", *args],
-            cwd=str(APP_ROOT),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-        )
-    except Exception:
-        raise HTTPException(status_code=500, detail="App git command failed")
-    return completed
 
 
 GITHUB_API_URL = "https://api.github.com"
@@ -682,67 +806,6 @@ def _fetch_latest_release_tag_name(
             return name
 
     return None
-
-
-def _ensure_app_repo_initialized() -> None:
-    git_dir = APP_ROOT / ".git"
-    if not git_dir.is_dir():
-        raise HTTPException(status_code=500, detail="App git repository not found")
-    remotes_result = _run_app_git(["remote"])
-    if remotes_result.returncode == 0:
-        names = {line.strip() for line in remotes_result.stdout.splitlines() if line.strip()}
-    else:
-        names = set()
-    if "origin" not in names and APP_REPO_REMOTE_URL:
-        add_remote = _run_app_git(["remote", "add", "origin", APP_REPO_REMOTE_URL])
-        if add_remote.returncode != 0:
-            raise HTTPException(status_code=500, detail="Failed to configure app git remote")
-
-
-def _app_repo_sync_state() -> str:
-    head = _run_app_git(["rev-parse", "@"])  # type: ignore[list-item]
-    if head.returncode != 0:
-        return "unknown"
-    upstream = _run_app_git(["rev-parse", "@{u}"])
-    if upstream.returncode != 0:
-        return "no_upstream"
-    base = _run_app_git(["merge-base", "@", "@{u}"])
-    if base.returncode != 0:
-        return "unknown"
-    head_sha = head.stdout.strip()
-    upstream_sha = upstream.stdout.strip()
-    base_sha = base.stdout.strip()
-    if not head_sha or not upstream_sha or not base_sha:
-        return "unknown"
-    if head_sha == upstream_sha:
-        return "up_to_date"
-    if head_sha == base_sha:
-        return "behind"
-    if upstream_sha == base_sha:
-        return "ahead"
-    return "diverged"
-
-
-def auto_pull_app_repo() -> Dict[str, Any]:
-    _ensure_app_repo_initialized()
-    state_before = _app_repo_sync_state()
-    if state_before in {"diverged"}:
-        return {"ok": False, "pulled": False, "reason": state_before}
-    if state_before == "no_upstream":
-        return {"ok": False, "pulled": False, "reason": "no_upstream"}
-    pull_result = _run_app_git(["pull", "--ff-only"])
-    if pull_result.returncode != 0:
-        raise HTTPException(
-            status_code=409,
-            detail="Failed to pull app repository (non fast-forward or other error)",
-        )
-    state_after = _app_repo_sync_state()
-    return {
-        "ok": True,
-        "pulled": True,
-        "before": state_before,
-        "after": state_after,
-    }
 
 
 def build_notes_tree() -> Dict[str, Any]:
@@ -1523,7 +1586,10 @@ async def versioning_notes_pull() -> Dict[str, Any]:
 
 @app.post("/api/versioning/app/pull")
 async def versioning_app_pull() -> Dict[str, Any]:
-    return auto_pull_app_repo()
+    raise HTTPException(
+        status_code=501,
+        detail="Automatic pulling of the app repository is no longer supported.",
+    )
 
 
 @app.get("/api/versioning/app/history")
