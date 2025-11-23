@@ -2554,6 +2554,147 @@
       // Ignore storage errors
     }
   }
+  function normalizeSharedNotePath(raw) {
+    if (!raw) return "";
+    let value = String(raw).trim();
+    if (!value) return "";
+    if (value.startsWith("?")) {
+      value = value.slice(1);
+    }
+    const qIndex = value.indexOf("?");
+    if (qIndex !== -1) {
+      value = value.slice(0, qIndex);
+    }
+    while (value.startsWith("/")) {
+      value = value.slice(1);
+    }
+    const lower = value.toLowerCase();
+    if (lower.startsWith("notes/")) {
+      value = value.slice("notes/".length);
+    }
+    return value;
+  }
+
+  function normalizeSharedMode(raw) {
+    if (!raw) return "";
+    const value = String(raw).trim().toLowerCase();
+    if (!value) return "";
+    if (value === "view") return "read";
+    if (value === "reader") return "read";
+    if (value === "editor") return "edit";
+    if (value === "html") return "export";
+    if (value === "dl") return "download";
+    if (value === "read" || value === "edit" || value === "export" || value === "download") {
+      return value;
+    }
+    return "";
+  }
+
+  async function handleSharedLinkFromLocation() {
+    if (typeof window === "undefined" || !window.location) {
+      return;
+    }
+    const search = window.location.search || "";
+    if (!search || search.length <= 1) {
+      return;
+    }
+
+    let params;
+    try {
+      params = new URLSearchParams(search);
+    } catch (e) {
+      return;
+    }
+
+    let rawNote = params.get("note") || "";
+    let rawMode = params.get("mode") || "";
+
+    if (!rawMode && rawNote && rawNote.indexOf("?") !== -1) {
+      const parts = rawNote.split("?", 2);
+      rawNote = parts[0];
+      try {
+        const inner = new URLSearchParams(parts[1] || "");
+        rawMode = inner.get("mode") || rawMode;
+      } catch (e) {}
+    }
+
+    const notePath = normalizeSharedNotePath(rawNote);
+    const modeFromUrl = normalizeSharedMode(rawMode);
+
+    if (!notePath) {
+      return;
+    }
+
+    try {
+      const items = document.querySelectorAll(".tree-item.note");
+      for (const el of items) {
+        if (el.dataset.path === notePath) {
+          clearSelection();
+          el.classList.add("selected");
+          break;
+        }
+      }
+    } catch (e) {}
+
+    if (isImagePath(notePath)) {
+      await openImagePath(notePath);
+      if (modeFromUrl === "download") {
+        try {
+          const link = document.createElement("a");
+          link.href = `/files/${notePath}`;
+          const name = notePath.split("/").pop() || notePath;
+          link.download = name;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        } catch (e) {}
+      }
+      return;
+    }
+
+    await openNotePath(notePath);
+
+    if (!modeFromUrl) {
+      return;
+    }
+
+    if (modeFromUrl === "read") {
+      setMode("view");
+      return;
+    }
+
+    if (modeFromUrl === "edit") {
+      setMode("edit");
+      return;
+    }
+
+    if (modeFromUrl === "export") {
+      if (currentNote && currentNote.path === notePath) {
+        await downloadCurrentNoteHtml();
+      }
+      return;
+    }
+
+    if (modeFromUrl === "download") {
+      if (currentNote && currentNote.path === notePath) {
+        try {
+          const blob = new Blob([currentNote.content || ""], {
+            type: "text/markdown;charset=utf-8",
+          });
+          const blobUrl = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          const baseName = currentNote.name || notePath.split("/").pop() || "note.md";
+          const name = /\.md$/i.test(baseName) ? baseName : `${baseName}.md`;
+          a.download = name;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(blobUrl);
+        } catch (e) {}
+      }
+    }
+  }
 
   function getVisibleTreeItems() {
     if (!treeContainer) return [];
@@ -3483,6 +3624,7 @@
     updateAutoSaveTimerFromSettings();
     setupSplitter();
     await loadTree();
+    await handleSharedLinkFromLocation();
     await refreshAppVersionSubtitle();
   }
 
