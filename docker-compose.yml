@@ -3,7 +3,7 @@ services:
     build: .
     image: markdown-notes-app:latest
     ports:
-      - "8000:8000"
+      - "3002:8000"
     volumes:
       - .:/app
     environment:
