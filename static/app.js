@@ -25,11 +25,47 @@ async function updateHealthStatus() {
   }
 }
 
+async function loadImage(imagePath) {
+  const noteNameEl = document.getElementById("note-name");
+  const notePathEl = document.getElementById("note-path");
+  const viewerEl = document.getElementById("viewer");
+
+  if (!viewerEl || !noteNameEl || !notePathEl) return;
+
+  viewerEl.textContent = "Loading image…";
+
+  const safePath = toSafePath(imagePath);
+  const img = new Image();
+  img.src = `/files/${safePath}`;
+  img.alt = imagePath;
+
+  img.onload = () => {
+    const parts = imagePath.split("/");
+    const name = parts[parts.length - 1] || imagePath;
+    noteNameEl.textContent = name;
+    notePathEl.textContent = imagePath;
+    viewerEl.innerHTML = "";
+    viewerEl.appendChild(img);
+  };
+
+  img.onerror = () => {
+    showError("Unable to load image from the server.");
+    viewerEl.textContent = "Unable to load image.";
+  };
+}
+
 function showError(message) {
   const banner = document.getElementById("error-banner");
   if (!banner) return;
   banner.textContent = message;
   banner.classList.remove("hidden");
+}
+
+function toSafePath(relPath) {
+  return relPath
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
 }
 
 function createTreeItem(node) {
@@ -123,10 +159,7 @@ async function loadNote(notePath) {
   viewerEl.textContent = "Loading note…";
 
   try {
-    const safePath = notePath
-      .split("/")
-      .map((segment) => encodeURIComponent(segment))
-      .join("/");
+    const safePath = toSafePath(notePath);
     const response = await fetch(`/api/notes/${safePath}`);
 
     if (!response.ok) {
@@ -227,6 +260,116 @@ async function handleNewNoteClick() {
   }
 }
 
+function getSelectedTreeItem() {
+  const treeRootEl = document.getElementById("tree");
+  if (!treeRootEl) return null;
+  return treeRootEl.querySelector(".tree-item.selected");
+}
+
+async function handleRenameSelectedItem() {
+  const item = getSelectedTreeItem();
+  if (!item) return;
+
+  const path = item.dataset.path || "";
+  if (!path) return;
+
+  const parts = path.split("/");
+  const currentName = parts[parts.length - 1] || path;
+  const isNote = item.classList.contains("note");
+
+  const baseName =
+    isNote && currentName.toLowerCase().endsWith(".md")
+      ? currentName.slice(0, -3)
+      : currentName;
+
+  const input = window.prompt("Rename item", baseName);
+  if (!input) return;
+
+  const trimmed = input.trim();
+  if (!trimmed) return;
+
+  parts[parts.length - 1] = trimmed;
+  const destPath = parts.join("/");
+
+  try {
+    if (isNote) {
+      const response = await fetch("/api/notes/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourcePath: path, destinationPath: destPath }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Rename note failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      await loadTree();
+      if (data.path) {
+        loadNote(data.path);
+      }
+    } else if (item.classList.contains("folder")) {
+      const response = await fetch("/api/folders/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourcePath: path, destinationPath: destPath }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Rename folder failed with status ${response.status}`);
+      }
+
+      await loadTree();
+    }
+  } catch (error) {
+    console.error("Rename request failed", error);
+    showError("Unable to rename item.");
+  }
+}
+
+async function handleDeleteSelectedItem() {
+  const item = getSelectedTreeItem();
+  if (!item) return;
+
+  const path = item.dataset.path || "";
+  if (!path) return;
+
+  const confirmed = window.confirm(
+    "Delete this item and its contents (for folders)?",
+  );
+  if (!confirmed) return;
+
+  const isNote = item.classList.contains("note");
+  const isFolder = item.classList.contains("folder");
+
+  try {
+    if (isNote) {
+      const safePath = toSafePath(path);
+      const response = await fetch(`/api/notes/${safePath}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Delete note failed with status ${response.status}`);
+      }
+    } else if (isFolder) {
+      const safePath = toSafePath(path);
+      const response = await fetch(`/api/folders/${safePath}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Delete folder failed with status ${response.status}`);
+      }
+    }
+
+    await loadTree();
+  } catch (error) {
+    console.error("Delete request failed", error);
+    showError("Unable to delete item.");
+  }
+}
+
 function setupTreeSelection() {
   const treeRootEl = document.getElementById("tree");
   if (!treeRootEl) return;
@@ -245,11 +388,23 @@ function setupTreeSelection() {
 
     item.classList.add("selected");
 
+    const path = item.dataset.path;
+    if (!path) return;
+
     if (item.classList.contains("note")) {
-      const path = item.dataset.path;
-      if (path) {
-        loadNote(path);
-      }
+      loadNote(path);
+    } else if (item.classList.contains("image")) {
+      loadImage(path);
+    }
+  });
+
+  treeRootEl.addEventListener("keydown", (event) => {
+    if (event.key === "F2") {
+      event.preventDefault();
+      void handleRenameSelectedItem();
+    } else if (event.key === "Delete") {
+      event.preventDefault();
+      void handleDeleteSelectedItem();
     }
   });
 }

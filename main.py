@@ -11,7 +11,9 @@ versioning APIs described in README.md and roadmap.md.
 """
 from __future__ import annotations
 
+import mimetypes
 import os
+import shutil
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List
@@ -229,6 +231,11 @@ class CreateNoteRequest(BaseModel):
     content: str | None = None
 
 
+class RenameRequest(BaseModel):
+    sourcePath: str
+    destinationPath: str
+
+
 app = FastAPI(title="Markdown Notes App", version="0.1.0")
 
 
@@ -308,6 +315,110 @@ def put_note(note_path: str, payload: NoteContent) -> Dict[str, Any]:
         "path": _relative_to_notes_root(note_file),
         "name": note_file.name,
     }
+
+
+@app.post("/api/notes/rename", tags=["notes"])
+def rename_note(payload: RenameRequest) -> Dict[str, Any]:
+    source_path = payload.sourcePath
+    destination_path = payload.destinationPath
+
+    if not destination_path.endswith(NOTE_FILE_EXTENSION):
+        destination_path = f"{destination_path}{NOTE_FILE_EXTENSION}"
+
+    try:
+        source, destination = _resolve_destination_path(source_path, destination_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not source.is_file():
+        raise HTTPException(status_code=404, detail="Source note not found")
+
+    if destination.exists():
+        raise HTTPException(status_code=409, detail="Destination note already exists")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source.rename(destination)
+
+    return {
+        "path": _relative_to_notes_root(destination),
+        "name": destination.name,
+    }
+
+
+@app.post("/api/folders/rename", tags=["notes"])
+def rename_folder(payload: RenameRequest) -> Dict[str, Any]:
+    try:
+        source, destination = _resolve_destination_path(payload.sourcePath, payload.destinationPath)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not source.is_dir():
+        raise HTTPException(status_code=404, detail="Source folder not found")
+
+    if destination.exists():
+        raise HTTPException(status_code=409, detail="Destination folder already exists")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source.rename(destination)
+
+    return {
+        "path": _relative_to_notes_root(destination),
+        "name": destination.name,
+    }
+
+
+@app.delete("/api/notes/{note_path:path}", tags=["notes"])
+def delete_note(note_path: str) -> Dict[str, Any]:
+    try:
+        note_file = _resolve_relative_path(note_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not note_file.is_file():
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    note_file.unlink()
+
+    return {
+        "path": note_path,
+        "deleted": True,
+    }
+
+
+@app.delete("/api/folders/{folder_path:path}", tags=["notes"])
+def delete_folder(folder_path: str) -> Dict[str, Any]:
+    try:
+        folder = _resolve_relative_path(folder_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not folder.is_dir():
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    shutil.rmtree(folder)
+
+    return {
+        "path": folder_path,
+        "deleted": True,
+    }
+
+
+@app.get("/files/{file_rel_path:path}", tags=["files"])
+def get_file(file_rel_path: str) -> FileResponse:
+    try:
+        file_path = _resolve_relative_path(file_rel_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    suffix = file_path.suffix.lower()
+    if suffix not in IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=404, detail="Unsupported file type")
+
+    content_type, _ = mimetypes.guess_type(str(file_path))
+    return FileResponse(file_path, media_type=content_type or "application/octet-stream")
 
 
 @app.post("/api/folders", tags=["notes"], status_code=201)

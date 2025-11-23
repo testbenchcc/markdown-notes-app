@@ -28,17 +28,19 @@
  ## v0.2.0 – Core Notes CRUD and Tree Stability
 
  - **Backend**
-  - [ ] Reconfirm and stabilize the existing notes file tree APIs (`/api/tree`, `/api/notes`, `/api/folders`).
-  - [ ] Ensure path validation and safety helpers are fully covered by tests.
-  - [ ] Harden image-serving endpoints for note-related assets.
+  - [x] Reconfirm and stabilize the existing notes file tree and CRUD APIs (`/api/tree`, `GET/PUT /api/notes`, `POST /api/folders`, `POST /api/notes`).
+  - [x] Ensure path validation and safety helpers are fully covered by tests (tree building + note/folder creation paths).
+  - [x] Harden image-serving endpoints for note-related assets (e.g., `/files/...`, image-specific validation and safety checks).
 
  - **Frontend**
-  - [ ] Ensure the left-hand tree correctly reflects the backend model (folders, notes, images).
-  - [ ] Verify creation/rename/delete flows for notes and folders work end-to-end.
-  - [ ] Ensure image nodes open correctly in the viewer.
+  - [x] Ensure the left-hand tree correctly reflects the backend model (folders, notes, images) using `/api/tree`.
+  - [x] Verify creation flows for notes and folders work end-to-end (New Folder/New Note → CRUD APIs → tree refresh and viewer load).
+  - [x] Add rename/delete flows for notes and folders (backend endpoints + UI wiring).
+  - [x] Ensure image nodes open correctly in the viewer.
 
  - **Quality**
-  - [ ] Add tests around notes/folder creation and deletion to avoid regressions.
+  - [x] Add tests around notes/folder creation to avoid regressions (`tests/test_tree_and_paths.py`, `tests/test_notes_crud.py`).
+  - [x] Add tests around delete/rename behavior once implemented (`tests/test_rename_delete_and_files.py`).
 
  ---
 

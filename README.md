@@ -21,10 +21,14 @@ The goal is to preserve the existing layout, button placements, search position,
 - Initial v0.2.0 backend/frontend work-in-progress:
   - Secure path helpers (`_validate_relative_path`, `_resolve_relative_path`, `_resolve_destination_path`).
   - Notes tree builder (`build_notes_tree`) and `GET /api/tree` endpoint.
-  - Basic note CRUD endpoints: `GET /api/notes/{note_path}`, `PUT /api/notes/{note_path}`, `POST /api/folders`, `POST /api/notes`.
-  - Minimal frontend wiring to render a read-only notes tree from `/api/tree`.
-  - Basic create flows from the UI: New Folder / New Note buttons call `POST /api/folders` and `POST /api/notes` respectively and refresh the tree.
-  - Pytest-based tests in `tests/test_tree_and_paths.py` and `tests/test_notes_crud.py`.
+  - Basic note CRUD endpoints: `GET/PUT /api/notes/{note_path}`, `POST /api/folders`, `POST /api/notes`.
+  - Rename/delete endpoints for notes and folders: `POST /api/notes/rename`, `POST /api/folders/rename`, `DELETE /api/notes/{note_path}`, `DELETE /api/folders/{folder_path}`.
+  - Image-serving endpoint `GET /files/{file_rel_path}` restricted to known image extensions.
+  - Frontend wiring to render a read-only notes tree from `/api/tree` and load notes via `GET /api/notes/{note_path}`.
+  - UI create flows: New Folder / New Note buttons call `POST /api/folders` and `POST /api/notes` respectively and refresh the tree.
+  - UI rename/delete flows: tree selection + `F2` / `Delete` keys call the rename/delete endpoints and refresh the tree.
+  - Image nodes in the tree open directly in the viewer via `/files/{file_rel_path}`.
+  - Pytest-based tests in `tests/test_tree_and_paths.py`, `tests/test_notes_crud.py`, and `tests/test_rename_delete_and_files.py`.
 - Recommended tooling decisions:
   - **Python**: Black (formatter), Ruff (linter), pytest (test runner).
   - **JavaScript**: Prettier (formatter), ESLint (linter); static assets are served directly by FastAPI without a bundler for now.

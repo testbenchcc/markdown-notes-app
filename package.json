@@ -1,0 +1,19 @@
+{
+  "name": "markdown-editor-app",
+  "version": "1.0.0",
+  "description": "Basic markdown editor with Monaco, markdown-it, Fancytree, and Mermaid",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.52.0",
+    "markdown-it": "^14.1.0",
+    "jquery.fancytree": "^2.38.3",
+    "mermaid": "^11.12.0"
+  },
+  "devDependencies": {},
+  "author": "",
+  "license": "MIT"
+}
