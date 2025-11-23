@@ -46,7 +46,7 @@ The goal is to preserve the existing layout, button placements, search position,
 - **Frontend**
   - Single-page UI served from `static/index.html`.
   - Main behavior, including the Monaco-based markdown editor and markdown-it live preview, is implemented in `static/app.js`.
-  - Settings modal markup provided by `static/settings-modal.html` and wired up via `app.js`.
+  - Settings modal markup is defined inline in `static/index.html` (see `.settings-overlay` / `.settings-modal`) and wired up via `static/app.js`.
   - Multiple CSS themes (`styles.css`, `styles-office.css`, `styles-high-contrast.css`, `styles-midnight.css`) selectable via settings.
 
 - **Deployment/runtime**

@@ -631,6 +631,101 @@ function setupTreeSelection() {
   });
 }
 
+function setActiveSettingsCategory(categoryId) {
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+
+  const navItems = overlay.querySelectorAll(".settings-nav-item");
+  navItems.forEach((item) => {
+    const id = item.dataset.settingsCategoryId;
+    item.classList.toggle("selected", id === categoryId);
+  });
+
+  const sections = overlay.querySelectorAll("[data-settings-category]");
+  sections.forEach((section) => {
+    const id = section.dataset.settingsCategory;
+    if (id === categoryId) {
+      section.classList.remove("hidden");
+    } else {
+      section.classList.add("hidden");
+    }
+  });
+}
+
+function openSettingsModal() {
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+
+  overlay.classList.remove("hidden");
+  setActiveSettingsCategory("general");
+
+  const firstNavItem = overlay.querySelector(".settings-nav-item");
+  if (firstNavItem instanceof HTMLElement) {
+    firstNavItem.focus();
+  }
+}
+
+function closeSettingsModal() {
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+
+  overlay.classList.add("hidden");
+}
+
+function setupSettingsModal() {
+  const settingsBtn = document.getElementById("settings-btn");
+  const overlay = document.getElementById("settings-overlay");
+  const closeBtn = document.getElementById("settings-close-btn");
+  const footerCloseBtn = document.getElementById("settings-footer-close-btn");
+
+  if (!settingsBtn || !overlay || !closeBtn) return;
+
+  function handleClose() {
+    closeSettingsModal();
+  }
+
+  settingsBtn.addEventListener("click", () => {
+    openSettingsModal();
+  });
+
+  closeBtn.addEventListener("click", () => {
+    handleClose();
+  });
+
+  if (footerCloseBtn) {
+    footerCloseBtn.addEventListener("click", () => {
+      handleClose();
+    });
+  }
+
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) {
+      handleClose();
+    }
+  });
+
+  const navItems = overlay.querySelectorAll(".settings-nav-item");
+  navItems.forEach((item) => {
+    item.addEventListener("click", () => {
+      const categoryId = item.dataset.settingsCategoryId;
+      if (categoryId) {
+        setActiveSettingsCategory(categoryId);
+      }
+    });
+  });
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      const overlayElement = document.getElementById("settings-overlay");
+      if (!overlayElement || overlayElement.classList.contains("hidden")) {
+        return;
+      }
+      event.preventDefault();
+      handleClose();
+    }
+  });
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   updateHealthStatus();
   loadTree();
@@ -638,4 +733,5 @@ window.addEventListener("DOMContentLoaded", () => {
   setupNewItemButtons();
   setupModeToggle();
   initMonacoEditor();
+  setupSettingsModal();
 });

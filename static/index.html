@@ -127,6 +127,147 @@
       </div>
     </div>
     <input id="import-file-input" type="file" accept=".zip" class="hidden" />
+    <div
+      id="settings-overlay"
+      class="settings-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+    >
+      <div class="settings-modal">
+        <div class="settings-header">
+          <div class="settings-title-group">
+            <div id="settings-title" class="settings-title">Settings</div>
+            <div class="settings-subtitle muted">
+              Notebook preferences and shortcuts
+            </div>
+          </div>
+          <button
+            id="settings-close-btn"
+            class="settings-header-close"
+            type="button"
+            aria-label="Close settings"
+            title="Close"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="settings-body">
+          <nav class="settings-nav" aria-label="Settings categories">
+            <button
+              type="button"
+              class="settings-nav-item"
+              data-settings-category-id="general"
+            >
+              General
+            </button>
+            <button
+              type="button"
+              class="settings-nav-item"
+              data-settings-category-id="editor"
+            >
+              Editor
+            </button>
+            <button
+              type="button"
+              class="settings-nav-item"
+              data-settings-category-id="appearance"
+            >
+              Appearance
+            </button>
+            <button
+              type="button"
+              class="settings-nav-item"
+              data-settings-category-id="shortcuts"
+            >
+              Keyboard Shortcuts
+            </button>
+            <button
+              type="button"
+              class="settings-nav-item"
+              data-settings-category-id="files"
+            >
+              Files &amp; Images
+            </button>
+            <button
+              type="button"
+              class="settings-nav-item"
+              data-settings-category-id="versioning"
+            >
+              Versioning
+            </button>
+          </nav>
+          <div class="settings-content">
+            <section
+              class="settings-category"
+              data-settings-category="general"
+            >
+              <div class="settings-category-title">General</div>
+              <p class="settings-field-description">
+                General notebook options will be configured here in a later
+                version.
+              </p>
+            </section>
+            <section
+              class="settings-category hidden"
+              data-settings-category="editor"
+            >
+              <div class="settings-category-title">Editor</div>
+              <p class="settings-field-description">
+                Editor preferences for Monaco and markdown preview will be
+                surfaced here.
+              </p>
+            </section>
+            <section
+              class="settings-category hidden"
+              data-settings-category="appearance"
+            >
+              <div class="settings-category-title">Appearance</div>
+              <p class="settings-field-description">
+                Theme and appearance controls will be added here.
+              </p>
+            </section>
+            <section
+              class="settings-category hidden"
+              data-settings-category="shortcuts"
+            >
+              <div class="settings-category-title">Keyboard Shortcuts</div>
+              <p class="settings-field-description">
+                Keyboard shortcuts for editing and navigation will be
+                documented and configurable here.
+              </p>
+            </section>
+            <section
+              class="settings-category hidden"
+              data-settings-category="files"
+            >
+              <div class="settings-category-title">Files &amp; Images</div>
+              <p class="settings-field-description">
+                File and image handling options will be added here.
+              </p>
+            </section>
+            <section
+              class="settings-category hidden"
+              data-settings-category="versioning"
+            >
+              <div class="settings-category-title">Versioning</div>
+              <p class="settings-field-description">
+                Git and versioning options will be exposed here.
+              </p>
+            </section>
+          </div>
+        </div>
+        <div class="settings-footer">
+          <button
+            type="button"
+            class="settings-btn"
+            id="settings-footer-close-btn"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
     <script src="/static/mermaid.min.js"></script>
     <script src="/vendor/markdown-it/markdown-it.min.js"></script>
     <script src="/vendor/monaco/vs/loader.js"></script>
