@@ -317,3 +317,42 @@ The roadmap and implementation indicate the following major feature areas that m
     - Context menu commands including gitignore integration.
 
 This report is an inventory and baseline. Follow-up reports in `rework-report/` will define the v2 design for Monaco, markdown-it, and Fancytree, and describe a migration plan from the current implementation.
+
+---
+
+## Roadmap Overview
+
+The high-level implementation roadmap for the rework is tracked in [`roadmap.md`](./roadmap.md). It defines small, versioned increments from **v0.1.0** through **v1.0.0**:
+
+- **v0.1.0 – Project Bootstrap**
+  - Confirm FastAPI app structure, configuration, and health checks.
+  - Ensure basic frontend shell and tooling are in place.
+
+- **v0.2.0 – Core Notes CRUD and Tree Stability**
+  - Harden notes/folder CRUD, tree APIs, and related tests.
+
+- **v0.3.0 – Markdown Editing & Live Preview**
+  - Introduce Monaco Editor and markdown-it while preserving existing UX.
+
+- **v0.4.0 – Tree and Navigation Rework**
+  - Move to Fancytree and keep current navigation behaviors.
+
+- **v0.5.0 – Search & Filters Enhancements**
+  - Improve search performance, filters, and integration with the tree and viewer.
+
+- **v0.6.0 – Images & Paste Workflow Hardening**
+  - Solidify paste-upload flows, limits, and image display behavior.
+
+- **v0.7.0 – Settings UX and Persistence Refinement**
+  - Refine settings model, persistence, and UI interactions.
+
+- **v0.8.0 – GitPython-based Versioning**
+  - Adopt GitPython for local notes/app repos and align the versioning UI.
+
+- **v0.9.0 – UX Polish, Shortcuts, and Theming**
+  - Polish keyboard shortcuts, theming, empty states, and visual details.
+
+- **v1.0.0 – Stable Release**
+  - Finalize UX, testing, and deployment configuration and tag `v1.0.0`.
+
+Use `roadmap.md` as the source of truth for the detailed checklists for each version.
