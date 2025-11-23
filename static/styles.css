@@ -491,8 +491,7 @@ body.resizing {
   overflow: hidden;
 }
 
-.content-view,
-.content-edit {
+.content-view {
   flex: 1;
   color: var(--md-text-main);
 }
@@ -564,30 +563,15 @@ body.resizing {
 }
 
 .content-edit {
-  position: relative;
-  z-index: 1;
-  background: transparent;
-  border: none;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  resize: none;
-  color: transparent;
-  caret-color: var(--md-text-main);
-  line-height: 1.4;
-}
-
-.content-edit:focus {
-  outline: none;
-}
-
-.content-view,
-.content-edit {
   flex: 1;
-  padding: 0.75rem 1rem;
-  overflow-y: auto;
-  font-size: 0.9rem;
+  padding: 0;
+  overflow: hidden;
 }
 
 .content-view {
+  padding: 0.75rem 1rem;
+  overflow-y: auto;
+  font-size: 0.9rem;
   line-height: 1.6;
   color: var(--md-text-main);
 }

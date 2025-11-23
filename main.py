@@ -21,6 +21,7 @@ from typing import Any, Dict, List
 import markdown
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 
@@ -237,6 +238,24 @@ class RenameRequest(BaseModel):
 
 
 app = FastAPI(title="Markdown Notes App", version="0.1.0")
+
+
+STATIC_DIR = APP_ROOT / "static"
+MONACO_STATIC_DIR = APP_ROOT / "node_modules" / "monaco-editor" / "min"
+MARKDOWN_IT_STATIC_DIR = APP_ROOT / "node_modules" / "markdown-it" / "dist"
+
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+if MONACO_STATIC_DIR.is_dir():
+    app.mount("/vendor/monaco", StaticFiles(directory=MONACO_STATIC_DIR), name="monaco")
+
+if MARKDOWN_IT_STATIC_DIR.is_dir():
+    app.mount(
+        "/vendor/markdown-it",
+        StaticFiles(directory=MARKDOWN_IT_STATIC_DIR),
+        name="markdown_it",
+    )
 
 
 @app.get("/", response_class=FileResponse, tags=["ui"])

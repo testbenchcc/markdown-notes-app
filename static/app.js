@@ -1,3 +1,215 @@
+let monacoEditor = null;
+let markdownRenderer = null;
+let currentNotePath = null;
+let currentNoteContent = "";
+let currentMode = "view";
+
+function ensureMarkdownRenderer() {
+  if (markdownRenderer || typeof window === "undefined") return markdownRenderer;
+
+  if (typeof window.markdownit !== "function") {
+    console.warn("markdown-it is not available; falling back to server-rendered HTML only.");
+    return null;
+  }
+
+  markdownRenderer = window.markdownit({
+    html: true,
+    linkify: true,
+    breaks: false,
+  });
+
+  return markdownRenderer;
+}
+
+function preprocessMermaidFences(text) {
+  const lines = [];
+  let inMermaid = false;
+  let buffer = [];
+
+  text.split(/\r?\n/).forEach((line) => {
+    const trimmed = line.trimStart();
+
+    if (!inMermaid && trimmed.startsWith("```mermaid")) {
+      inMermaid = true;
+      buffer = [];
+      return;
+    }
+
+    if (inMermaid && trimmed.startsWith("```")) {
+      inMermaid = false;
+      const body = buffer.join("\n").replace(/^[\n]+|[\n]+$/g, "");
+      lines.push(`<div class="mermaid">${body}</div>`);
+      buffer = [];
+      return;
+    }
+
+    if (inMermaid) {
+      buffer.push(line);
+    } else {
+      lines.push(line);
+    }
+  });
+
+  if (inMermaid && buffer.length) {
+    lines.push(...buffer);
+  }
+
+  return lines.join("\n");
+}
+
+function renderViewerHtml(html) {
+  const viewerEl = document.getElementById("viewer");
+  if (!viewerEl) return;
+
+  viewerEl.innerHTML = html;
+
+  if (window.mermaid && typeof window.mermaid.init === "function") {
+    try {
+      window.mermaid.init(undefined, viewerEl.querySelectorAll(".mermaid"));
+    } catch (error) {
+      console.error("Mermaid rendering failed", error);
+    }
+  }
+}
+
+function updatePreviewFromEditor() {
+  if (!monacoEditor) return;
+
+  const md = ensureMarkdownRenderer();
+  if (!md) return;
+
+  const value = monacoEditor.getValue();
+  const processed = preprocessMermaidFences(value);
+  const html = md.render(processed);
+  renderViewerHtml(html);
+}
+
+function initMonacoEditor() {
+  if (monacoEditor) return;
+
+  const editorContainer = document.getElementById("editor");
+  if (!editorContainer) return;
+
+  if (typeof require === "undefined") {
+    console.error("Monaco loader (require) is not available. Ensure /vendor/monaco/vs/loader.js is served.");
+    return;
+  }
+
+  require.config({ paths: { vs: "/vendor/monaco/vs" } });
+
+  require(["vs/editor/editor.main"], () => {
+    monacoEditor = monaco.editor.create(editorContainer, {
+      value: "",
+      language: "markdown",
+      theme: "vs-dark",
+      automaticLayout: true,
+      scrollBeyondLastLine: false,
+      minimap: { enabled: false },
+      wordWrap: "on",
+      lineNumbers: "on",
+    });
+
+    monacoEditor.onDidChangeModelContent(() => {
+      currentNoteContent = monacoEditor.getValue();
+      if (currentMode === "edit") {
+        updatePreviewFromEditor();
+      }
+    });
+
+    monacoEditor.onDidScrollChange(() => {
+      const viewerEl = document.getElementById("viewer");
+      if (!viewerEl) return;
+
+      const scrollTop = monacoEditor.getScrollTop();
+      const scrollHeight = monacoEditor.getScrollHeight();
+      if (!scrollHeight) return;
+
+      const ratio = scrollTop / scrollHeight;
+      const viewerScrollable = viewerEl.scrollHeight - viewerEl.clientHeight;
+      if (viewerScrollable > 0) {
+        viewerEl.scrollTop = ratio * viewerScrollable;
+      }
+    });
+  });
+}
+
+async function saveCurrentNote() {
+  if (!monacoEditor || !currentNotePath) return;
+
+  const content = monacoEditor.getValue();
+  const safePath = toSafePath(currentNotePath);
+
+  try {
+    const response = await fetch(`/api/notes/${safePath}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Save note failed with status ${response.status}`);
+    }
+  } catch (error) {
+    console.error("Save note request failed", error);
+    showError("Unable to save note.");
+    throw error;
+  }
+}
+
+function setMode(mode) {
+  currentMode = mode;
+
+  const viewerEl = document.getElementById("viewer");
+  const editorWrapperEl = document.getElementById("editor-wrapper");
+  const modeToggleBtn = document.getElementById("mode-toggle-btn");
+
+  if (!viewerEl || !editorWrapperEl || !modeToggleBtn) return;
+
+  if (!currentNotePath) {
+    modeToggleBtn.disabled = true;
+    editorWrapperEl.classList.add("hidden");
+    return;
+  }
+
+  modeToggleBtn.disabled = false;
+
+  if (mode === "edit") {
+    editorWrapperEl.classList.remove("hidden");
+    modeToggleBtn.setAttribute("aria-label", "View");
+    modeToggleBtn.setAttribute("title", "View");
+    initMonacoEditor();
+
+    if (monacoEditor) {
+      monacoEditor.setValue(currentNoteContent || "");
+      updatePreviewFromEditor();
+    }
+  } else {
+    editorWrapperEl.classList.add("hidden");
+    modeToggleBtn.setAttribute("aria-label", "Edit");
+    modeToggleBtn.setAttribute("title", "Edit");
+  }
+}
+
+function setupModeToggle() {
+  const modeToggleBtn = document.getElementById("mode-toggle-btn");
+  if (!modeToggleBtn) return;
+
+  modeToggleBtn.addEventListener("click", async () => {
+    if (!currentNotePath) return;
+
+    if (currentMode === "view") {
+      setMode("edit");
+    } else {
+      try {
+        await saveCurrentNote();
+        await loadNote(currentNotePath);
+      } finally {
+        setMode("view");
+      }
+    }
+  });
+}
+
 async function updateHealthStatus() {
   const buildTagEl = document.getElementById("build-tag-text");
 
@@ -168,9 +380,19 @@ async function loadNote(notePath) {
 
     const data = await response.json();
 
+    currentNotePath = data.path ?? notePath;
+    currentNoteContent = data.content ?? "";
     noteNameEl.textContent = data.name ?? "";
-    notePathEl.textContent = data.path ?? notePath;
-    viewerEl.innerHTML = data.html ?? "";
+    notePathEl.textContent = currentNotePath;
+
+    renderViewerHtml(data.html ?? "");
+
+    if (monacoEditor && currentMode === "edit") {
+      monacoEditor.setValue(currentNoteContent);
+      updatePreviewFromEditor();
+    }
+
+    setMode(currentMode);
   } catch (error) {
     console.error("/api/notes request failed", error);
     showError("Unable to load the selected note from the server.");
@@ -414,4 +636,6 @@ window.addEventListener("DOMContentLoaded", () => {
   loadTree();
   setupTreeSelection();
   setupNewItemButtons();
+  setupModeToggle();
+  initMonacoEditor();
 });

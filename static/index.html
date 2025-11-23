@@ -120,7 +120,7 @@
             <div id="viewer" class="content-view"></div>
             <div id="editor-wrapper" class="content-edit-wrapper hidden">
               <div id="editor-line-numbers" class="editor-line-numbers"></div>
-              <textarea id="editor" class="content-edit" spellcheck="false"></textarea>
+              <div id="editor" class="content-edit" aria-label="Markdown editor"></div>
             </div>
           </div>
         </div>
@@ -128,7 +128,8 @@
     </div>
     <input id="import-file-input" type="file" accept=".zip" class="hidden" />
     <script src="/static/mermaid.min.js"></script>
+    <script src="/vendor/markdown-it/markdown-it.min.js"></script>
+    <script src="/vendor/monaco/vs/loader.js"></script>
     <script src="/static/app.js"></script>
-    <script src="/static/editor-highlighting.js"></script>
   </body>
 </html>

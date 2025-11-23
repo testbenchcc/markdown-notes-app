@@ -45,8 +45,7 @@ The goal is to preserve the existing layout, button placements, search position,
 
 - **Frontend**
   - Single-page UI served from `static/index.html`.
-  - Main behavior implemented in `static/app.js`.
-  - Editor syntax highlighting and markdown-aware overlay implemented in `static/editor-highlighting.js`.
+  - Main behavior, including the Monaco-based markdown editor and markdown-it live preview, is implemented in `static/app.js`.
   - Settings modal markup provided by `static/settings-modal.html` and wired up via `app.js`.
   - Multiple CSS themes (`styles.css`, `styles-office.css`, `styles-high-contrast.css`, `styles-midnight.css`) selectable via settings.
 
@@ -204,12 +203,12 @@ The goal is to preserve the existing layout, button placements, search position,
     - Export note button.
   - Body:
     - Markdown viewer (`#viewer`) on the left.
-    - Editor wrapper (`#editor-wrapper`) containing line numbers and a `<textarea id="editor">` on the right.
+    - Editor wrapper (`#editor-wrapper`) containing a line-number gutter and a `<div id="editor">` that hosts the Monaco editor on the right.
 
 - **Global**
   - Error banner at the top of the app for user-facing error messages.
   - Hidden file input for notebook import.
-  - `mermaid.min.js`, `app.js`, and `editor-highlighting.js` loaded at the bottom of the body.
+  - `mermaid.min.js`, `markdown-it.min.js`, the Monaco AMD loader, and `app.js` loaded at the bottom of the body.
 
 ### Editor behavior (from `app.js` and `editor-highlighting.js`)
 

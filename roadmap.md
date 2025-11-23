@@ -52,12 +52,12 @@
 
  - **Frontend**
   - [ ] Replace the textarea + overlay editor with **Monaco Editor** while preserving:
-    - [ ] Line numbers.
-    - [ ] Scroll sync with viewer.
+    - [x] Line numbers.
+    - [x] Scroll sync with viewer.
     - [ ] Keyboard shortcuts for formatting.
   - [ ] Integrate **markdown-it** for client-side preview rendering, including:
     - [ ] Tables, task lists, fenced code blocks, inline code.
-    - [ ] Mermaid code fences rendered into `.mermaid` blocks.
+    - [x] Mermaid code fences rendered into `.mermaid` blocks.
   - [ ] Ensure server and client markdown outputs stay visually consistent.
 
  ---
