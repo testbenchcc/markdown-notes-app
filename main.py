@@ -198,6 +198,8 @@ class NotebookSettings(BaseModel):
     imageMaxDisplayWidth: int = 0
     imageMaxDisplayHeight: int = 0
     imageDefaultAlignment: str = "left"
+    dateFormat: str = "YYYY-MM-DD"
+    timeFormat: str = "HH:mm"
 
     class Config:
         extra = "ignore"

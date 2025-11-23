@@ -86,6 +86,34 @@
             </p>
           </div>
           <div class="settings-field">
+            <label class="settings-field-label" for="settings-date-format">
+              Date format pattern
+            </label>
+            <input
+              type="text"
+              id="settings-date-format"
+              class="settings-input-text"
+              placeholder="YYYY-MM-DD"
+            />
+            <p class="settings-field-description">
+              Pattern used when inserting the current date with the Ctrl+; shortcut (tokens: YYYY, MM, DD).
+            </p>
+          </div>
+          <div class="settings-field">
+            <label class="settings-field-label" for="settings-time-format">
+              Time format pattern
+            </label>
+            <input
+              type="text"
+              id="settings-time-format"
+              class="settings-input-text"
+              placeholder="HH:mm"
+            />
+            <p class="settings-field-description">
+              Pattern used when inserting the current time with the Ctrl+Shift+; shortcut (tokens: HH, mm, ss).
+            </p>
+          </div>
+          <div class="settings-field">
             <div class="settings-field-label">Notebook export / import</div>
             <button type="button" id="settings-export-notebook-btn" class="settings-btn">
               Export Notebook

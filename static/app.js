@@ -43,6 +43,8 @@
   let settingsEditorSpellcheckInput = null;
   let settingsIndexPageTitleInput = null;
   let settingsTabLengthInput = null;
+  let settingsDateFormatInput = null;
+  let settingsTimeFormatInput = null;
   let settingsImageDisplayModeSelect = null;
   let settingsImageMaxWidthInput = null;
   let settingsImageMaxHeightInput = null;
@@ -209,6 +211,68 @@
     }
   }
 
+  function getEffectiveSettings() {
+    if (savedSettings && typeof savedSettings === "object") {
+      return savedSettings;
+    }
+    return getDefaultSettings();
+  }
+
+  function getTabStringFromSettings() {
+    const settings = getEffectiveSettings();
+    let length = Number(settings && settings.tabLength);
+    if (!Number.isFinite(length) || length <= 0) {
+      length = 2;
+    }
+    return " ".repeat(length);
+  }
+
+  function formatDateTimeWithPattern(date, pattern) {
+    if (!date || !pattern) {
+      return "";
+    }
+    let result = String(pattern);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const seconds = date.getSeconds();
+
+    function pad2(value) {
+      return value < 10 ? "0" + value : String(value);
+    }
+
+    result = result.replace(/YYYY/g, String(year));
+    result = result.replace(/MM/g, pad2(month));
+    result = result.replace(/DD/g, pad2(day));
+    result = result.replace(/HH/g, pad2(hours));
+    result = result.replace(/mm/g, pad2(minutes));
+    result = result.replace(/ss/g, pad2(seconds));
+
+    return result;
+  }
+
+  function formatCurrentDateFromSettings() {
+    const settings = getEffectiveSettings();
+    const raw =
+      (settings && typeof settings.dateFormat === "string"
+        ? settings.dateFormat
+        : "") || "";
+    const pattern = raw.trim() || "YYYY-MM-DD";
+    return formatDateTimeWithPattern(new Date(), pattern);
+  }
+
+  function formatCurrentTimeFromSettings() {
+    const settings = getEffectiveSettings();
+    const raw =
+      (settings && typeof settings.timeFormat === "string"
+        ? settings.timeFormat
+        : "") || "";
+    const pattern = raw.trim() || "HH:mm";
+    return formatDateTimeWithPattern(new Date(), pattern);
+  }
+
   let versioningNotesRootEl = null;
   let versioningNotesRemoteUrlEl = null;
   let versioningGithubApiKeyStatusEl = null;
@@ -265,6 +329,8 @@
       autoSaveIntervalSeconds: 60,
       tabLength: 2,
       indexPageTitle: "NoteBooks",
+      dateFormat: "YYYY-MM-DD",
+      timeFormat: "HH:mm",
       imageStoragePath: "images",
       imageMaxPasteBytes: 5 * 1024 * 1024,
       imageDisplayMode: "fit-width",
@@ -412,6 +478,12 @@
     const tabDraft = Number(draftSettings.tabLength || 0);
     const tabSaved = Number(savedSettings.tabLength || 0);
     const tabDirty = tabDraft !== tabSaved;
+    const dateFormatDraft = (draftSettings.dateFormat || "").trim();
+    const dateFormatSaved = (savedSettings.dateFormat || "").trim();
+    const dateFormatDirty = dateFormatDraft !== dateFormatSaved;
+    const timeFormatDraft = (draftSettings.timeFormat || "").trim();
+    const timeFormatSaved = (savedSettings.timeFormat || "").trim();
+    const timeFormatDirty = timeFormatDraft !== timeFormatSaved;
     const imagePathDraft = (draftSettings.imageStoragePath || "").trim();
     const imagePathSaved = (savedSettings.imageStoragePath || "").trim();
     const imagePathDirty = imagePathDraft !== imagePathSaved;
@@ -423,6 +495,8 @@
       titleDirty ||
       autoSaveDirty ||
       tabDirty ||
+      dateFormatDirty ||
+      timeFormatDirty ||
       imagePathDirty ||
       imageMaxDirty;
     setSettingsCategoryDirty("general", anyDirty);
@@ -473,6 +547,14 @@
     }
     if (settingsIndexPageTitleInput) {
       settingsIndexPageTitleInput.value = draftSettings.indexPageTitle || "";
+    }
+    if (settingsDateFormatInput) {
+      const value = draftSettings.dateFormat || "YYYY-MM-DD";
+      settingsDateFormatInput.value = value;
+    }
+    if (settingsTimeFormatInput) {
+      const value = draftSettings.timeFormat || "HH:mm";
+      settingsTimeFormatInput.value = value;
     }
     if (settingsAutoSaveIntervalInput) {
       const seconds = Number(draftSettings.autoSaveIntervalSeconds || 0);
@@ -548,6 +630,8 @@
     settingsIndexPageTitleInput = root.querySelector(
       "#settings-index-page-title"
     );
+    settingsDateFormatInput = root.querySelector("#settings-date-format");
+    settingsTimeFormatInput = root.querySelector("#settings-time-format");
     settingsTabLengthInput = root.querySelector("#settings-tab-length");
     settingsAutoSaveIntervalInput = root.querySelector(
       "#settings-auto-save-interval"
@@ -666,6 +750,32 @@
             : getDefaultSettings();
         }
         draftSettings.indexPageTitle = settingsIndexPageTitleInput.value || "";
+        updateGeneralCategoryDirty();
+      });
+    }
+
+    if (settingsDateFormatInput) {
+      settingsDateFormatInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const value = settingsDateFormatInput.value || "";
+        draftSettings.dateFormat = value.trim();
+        updateGeneralCategoryDirty();
+      });
+    }
+
+    if (settingsTimeFormatInput) {
+      settingsTimeFormatInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const value = settingsTimeFormatInput.value || "";
+        draftSettings.timeFormat = value.trim();
         updateGeneralCategoryDirty();
       });
     }
@@ -2650,6 +2760,53 @@
     });
     editorEl.addEventListener("paste", (e) => {
       handleEditorPaste(e);
+    });
+    editorEl.addEventListener("keydown", (e) => {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const tabString = getTabStringFromSettings();
+        insertTextAtCursor(editorEl, tabString);
+        updateEditorLineNumbers();
+        return;
+      }
+
+      const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+      if (!isCtrlOrMeta || e.altKey) {
+        return;
+      }
+
+      const key = e.key;
+      const code = e.code || "";
+
+      if (key === "s" || key === "S") {
+        e.preventDefault();
+        if (!currentNote) {
+          return;
+        }
+        autoSaveCurrentNote();
+        return;
+      }
+
+      if (!e.shiftKey && code === "Semicolon") {
+        e.preventDefault();
+        const formatted = formatCurrentDateFromSettings();
+        if (!formatted) {
+          return;
+        }
+        insertTextAtCursor(editorEl, formatted);
+        updateEditorLineNumbers();
+        return;
+      }
+
+      if (e.shiftKey && code === "Semicolon") {
+        e.preventDefault();
+        const formatted = formatCurrentTimeFromSettings();
+        if (!formatted) {
+          return;
+        }
+        insertTextAtCursor(editorEl, formatted);
+        updateEditorLineNumbers();
+      }
     });
   }
 

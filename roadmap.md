@@ -1,6 +1,12 @@
+## 1.4.0 - Gitignore context menu
+
+- [ ] Expand all and Callapse all should also be in the content menu for files
+- [ ] Add context menu item for folders and files to add and remove it from the notes repository .gitignore. Only show these items if `Automatically commit and push notes after saving` is enabled.
+- [ ] Add a .gitkeep file to any new folders as a precaution
+
 ## 1.3.9 - Keyboard shortcuts
 
-- [ ] Add tipical keyboard shortcuts when we are using the editor.
+- [x] Add tipical keyboard shortcuts when we are using the editor.
   - ctrl+s - manually trigger a save. Do not show the default save dialog moast browsers show.
   - tab - insert a tab (use tab_length value). This currently being used for screen navigation by the system.
   - ctrl+; - insert the current date (format set on settings page)

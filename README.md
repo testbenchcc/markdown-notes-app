@@ -16,7 +16,7 @@ This application was created with AI.
   - Right pane: markdown note viewer/editor with line numbers in edit mode
   - View/Edit toggle with automatic saving when leaving edit mode, changing notes, creating/renaming/deleting notes, and when applying settings
   - Optional periodic auto-save while editing, configured via an auto-save interval in the Settings modal
-  - Configurable tab width used for markdown rendering (and future editor Tab behavior), controlled from the Settings modal
+  - Configurable tab width used for markdown rendering and editor Tab behavior (Tab inserts spaces instead of moving focus), controlled from the Settings modal
   - Draggable vertical splitter between panes
   - View and edit modes keep scroll position aligned between the reader and editor when toggling
   - Markdown-aware syntax highlighting in the editor that mirrors the viewer for headings, bullets, task checkboxes, and fenced code blocks
@@ -25,6 +25,11 @@ This application was created with AI.
   - Keyboard navigation in the notes tree (arrow keys, Home/End, Enter/Space)
   - Remembers the last opened note per browser (localStorage)
   - Theme support with a Gruvbox-inspired dark default (based on Obsidian Gruvbox), plus Office and High Contrast themes
+- Editor keyboard shortcuts while editing notes:
+  - Tab: insert spaces using the configured tab width instead of moving focus
+  - Ctrl+S (or Cmd+S): manually save the current note without showing the browser save dialog
+  - Ctrl+;: insert the current date using the configured date format pattern
+  - Ctrl+Shift+;: insert the current time using the configured time format pattern
 - Simple text search across markdown notes
 - Paste images directly into notes; images are saved under a configurable subfolder inside the notebook (default `images/`) and referenced using standard markdown image syntax via a `/files/...` path. Image files under the configured images folder also appear in the notes tree and can be opened directly in the viewer. An Images section in the Settings modal controls the storage folder, a soft max paste size, and a cleanup action that removes unreferenced images, while a File handling section controls how images are displayed in the viewer (fit to width vs max width/height and a default alignment of left/center/right).
 - Settings modal (via the file tree footer Settings button with a gear icon), sized to 80vw by 90vh with vertically scrollable content when needed, with per-browser preferences including options to enable spellcheck in the editor, select the UI theme, choose a default theme for exported HTML notes, and access notebook export/import controls
