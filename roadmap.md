@@ -8,7 +8,7 @@
 
 ## v1.3.8 - Allow viewing of images
 
-- [ ] Allow user to view images in file tree, and view then in the right pane when selected.
+- [x] Allow user to view images in file tree, and view then in the right pane when selected.
 
 ## v1.3.7 - Move env variable to settings modal
 

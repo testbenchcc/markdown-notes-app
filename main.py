@@ -632,8 +632,14 @@ def build_notes_tree() -> Dict[str, Any]:
                 name = child.name
                 if name.startswith("."):
                     continue
-                # Only include markdown files and directories.
-                if child.is_dir() or (child.is_file() and child.suffix.lower() == ".md"):
+                # Include markdown files, image files, and directories.
+                if child.is_dir() or (
+                    child.is_file()
+                    and (
+                        child.suffix.lower() == ".md"
+                        or child.suffix.lower() in ALLOWED_IMAGE_EXTENSIONS
+                    )
+                ):
                     child_rel = rel / child.name if rel != Path("") else Path(child.name)
                     children.append(build_node(child, child_rel))
 
@@ -644,9 +650,11 @@ def build_notes_tree() -> Dict[str, Any]:
                 "children": children,
             }
 
-        # Note node
+        # Leaf node: note or image
+        suffix = path.suffix.lower()
+        node_type = "note" if suffix == ".md" else "image"
         return {
-            "type": "note",
+            "type": node_type,
             "name": path.name,
             "path": rel_str,
         }

@@ -335,6 +335,11 @@ body {
   filter: invert(1);
 }
 
+.tree-item.image .tree-icon {
+  background-image: url("/static/icons/file-single.png");
+  filter: invert(1);
+}
+
 .tree-item.folder .label {
   color: var(--md-grey);
 }

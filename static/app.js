@@ -32,6 +32,7 @@
   let contextMenuTargetEl = null;
 
   let currentNote = null; // { path, name, content, html }
+  let currentImage = null; // { path, name }
   let mode = "view"; // "view" | "edit"
 
   const SETTINGS_STORAGE_KEY = "markdownNotesSettings";
@@ -234,6 +235,7 @@
   };
 
   const DEFAULT_THEME_ID = "office";
+  const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"];
 
   function applyTheme(themeId) {
     if (!themeLinkEl) {
@@ -1601,6 +1603,10 @@
       items.push({ id: "delete", label: "Delete note" });
       items.push({ separator: true });
       items.push({ id: "copy-path", label: "Copy note path" });
+    } else if (target.type === "image") {
+      items.push({ id: "open-image", label: "Open image" });
+      items.push({ separator: true });
+      items.push({ id: "copy-path", label: "Copy image path" });
     }
 
     contextMenuEl.innerHTML = "";
@@ -1628,7 +1634,12 @@
   function showContextMenuForItem(item, clientX, clientY) {
     if (!contextMenuEl) return;
 
-    const type = item.classList.contains("folder") ? "folder" : "note";
+    let type = "note";
+    if (item.classList.contains("folder")) {
+      type = "folder";
+    } else if (item.classList.contains("image")) {
+      type = "image";
+    }
     const path = item.dataset.path || "";
 
     contextMenuTarget = { type, path };
@@ -1706,6 +1717,17 @@
         expandAllFolders();
       } else if (actionId === "collapse-all") {
         collapseAllFolders();
+      }
+      return;
+    }
+
+    if (type === "image") {
+      if (actionId === "open-image" && path) {
+        if (targetEl) {
+          clearSelection();
+          targetEl.classList.add("selected");
+        }
+        await openImagePath(path);
       }
       return;
     }
@@ -2008,6 +2030,14 @@
           renderNode(child, childrenContainer, depth + 1);
         });
       }
+    } else if (node.type === "image") {
+      item.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        clearSelection();
+        item.classList.add("selected");
+        await openImagePath(node.path);
+      });
+      container.appendChild(item);
     } else {
       item.addEventListener("click", async (e) => {
         e.stopPropagation();
@@ -2017,6 +2047,55 @@
       });
       container.appendChild(item);
     }
+  }
+
+  function isImagePath(path) {
+    if (!path) return false;
+    const lower = String(path).toLowerCase();
+    return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+  }
+
+  async function openImagePath(path) {
+    const nextPath = (path || "").trim();
+    if (!nextPath) {
+      return;
+    }
+
+    await saveCurrentNoteIfEditing();
+
+    currentNote = null;
+    currentImage = {
+      path: nextPath,
+      name: nextPath.split("/").pop() || nextPath,
+    };
+
+    noteNameEl.textContent = currentImage.name;
+    notePathEl.textContent = currentImage.path;
+
+    mode = "view";
+    viewerEl.classList.remove("hidden");
+    if (editorWrapperEl) {
+      editorWrapperEl.classList.add("hidden");
+    } else {
+      editorEl.classList.add("hidden");
+    }
+
+    modeToggleBtn.disabled = true;
+    if (noteExportBtn) {
+      noteExportBtn.disabled = true;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "image-viewer";
+    const img = document.createElement("img");
+    img.src = `/files/${currentImage.path}`;
+    img.alt = currentImage.name;
+    wrapper.appendChild(img);
+
+    viewerEl.innerHTML = "";
+    viewerEl.appendChild(wrapper);
+
+    applyImageDisplaySettingsInViewer();
   }
 
   async function openNotePath(path) {
@@ -2036,6 +2115,7 @@
       clearError();
       const note = await fetchJSON(`/api/notes/${encodeURIComponent(path)}`);
       currentNote = note;
+      currentImage = null;
       try {
         const storage = window.localStorage;
         if (storage) {
@@ -2499,6 +2579,7 @@
 
     const isFolder = current.classList.contains("folder");
     const isNote = current.classList.contains("note");
+    const isImage = current.classList.contains("image");
 
     if (e.key === "ArrowRight") {
       if (isFolder) {
@@ -2531,7 +2612,7 @@
       if (isFolder) {
         const expanded = current.classList.contains("expanded");
         setFolderExpanded(current, !expanded);
-      } else if (isNote) {
+      } else if (isNote || isImage) {
         current.click();
       }
     }
