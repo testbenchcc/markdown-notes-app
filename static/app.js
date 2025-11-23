@@ -507,6 +507,12 @@
         nextLevel = 2;
       } else if (level === 2) {
         nextLevel = 3;
+      } else if (level === 3) {
+        nextLevel = 4;
+      } else if (level === 4) {
+        nextLevel = 5;
+      } else if (level === 5) {
+        nextLevel = 6;
       } else {
         nextLevel = 0;
       }
@@ -3111,6 +3117,21 @@
       return;
     }
 
+    const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+    if (
+      isCtrlOrMeta &&
+      e.shiftKey &&
+      !e.altKey &&
+      (e.key === "E" || e.key === "e")
+    ) {
+      if (!currentNote || !modeToggleBtn || modeToggleBtn.disabled) {
+        return;
+      }
+      e.preventDefault();
+      modeToggleBtn.click();
+      return;
+    }
+
     if (!treeContainer) return;
 
     const active = document.activeElement;
@@ -3289,13 +3310,11 @@
 
       const codeState = getEditorCodeState(editorEl);
       const lowerKey = (key || "").toLowerCase();
-      const isSaveCombo = !isAlt && !e.shiftKey && (lowerKey === "s");
-      const isIndentCombo =
-        e.shiftKey && (key === ">" || key === "<");
+      const isSaveCombo = !isAlt && !e.shiftKey && lowerKey === "s";
+      const isIndentCombo = e.shiftKey && (key === ">" || key === "<");
       const isDuplicateCombo = e.shiftKey && lowerKey === "d";
 
       if (codeState.inside && !isSaveCombo && !isIndentCombo && !isDuplicateCombo) {
-        e.preventDefault();
         return;
       }
 

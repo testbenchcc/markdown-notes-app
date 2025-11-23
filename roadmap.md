@@ -1,5 +1,5 @@
 ## v1.4.5 - Sharable links
-
+ 
 - [ ] Convert over to allow for sharable links in the following format: notes.husqy.net/?note=/notes/projects/app.md?mode=edit
   - modes shoult include:
     - read, edit, export (notes only), download (notes, files and images)
