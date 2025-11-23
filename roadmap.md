@@ -1,8 +1,4 @@
-## v1.3.9 - Allow viewing of images
-
-- [ ] Allow user to view images in file tree, and view then in the right pane when selected.
-
-## 1.3.8 - Keyboard shortcuts
+## 1.3.9 - Keyboard shortcuts
 
 - [ ] Add tipical keyboard shortcuts when we are using the editor.
   - ctrl+s - manually trigger a save. Do not show the default save dialog moast browsers show.
@@ -10,10 +6,14 @@
   - ctrl+; - insert the current date (format set on settings page)
   - ctrl+shift+; - insert the current time (format set on settings page)
 
+## v1.3.8 - Allow viewing of images
+
+- [ ] Allow user to view images in file tree, and view then in the right pane when selected.
+
 ## v1.3.7 - Move env variable to settings modal
 
 - [ ] Move NOTES_ROOT into the settings modal
-- [ ] Move tab_length value to settings modal
+- [x] Move tab_length value to settings modal
 
 ## v1.3.6 - Commit conditions
 

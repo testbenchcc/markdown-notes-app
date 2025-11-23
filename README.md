@@ -16,6 +16,7 @@ This application was created with AI.
   - Right pane: markdown note viewer/editor with line numbers in edit mode
   - View/Edit toggle with automatic saving when leaving edit mode, changing notes, creating/renaming/deleting notes, and when applying settings
   - Optional periodic auto-save while editing, configured via an auto-save interval in the Settings modal
+  - Configurable tab width used for markdown rendering (and future editor Tab behavior), controlled from the Settings modal
   - Draggable vertical splitter between panes
   - View and edit modes keep scroll position aligned between the reader and editor when toggling
   - Markdown-aware syntax highlighting in the editor that mirrors the viewer for headings, bullets, task checkboxes, and fenced code blocks
@@ -90,8 +91,8 @@ The container uses a bind mount of the project directory so that notes and code 
 - Subfolders represent categories.
 - Each `.md` file is a note.
 - The `notes/` folder can also be initialized as a separate Git repository (for example `https://github.com/testbenchcc/markdown-notes.git`), which is git-ignored by the main app repo and used for versioning and sync.
-- The app treats the folder where `main.py` lives as the notebook root and uses a configurable `NOTES_ROOT` path defined near the top of `main.py`.
-- You can also override the notes root by setting a `NOTES_ROOT` environment variable. If it is a relative path, it is resolved against the application root (the folder containing `main.py`).
+- The app treats the folder where `main.py` lives as the notebook root and uses a `NOTES_ROOT` path defined near the top of `main.py`.
+- You can override the notes root by setting a `NOTES_ROOT` environment variable. If it is a relative path, it is resolved against the application root (the folder containing `main.py`).
 
 To move or copy a notebook, you can either copy or clone the entire repository folder (including `notes/`), or use the in-app Export feature to download a zip archive and Import it into another instance.
 

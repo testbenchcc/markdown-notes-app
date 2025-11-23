@@ -159,8 +159,18 @@ def _preprocess_mermaid_fences(text: str) -> str:
     return pattern.sub(_replace, text)
 
 
-def _render_markdown_html(text: str) -> str:
+def _render_markdown_html(text: str, tab_length: int | None = None) -> str:
     processed = _preprocess_mermaid_fences(text)
+    effective_tab_length: int
+    try:
+        if tab_length is None:
+            effective_tab_length = 2
+        else:
+            value = int(tab_length)
+            effective_tab_length = value if value > 0 else 2
+    except (TypeError, ValueError):
+        effective_tab_length = 2
+
     return markdown.markdown(
         processed,
         extensions=["extra", "codehilite", "pymdownx.tasklist"],
@@ -168,7 +178,7 @@ def _render_markdown_html(text: str) -> str:
             "codehilite": {"guess_lang": False, "noclasses": True},
             "pymdownx.tasklist": {"clickable_checkbox": False},
         },
-        tab_length=2,
+        tab_length=effective_tab_length,
     )
 
 
@@ -180,6 +190,7 @@ class NotebookSettings(BaseModel):
     autoPullNotes: bool = False
     autoPullIntervalMinutes: int = 30
     autoSaveIntervalSeconds: int = 60
+    tabLength: int = 2
     indexPageTitle: str = "NoteBooks"
     imageStoragePath: str = "images"
     imageMaxPasteBytes: int = 5 * 1024 * 1024
@@ -700,7 +711,9 @@ async def get_note(note_path: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Not a markdown file")
 
     raw = file_path.read_text(encoding="utf-8")
-    html = _render_markdown_html(raw)
+    settings = load_notebook_settings()
+    tab_length = settings.get("tabLength") if isinstance(settings, dict) else None
+    html = _render_markdown_html(raw, tab_length=tab_length)
 
     rel_path = file_path.relative_to(NOTES_ROOT).as_posix()
 
@@ -726,7 +739,9 @@ async def export_note_html(note_path: str, theme: str | None = None) -> HTMLResp
         raise HTTPException(status_code=400, detail="Not a markdown file")
 
     raw = file_path.read_text(encoding="utf-8")
-    body_html = _render_markdown_html(raw)
+    settings = load_notebook_settings()
+    tab_length = settings.get("tabLength") if isinstance(settings, dict) else None
+    body_html = _render_markdown_html(raw, tab_length=tab_length)
 
     title = file_path.stem or file_path.name
     safe_title = html_module.escape(title, quote=True)

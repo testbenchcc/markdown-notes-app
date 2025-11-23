@@ -41,6 +41,7 @@
   let settingsInitialized = false;
   let settingsEditorSpellcheckInput = null;
   let settingsIndexPageTitleInput = null;
+  let settingsTabLengthInput = null;
   let settingsImageDisplayModeSelect = null;
   let settingsImageMaxWidthInput = null;
   let settingsImageMaxHeightInput = null;
@@ -260,6 +261,7 @@
       autoPullNotes: false,
       autoPullIntervalMinutes: 30,
       autoSaveIntervalSeconds: 60,
+      tabLength: 2,
       indexPageTitle: "NoteBooks",
       imageStoragePath: "images",
       imageMaxPasteBytes: 5 * 1024 * 1024,
@@ -405,6 +407,9 @@
     const autoSaveDraft = Number(draftSettings.autoSaveIntervalSeconds || 0);
     const autoSaveSaved = Number(savedSettings.autoSaveIntervalSeconds || 0);
     const autoSaveDirty = autoSaveDraft !== autoSaveSaved;
+    const tabDraft = Number(draftSettings.tabLength || 0);
+    const tabSaved = Number(savedSettings.tabLength || 0);
+    const tabDirty = tabDraft !== tabSaved;
     const imagePathDraft = (draftSettings.imageStoragePath || "").trim();
     const imagePathSaved = (savedSettings.imageStoragePath || "").trim();
     const imagePathDirty = imagePathDraft !== imagePathSaved;
@@ -415,6 +420,7 @@
       spellcheckDirty ||
       titleDirty ||
       autoSaveDirty ||
+      tabDirty ||
       imagePathDirty ||
       imageMaxDirty;
     setSettingsCategoryDirty("general", anyDirty);
@@ -470,6 +476,10 @@
       const seconds = Number(draftSettings.autoSaveIntervalSeconds || 0);
       settingsAutoSaveIntervalInput.value =
         seconds > 0 ? String(seconds) : "";
+    }
+    if (settingsTabLengthInput) {
+      const length = Number(draftSettings.tabLength || 0);
+      settingsTabLengthInput.value = length > 0 ? String(length) : "";
     }
     if (settingsImageDisplayModeSelect) {
       const mode = draftSettings.imageDisplayMode || "fit-width";
@@ -536,6 +546,7 @@
     settingsIndexPageTitleInput = root.querySelector(
       "#settings-index-page-title"
     );
+    settingsTabLengthInput = root.querySelector("#settings-tab-length");
     settingsAutoSaveIntervalInput = root.querySelector(
       "#settings-auto-save-interval"
     );
@@ -653,6 +664,23 @@
             : getDefaultSettings();
         }
         draftSettings.indexPageTitle = settingsIndexPageTitleInput.value || "";
+        updateGeneralCategoryDirty();
+      });
+    }
+
+    if (settingsTabLengthInput) {
+      settingsTabLengthInput.addEventListener("change", () => {
+        if (!draftSettings) {
+          draftSettings = savedSettings
+            ? { ...savedSettings }
+            : getDefaultSettings();
+        }
+        const raw = settingsTabLengthInput.value;
+        let length = parseInt(raw, 10);
+        if (!Number.isFinite(length) || length <= 0) {
+          length = 2;
+        }
+        draftSettings.tabLength = length;
         updateGeneralCategoryDirty();
       });
     }
