@@ -102,6 +102,10 @@ class DeletePathRequest(BaseModel):
     path: str
 
 
+class GitignorePathRequest(BaseModel):
+    path: str
+
+
 def ensure_notes_root() -> None:
     """Ensure the notes root directory exists."""
 
@@ -426,6 +430,33 @@ def auto_pull_notes() -> Dict[str, Any]:
         "after": state_after,
         "commit_result": commit_result,
     }
+
+
+def _get_notes_gitignore_path() -> Path:
+    ensure_notes_root()
+    return NOTES_ROOT / ".gitignore"
+
+
+def _read_notes_gitignore_lines() -> list[str]:
+    path = _get_notes_gitignore_path()
+    if not path.is_file():
+        return []
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except Exception:
+        return []
+    return [line.rstrip("\r\n") for line in raw.splitlines()]
+
+
+def _write_notes_gitignore_lines(lines: list[str]) -> None:
+    path = _get_notes_gitignore_path()
+    if not lines:
+        path.write_text("", encoding="utf-8")
+        return
+    text = "\n".join(lines)
+    if not text.endswith("\n"):
+        text += "\n"
+    path.write_text(text, encoding="utf-8")
 
 def _run_app_git(args: list[str]) -> subprocess.CompletedProcess:
     try:
@@ -864,6 +895,27 @@ async def save_note(note_path: str, payload: SaveNoteRequest) -> Dict[str, Any]:
     return {"ok": True, "path": rel_path, "name": file_path.name}
 
 
+def _ensure_gitkeep_for_folder(folder_path: Path) -> None:
+    try:
+        base = NOTES_ROOT.resolve()
+        current = folder_path.resolve()
+    except Exception:
+        return
+
+    while True:
+        if base not in current.parents and current != base:
+            break
+        gitkeep_path = current / ".gitkeep"
+        if not gitkeep_path.exists():
+            try:
+                gitkeep_path.write_text("", encoding="utf-8")
+            except Exception:
+                pass
+        if current == base:
+            break
+        current = current.parent
+
+
 @app.get("/api/search")
 async def search_notes(q: str = Query(..., min_length=1, max_length=200)) -> Dict[str, Any]:
     """Search across all markdown notes for a simple text query.
@@ -972,6 +1024,8 @@ async def create_folder(payload: CreatePathRequest) -> Dict[str, Any]:
     folder_path = _resolve_relative_path(payload.path)
     folder_path.mkdir(parents=True, exist_ok=True)
 
+    _ensure_gitkeep_for_folder(folder_path)
+
     rel_path = folder_path.relative_to(NOTES_ROOT).as_posix()
 
     return {"ok": True, "path": rel_path}
@@ -994,6 +1048,7 @@ async def create_note(payload: CreatePathRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Note already exists")
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_gitkeep_for_folder(file_path.parent)
     initial_content = payload.content or ""
     file_path.write_text(initial_content, encoding="utf-8")
 
@@ -1313,6 +1368,44 @@ async def import_notebook(
             shutil.copyfileobj(src, dst)
     archive.close()
     return {"ok": True}
+
+
+@app.post("/api/versioning/notes/gitignore/add")
+async def versioning_notes_gitignore_add(payload: GitignorePathRequest) -> Dict[str, Any]:
+    ensure_notes_root()
+    if not payload.path.strip():
+        raise HTTPException(status_code=400, detail="Path must not be empty")
+
+    safe_rel = _validate_relative_path(payload.path)
+    existing = _read_notes_gitignore_lines()
+
+    if safe_rel not in existing:
+        next_lines = existing + [safe_rel]
+        _write_notes_gitignore_lines(next_lines)
+        added = True
+    else:
+        added = False
+
+    return {"ok": True, "path": safe_rel, "added": added}
+
+
+@app.post("/api/versioning/notes/gitignore/remove")
+async def versioning_notes_gitignore_remove(payload: GitignorePathRequest) -> Dict[str, Any]:
+    ensure_notes_root()
+    if not payload.path.strip():
+        raise HTTPException(status_code=400, detail="Path must not be empty")
+
+    safe_rel = _validate_relative_path(payload.path)
+    existing = _read_notes_gitignore_lines()
+    if not existing:
+        _write_notes_gitignore_lines(existing)
+        return {"ok": True, "path": safe_rel, "removed": False}
+
+    next_lines = [line for line in existing if line.strip() != safe_rel]
+    removed = len(next_lines) < len(existing)
+    _write_notes_gitignore_lines(next_lines)
+
+    return {"ok": True, "path": safe_rel, "removed": removed}
 
 
 @app.post("/api/versioning/notes/commit-and-push")

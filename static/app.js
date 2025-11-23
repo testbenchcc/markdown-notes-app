@@ -227,6 +227,14 @@
     return " ".repeat(length);
   }
 
+  function shouldShowGitignoreActions() {
+    const settings = savedSettings || getDefaultSettings();
+    if (!settings || typeof settings !== "object") {
+      return false;
+    }
+    return !!settings.autoCommitNotes;
+  }
+
   function formatDateTimeWithPattern(date, pattern) {
     if (!date || !pattern) {
       return "";
@@ -1700,6 +1708,17 @@
       });
       items.push({ id: "expand-all", label: "Expand all" });
       items.push({ id: "collapse-all", label: "Collapse all" });
+      if (shouldShowGitignoreActions() && target.path) {
+        items.push({ separator: true });
+        items.push({
+          id: "gitignore-add",
+          label: "Add to notes .gitignore",
+        });
+        items.push({
+          id: "gitignore-remove",
+          label: "Remove from notes .gitignore",
+        });
+      }
       items.push({ separator: true });
       items.push({
         id: "copy-path",
@@ -1712,9 +1731,37 @@
       items.push({ id: "rename", label: "Rename note" });
       items.push({ id: "delete", label: "Delete note" });
       items.push({ separator: true });
+      items.push({ id: "expand-all", label: "Expand all" });
+      items.push({ id: "collapse-all", label: "Collapse all" });
+      if (shouldShowGitignoreActions() && target.path) {
+        items.push({ separator: true });
+        items.push({
+          id: "gitignore-add",
+          label: "Add to notes .gitignore",
+        });
+        items.push({
+          id: "gitignore-remove",
+          label: "Remove from notes .gitignore",
+        });
+      }
+      items.push({ separator: true });
       items.push({ id: "copy-path", label: "Copy note path" });
     } else if (target.type === "image") {
       items.push({ id: "open-image", label: "Open image" });
+      items.push({ separator: true });
+      items.push({ id: "expand-all", label: "Expand all" });
+      items.push({ id: "collapse-all", label: "Collapse all" });
+      if (shouldShowGitignoreActions() && target.path) {
+        items.push({ separator: true });
+        items.push({
+          id: "gitignore-add",
+          label: "Add to notes .gitignore",
+        });
+        items.push({
+          id: "gitignore-remove",
+          label: "Remove from notes .gitignore",
+        });
+      }
       items.push({ separator: true });
       items.push({ id: "copy-path", label: "Copy image path" });
     }
@@ -1792,6 +1839,16 @@
 
     hideContextMenu();
 
+    if (actionId === "expand-all") {
+      expandAllFolders();
+      return;
+    }
+
+    if (actionId === "collapse-all") {
+      collapseAllFolders();
+      return;
+    }
+
     if (actionId === "copy-path") {
       const value = path || "/";
       try {
@@ -1802,6 +1859,40 @@
         }
       } catch (err) {
         window.prompt("Path", value);
+      }
+      return;
+    }
+
+    if (actionId === "gitignore-add") {
+      if (!path) {
+        return;
+      }
+      try {
+        clearError();
+        await fetchJSON("/api/versioning/notes/gitignore/add", {
+          method: "POST",
+          body: JSON.stringify({ path }),
+        });
+        await triggerNotesAutoCommit();
+      } catch (err) {
+        showError(`Failed to update notes .gitignore: ${err.message}`);
+      }
+      return;
+    }
+
+    if (actionId === "gitignore-remove") {
+      if (!path) {
+        return;
+      }
+      try {
+        clearError();
+        await fetchJSON("/api/versioning/notes/gitignore/remove", {
+          method: "POST",
+          body: JSON.stringify({ path }),
+        });
+        await triggerNotesAutoCommit();
+      } catch (err) {
+        showError(`Failed to update notes .gitignore: ${err.message}`);
       }
       return;
     }

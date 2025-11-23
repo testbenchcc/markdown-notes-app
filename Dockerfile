@@ -11,6 +11,11 @@ RUN apt-get update \
     && apt-get install -y git \
     && rm -rf /var/lib/apt/lists/*
 
+RUN git config --global user.name "Tony" \
+    && git config --global user.email "tony@testbench.cc"
+
+RUN ssh-add /root/.ssh/id_ed25519
+
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
