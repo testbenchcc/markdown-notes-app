@@ -17,12 +17,13 @@ The goal is to preserve the existing layout, button placements, search position,
 - Notes root resolved from `NOTES_ROOT` env var or defaulting to `notes/` under the app root (directory is created on startup).
 - `requirements.txt` defines the initial backend dependencies (FastAPI + Uvicorn); the rest of this document describes the target architecture for later roadmap stages.
 - Minimal SPA shell under `static/` (`index.html`, `styles.css`, `app.js`) served from the FastAPI app at `/`.
-- Frontend currently uses the legacy layout structure (nav pane, divider, content pane) and calls `/health` to display basic status information.
+- Frontend currently uses the legacy layout structure (nav pane, divider, content pane), calls `/health` to display basic status information, and loads note content into the viewer when a note is selected from the tree using `GET /api/notes/{note_path}`.
 - Initial v0.2.0 backend/frontend work-in-progress:
   - Secure path helpers (`_validate_relative_path`, `_resolve_relative_path`, `_resolve_destination_path`).
   - Notes tree builder (`build_notes_tree`) and `GET /api/tree` endpoint.
   - Basic note CRUD endpoints: `GET /api/notes/{note_path}`, `PUT /api/notes/{note_path}`, `POST /api/folders`, `POST /api/notes`.
   - Minimal frontend wiring to render a read-only notes tree from `/api/tree`.
+  - Basic create flows from the UI: New Folder / New Note buttons call `POST /api/folders` and `POST /api/notes` respectively and refresh the tree.
   - Pytest-based tests in `tests/test_tree_and_paths.py` and `tests/test_notes_crud.py`.
 - Recommended tooling decisions:
   - **Python**: Black (formatter), Ruff (linter), pytest (test runner).
