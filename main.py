@@ -16,8 +16,10 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List
 
-from fastapi import FastAPI
+import markdown
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -76,6 +78,7 @@ IMAGE_EXTENSIONS = {
     ".bmp",
     ".svg",
 }
+DEFAULT_TAB_LENGTH = 4
 
 
 def _validate_relative_path(path_str: str) -> str:
@@ -169,6 +172,63 @@ def build_notes_tree() -> List[Dict[str, Any]]:
     return _build_tree_for_directory(root, root)
 
 
+def _preprocess_mermaid_fences(text: str) -> str:
+    lines: List[str] = []
+    in_mermaid = False
+    buffer: List[str] = []
+
+    for line in text.splitlines():
+        if not in_mermaid and line.lstrip().startswith("```mermaid"):
+            in_mermaid = True
+            buffer = []
+            continue
+        if in_mermaid and line.lstrip().startswith("```"):
+            in_mermaid = False
+            body = "\n".join(buffer).strip("\n")
+            lines.append(f'<div class="mermaid">{body}</div>')
+            buffer = []
+            continue
+        if in_mermaid:
+            buffer.append(line)
+        else:
+            lines.append(line)
+
+    if in_mermaid and buffer:
+        lines.extend(buffer)
+
+    return "\n".join(lines)
+
+
+def _render_markdown_html(markdown_text: str, tab_length: int = DEFAULT_TAB_LENGTH) -> str:
+    processed = _preprocess_mermaid_fences(markdown_text)
+    html = markdown.markdown(
+        processed,
+        extensions=["extra", "codehilite", "pymdownx.tasklist"],
+        extension_configs={
+            "codehilite": {
+                "linenums": False,
+                "guess_lang": False,
+                "noclasses": True,
+            }
+        },
+        output_format="html5",
+    )
+    return html
+
+
+class NoteContent(BaseModel):
+    content: str
+
+
+class CreateFolderRequest(BaseModel):
+    path: str
+
+
+class CreateNoteRequest(BaseModel):
+    path: str
+    content: str | None = None
+
+
 app = FastAPI(title="Markdown Notes App", version="0.1.0")
 
 
@@ -205,6 +265,90 @@ def api_tree() -> Dict[str, Any]:
     return {
         "root": str(cfg.notes_root),
         "nodes": tree,
+    }
+
+
+def _relative_to_notes_root(path: Path) -> str:
+    cfg = get_config()
+    return path.relative_to(cfg.notes_root).as_posix()
+
+
+@app.get("/api/notes/{note_path:path}", tags=["notes"])
+def get_note(note_path: str) -> Dict[str, Any]:
+    try:
+        note_file = _resolve_relative_path(note_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not note_file.is_file():
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    content = note_file.read_text(encoding="utf8")
+    html = _render_markdown_html(content)
+
+    return {
+        "path": _relative_to_notes_root(note_file),
+        "name": note_file.name,
+        "content": content,
+        "html": html,
+    }
+
+
+@app.put("/api/notes/{note_path:path}", tags=["notes"])
+def put_note(note_path: str, payload: NoteContent) -> Dict[str, Any]:
+    try:
+        note_file = _resolve_relative_path(note_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    note_file.parent.mkdir(parents=True, exist_ok=True)
+    note_file.write_text(payload.content, encoding="utf8")
+
+    return {
+        "path": _relative_to_notes_root(note_file),
+        "name": note_file.name,
+    }
+
+
+@app.post("/api/folders", tags=["notes"], status_code=201)
+def create_folder(payload: CreateFolderRequest) -> Dict[str, Any]:
+    try:
+        folder = _resolve_relative_path(payload.path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    folder.mkdir(parents=True, exist_ok=True)
+    gitkeep = folder / ".gitkeep"
+    if not gitkeep.exists():
+        gitkeep.write_text("", encoding="utf8")
+
+    return {
+        "path": _relative_to_notes_root(folder),
+        "name": folder.name,
+    }
+
+
+@app.post("/api/notes", tags=["notes"], status_code=201)
+def create_note(payload: CreateNoteRequest) -> Dict[str, Any]:
+    note_path = payload.path
+    if not note_path.endswith(NOTE_FILE_EXTENSION):
+        note_path = f"{note_path}{NOTE_FILE_EXTENSION}"
+
+    try:
+        note_file = _resolve_relative_path(note_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if note_file.exists():
+        raise HTTPException(status_code=409, detail="Note already exists")
+
+    note_file.parent.mkdir(parents=True, exist_ok=True)
+    content = payload.content or ""
+    note_file.write_text(content, encoding="utf8")
+
+    return {
+        "path": _relative_to_notes_root(note_file),
+        "name": note_file.name,
     }
 
 
