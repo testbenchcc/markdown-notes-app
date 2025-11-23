@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -66,6 +66,109 @@ def get_config() -> AppConfig:
     return AppConfig()
 
 
+NOTE_FILE_EXTENSION = ".md"
+IMAGE_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".svg",
+}
+
+
+def _validate_relative_path(path_str: str) -> str:
+    raw = path_str.strip()
+    if not raw:
+        raise ValueError("Path must not be empty")
+
+    if ":" in raw:
+        raise ValueError("Path must be relative and must not contain drive specifiers")
+
+    path = Path(raw)
+
+    if path.is_absolute():
+        raise ValueError("Path must be relative")
+
+    parts: List[str] = list(path.parts)
+
+    if any(part == ".." for part in parts):
+        raise ValueError("Path must not contain '..' segments")
+
+    normalized = Path(*[part for part in parts if part not in (".", "")])
+
+    if not normalized.parts:
+        raise ValueError("Path must not resolve to empty")
+
+    return normalized.as_posix()
+
+
+def _resolve_relative_path(relative_path: str) -> Path:
+    cfg = get_config()
+    safe_rel = _validate_relative_path(relative_path)
+    target = (cfg.notes_root / safe_rel).resolve()
+
+    try:
+        target.relative_to(cfg.notes_root)
+    except ValueError as exc:  # pragma: no cover - defensive branch
+        raise ValueError("Resolved path escapes the notes root") from exc
+
+    return target
+
+
+def _resolve_destination_path(source_relative: str, destination_relative: str) -> tuple[Path, Path]:
+    source = _resolve_relative_path(source_relative)
+    destination = _resolve_relative_path(destination_relative)
+
+    if source == destination:
+        raise ValueError("Source and destination paths must be different")
+
+    return source, destination
+
+
+def _build_tree_for_directory(directory: Path, root: Path) -> List[Dict[str, Any]]:
+    entries: List[Dict[str, Any]] = []
+
+    for child in sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name.lower())):
+        if child.name.startswith("."):
+            continue
+
+        if child.is_dir():
+            node: Dict[str, Any] = {
+                "type": "folder",
+                "name": child.name,
+                "path": child.relative_to(root).as_posix(),
+                "children": _build_tree_for_directory(child, root),
+            }
+            entries.append(node)
+        elif child.is_file():
+            suffix = child.suffix.lower()
+
+            if suffix == NOTE_FILE_EXTENSION:
+                node_type = "note"
+            elif suffix in IMAGE_EXTENSIONS:
+                node_type = "image"
+            else:
+                continue
+
+            entries.append(
+                {
+                    "type": node_type,
+                    "name": child.name,
+                    "path": child.relative_to(root).as_posix(),
+                }
+            )
+
+    return entries
+
+
+def build_notes_tree() -> List[Dict[str, Any]]:
+    cfg = get_config()
+    root = cfg.notes_root
+    return _build_tree_for_directory(root, root)
+
+
 app = FastAPI(title="Markdown Notes App", version="0.1.0")
 
 
@@ -91,6 +194,17 @@ def health() -> Dict[str, Any]:
         "version": "0.1.0",
         "notesRoot": str(cfg.notes_root),
         "settingsPath": str(cfg.settings_path),
+    }
+
+
+@app.get("/api/tree", tags=["notes"])
+def api_tree() -> Dict[str, Any]:
+    cfg = get_config()
+    tree = build_notes_tree()
+
+    return {
+        "root": str(cfg.notes_root),
+        "nodes": tree,
     }
 
 

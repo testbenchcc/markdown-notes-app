@@ -17,7 +17,12 @@ The goal is to preserve the existing layout, button placements, search position,
 - Notes root resolved from `NOTES_ROOT` env var or defaulting to `notes/` under the app root (directory is created on startup).
 - `requirements.txt` defines the initial backend dependencies (FastAPI + Uvicorn); the rest of this document describes the target architecture for later roadmap stages.
 - Minimal SPA shell under `static/` (`index.html`, `styles.css`, `app.js`) served from the FastAPI app at `/`.
-- Frontend currently boots a placeholder layout and calls `/health` to display basic status information.
+- Frontend currently uses the legacy layout structure (nav pane, divider, content pane) and calls `/health` to display basic status information.
+- Initial v0.2.0 backend/frontend work-in-progress:
+  - Secure path helpers (`_validate_relative_path`, `_resolve_relative_path`, `_resolve_destination_path`).
+  - Notes tree builder (`build_notes_tree`) and `GET /api/tree` endpoint.
+  - Minimal frontend wiring to render a read-only notes tree from `/api/tree`.
+  - Pytest-based tests in `tests/test_tree_and_paths.py`.
 - Recommended tooling decisions:
   - **Python**: Black (formatter), Ruff (linter), pytest (test runner).
   - **JavaScript**: Prettier (formatter), ESLint (linter); static assets are served directly by FastAPI without a bundler for now.

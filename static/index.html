@@ -4,63 +4,131 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Markdown Notes App</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link id="theme-stylesheet" rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <div id="app">
-      <header id="app-header">
-        <h1 id="nav-title">Markdown Notes</h1>
-        <div id="app-meta">
-          <span id="app-status" data-status="bootstrapped">Loading…</span>
-        </div>
-      </header>
-
-      <main id="layout">
-        <section id="nav-pane">
-          <div id="nav-header">
-            <div id="nav-actions">
-              <button id="new-folder-btn" type="button">New Folder</button>
-              <button id="new-note-btn" type="button">New Note</button>
-            </div>
-            <div id="nav-search">
-              <input id="search-input" placeholder="Search notes" />
+      <div id="error-banner" class="error-banner hidden"></div>
+      <div id="main">
+        <div id="nav-pane">
+          <div class="nav-header">
+            <span id="nav-title" class="nav-title">NoteBooks</span>
+            <div class="nav-actions">
+              <button
+                id="new-folder-btn"
+                class="small-btn icon-btn"
+                type="button"
+                aria-label="New folder"
+                title="New folder"
+              >
+                <img
+                  src="/static/icons/folder.png"
+                  alt=""
+                  class="icon-btn-image"
+                />
+              </button>
+              <button
+                id="new-note-btn"
+                class="small-btn icon-btn"
+                type="button"
+                aria-label="New note"
+                title="New note"
+              >
+                <img
+                  src="/static/icons/file.png"
+                  alt=""
+                  class="icon-btn-image"
+                />
+              </button>
             </div>
           </div>
-          <div id="tree" aria-label="Notes tree"></div>
-          <div id="search-results" aria-label="Search results"></div>
-        </section>
-
-        <section id="content-pane">
-          <header id="content-header">
-            <div id="note-meta">
-              <h2 id="note-title">Welcome</h2>
-              <div id="note-path">/welcome.md</div>
+          <div class="nav-search">
+            <input
+              id="search-input"
+              class="search-input"
+              type="search"
+              placeholder="Search notes..."
+            />
+          </div>
+          <div id="search-results" class="search-results hidden"></div>
+          <div id="tree" class="tree" tabindex="0"></div>
+          <div class="nav-footer">
+            <div id="nav-footer-build" class="nav-footer-build muted">
+              <img
+                src="/static/icons/tag.png"
+                alt=""
+                class="icon-btn-image"
+              />
+              <span id="build-tag-text"></span>
             </div>
-            <div id="content-actions">
-              <button id="mode-toggle" type="button">View</button>
-              <button id="export-note" type="button">Export</button>
+            <div class="nav-footer-actions">
+              <button
+                id="settings-btn"
+                class="small-btn icon-btn"
+                type="button"
+                aria-label="Settings"
+                title="Settings"
+              >
+                <img
+                  src="/static/icons/settings.png"
+                  alt=""
+                  class="icon-btn-image"
+                />
+              </button>
             </div>
-          </header>
-
-          <section id="content-body">
-            <article id="viewer">
-              <p>
-                Markdown preview will appear here once the full editor and
-                rendering pipeline are implemented.
-              </p>
-            </article>
-            <section id="editor-wrapper">
-              <textarea
-                id="editor"
-                spellcheck="false"
-                placeholder="Start typing markdown…"
-              ></textarea>
-            </section>
-          </section>
-        </section>
-      </main>
+          </div>
+        </div>
+        <div id="divider" class="divider"></div>
+        <div id="content-pane">
+          <div id="content-header" class="content-header">
+            <div class="content-meta">
+              <div id="note-name" class="note-name">No note selected</div>
+              <div id="note-path" class="note-path muted"></div>
+            </div>
+            <div class="content-actions">
+              <button
+                id="mode-toggle-btn"
+                class="small-btn icon-btn"
+                type="button"
+                disabled
+                aria-label="Edit"
+                title="Edit"
+              >
+                <img
+                  src="/static/icons/edit.png"
+                  alt=""
+                  class="icon-btn-image"
+                />
+              </button>
+              <button
+                id="note-export-btn"
+                class="small-btn icon-btn"
+                type="button"
+                disabled
+                aria-label="Export Note"
+                title="Export Note"
+              >
+                <img
+                  src="/static/icons/import-export.png"
+                  alt=""
+                  class="icon-btn-image"
+                />
+              </button>
+            </div>
+          </div>
+          <div id="content-body" class="content-body">
+            <div id="viewer" class="content-view"></div>
+            <div id="editor-wrapper" class="content-edit-wrapper hidden">
+              <div id="editor-line-numbers" class="editor-line-numbers"></div>
+              <textarea id="editor" class="content-edit" spellcheck="false"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-
-    <script src="/static/app.js" type="module"></script>
+    <input id="import-file-input" type="file" accept=".zip" class="hidden" />
+    <script src="/static/mermaid.min.js"></script>
+    <script src="/static/app.js"></script>
+    <script src="/static/editor-highlighting.js"></script>
   </body>
 </html>
