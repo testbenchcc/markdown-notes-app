@@ -10,10 +10,8 @@ services:
       dockerfile: Dockerfile
     image: markdown-notes-app:latest
     container_name: markdown-notes-app
-    ports:
-      - "3002:8000"
     volumes:
-      - .:/app
+      - .env:/app/.env:ro
       - /home/tbrinkhuis/.ssh:/root/.ssh:ro
     environment:
       - PYTHONUNBUFFERED=1
