@@ -1,3 +1,37 @@
+## v1.4.5 - Sharable links
+
+- [ ] Convert over to allow for sharable links in the following format: notes.husqy.net/?note=/notes/projects/app.md?mode=edit
+  - modes shoult include:
+    - read, edit, export (notes only), download (notes, files and images)
+
+## v1.4.4 - Update editor shortcuts
+
+- [ ] Add additional shortcuts. Seperate shortcut code into its own file. Move existing shortcut code (v1.3.9) for notes into this file as well. Stacking multiple styles is allowed. Pressing a shortcut that has already been applied would remove that shortcuts characters. For example: ~~***text***~~ pressing ctrl+B would return ~~*text*~~
+  - Formating shortcuts
+  - Ctrl+B surrounds the selected text with ** to make it bold
+  - Ctrl+I surrounds the selected text with * to italicize it
+  - Ctrl+K surrounds the selected text with [text]() to create a Markdown link
+  - Ctrl+Shift+K surrounds the selected text with backticks to make inline code
+  - Ctrl+Shift+C surrounds the selected text with triple backticks to make a fenced code block
+  - Ctrl+Shift+I surrounds the selected text with ![alt]() to insert an image reference
+  - Ctrl+H replaces the start of the line with heading markers (#, ##, ###) based on level
+  - Ctrl+Shift+> or Tab indents the selected lines for nested lists
+  - Ctrl+Shift+< or Shift+Tab unindents the selected lines 
+  - Ctrl+L toggles checklist formatting by turning selected lines into - [ ] items
+  - Ctrl+U adds - to the selected lines to create an unordered list
+  - Ctrl+Shift+O adds 1. to selected lines for an ordered list
+  - Ctrl+Shift+D duplicates the current line or selected block
+  - Alt+Shift+F formats the document if supported (future feature) (not implemented) 
+    - Add shortcut, but leave functionality empty for future use.
+- [x] Add a settings category named Keyboard Shortcuts in the settings modal, and list the shortcuts out in a presentable way. Only present the information, no additionaly functionlity is needed on this page.
+- [x] When the cursor is inside of single backtick or triple backtick encapsulations:
+  - Allow ctrl+s shortcut
+  - Inhibit useing all other shortcuts except:
+    - shortcuts related to indenting
+    - Ctrl+Shift+D
+    - inhibt the shortcuts action, not the presence of the shortcut. If we do not do this, the browsers default shortcuts can take over and I do not want this.
+- [ ] Alt+Shift+F formating should ignore the contents of triple backtick encapsulations
+
 ## v1.4.3 - Notes git automation without local git CLI
 
 - [x] Decide on a strategy for notes auto-commit and auto-pull that does not rely on the git CLI (disable, make optional, or reimplement using the GitHub API only).

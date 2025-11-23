@@ -44,6 +44,13 @@
         >
           Appearance
         </button>
+        <button
+          type="button"
+          class="settings-nav-item"
+          data-category="shortcuts"
+        >
+          Keyboard Shortcuts
+        </button>
       </nav>
       <div class="settings-content">
         <section class="settings-category-panel" data-category="general">
@@ -363,6 +370,51 @@
             </select>
             <p class="settings-field-description">
               Chooses the theme used when exporting a note as HTML.
+            </p>
+          </div>
+        </section>
+        <section class="settings-category-panel hidden" data-category="shortcuts">
+          <h3 class="settings-category-title">Keyboard Shortcuts</h3>
+          <div class="settings-field">
+            <p class="settings-field-description">
+              Editor shortcuts are active when the note editor has focus. When the cursor is inside inline code or fenced code blocks, only <code>Ctrl+S</code>, indent / unindent, and <code>Ctrl+Shift+D</code> remain active. Other shortcuts are disabled to avoid triggering browser defaults.
+            </p>
+          </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Formatting</div>
+            <p class="settings-field-description">
+              <code>Ctrl+B</code> – Toggle bold (<code>**text**</code>) around the selection.<br />
+              <code>Ctrl+I</code> – Toggle italics (<code>*text*</code>) around the selection.<br />
+              <code>Ctrl+K</code> – Insert or wrap as a Markdown link (<code>[text]()</code>).<br />
+              <code>Ctrl+Shift+K</code> – Toggle inline code using backticks (<code>`code`</code>).<br />
+              <code>Ctrl+Shift+C</code> – Toggle a fenced code block with triple backticks.<br />
+              <code>Ctrl+Shift+I</code> – Insert or wrap as an image reference (<code>![alt]()</code>).
+            </p>
+          </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Headings and lists</div>
+            <p class="settings-field-description">
+              <code>Ctrl+H</code> – Cycle heading level at the start of selected lines (#, ##, ###, then back to plain text).<br />
+              <code>Ctrl+L</code> – Toggle checklist items (<code>- [ ]</code>) for selected lines.<br />
+              <code>Ctrl+U</code> – Toggle unordered list bullets (<code>-</code>) for selected lines.<br />
+              <code>Ctrl+Shift+O</code> – Toggle ordered list numbering (<code>1.</code>) for selected lines.
+            </p>
+          </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Indenting and duplication</div>
+            <p class="settings-field-description">
+              <code>Tab</code> – Indent selected lines using the configured tab width.<br />
+              <code>Shift+Tab</code> – Unindent selected lines.<br />
+              <code>Ctrl+Shift+&gt;</code> – Indent selected lines (same as Tab).<br />
+              <code>Ctrl+Shift+&lt;</code> – Unindent selected lines (same as Shift+Tab).<br />
+              <code>Ctrl+Shift+D</code> – Duplicate the current line or selected block.
+            </p>
+          </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Saving and formatting</div>
+            <p class="settings-field-description">
+              <code>Ctrl+S</code> – Manually save the current note without opening the browser's save dialog.<br />
+              <code>Alt+Shift+F</code> – Reserved for future document formatting. The shortcut is captured but currently does not modify the note.
             </p>
           </div>
         </section>

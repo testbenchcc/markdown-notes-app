@@ -211,6 +211,403 @@
     }
   }
 
+  function getTextSelectionInfo(textarea) {
+    if (!textarea) {
+      return {
+        value: "",
+        start: 0,
+        end: 0,
+        before: "",
+        selected: "",
+        after: "",
+      };
+    }
+    const value = textarea.value || "";
+    let start =
+      typeof textarea.selectionStart === "number"
+        ? textarea.selectionStart
+        : 0;
+    let end =
+      typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : start;
+    if (start > end) {
+      const tmp = start;
+      start = end;
+      end = tmp;
+    }
+    return {
+      value,
+      start,
+      end,
+      before: value.slice(0, start),
+      selected: value.slice(start, end),
+      after: value.slice(end),
+    };
+  }
+
+  function setTextAndSelection(textarea, nextValue, selectionStart, selectionEnd) {
+    if (!textarea) {
+      return;
+    }
+    const value = String(nextValue || "");
+    textarea.value = value;
+    let start =
+      typeof selectionStart === "number" ? selectionStart : value.length;
+    let end =
+      typeof selectionEnd === "number" ? selectionEnd : start;
+    if (start < 0) {
+      start = 0;
+    }
+    if (end < start) {
+      end = start;
+    }
+    if (end > value.length) {
+      end = value.length;
+    }
+    try {
+      textarea.selectionStart = start;
+      textarea.selectionEnd = end;
+    } catch (e) {
+      // Ignore selection errors
+    }
+  }
+
+  function wrapSelectionWithMarkers(textarea, leftMarker, rightMarker) {
+    const left = leftMarker || "";
+    const right =
+      typeof rightMarker === "string" && rightMarker.length
+        ? rightMarker
+        : left;
+    const info = getTextSelectionInfo(textarea);
+    const { value, start, end, before, selected, after } = info;
+    const hasSelection = end > start;
+    const inner = hasSelection ? selected : "";
+    const prefixLen = left.length;
+    const suffixLen = right.length;
+
+    if (
+      hasSelection &&
+      prefixLen &&
+      suffixLen &&
+      start >= prefixLen &&
+      value.length >= end + suffixLen
+    ) {
+      const prefixStart = start - prefixLen;
+      const prefix = value.slice(prefixStart, start);
+      const suffix = value.slice(end, end + suffixLen);
+      if (prefix === left && suffix === right) {
+        const newBefore = value.slice(0, prefixStart);
+        const newSelected = inner;
+        const newAfter = value.slice(end + suffixLen);
+        const newValue = newBefore + newSelected + newAfter;
+        const newStart = prefixStart;
+        const newEnd = newStart + newSelected.length;
+        setTextAndSelection(textarea, newValue, newStart, newEnd);
+        return;
+      }
+    }
+
+    const insertText = left + (inner || "") + right;
+    const newBefore = before;
+    const newAfter = after;
+    const newValue = newBefore + insertText + newAfter;
+    const newStart = newBefore.length + left.length;
+    const newEnd = newStart + inner.length;
+    setTextAndSelection(textarea, newValue, newStart, newEnd);
+  }
+
+  function getSelectedLinesInfo(textarea) {
+    if (!textarea) {
+      return {
+        value: "",
+        start: 0,
+        end: 0,
+        lineStart: 0,
+        lineEnd: 0,
+        before: "",
+        block: "",
+        after: "",
+      };
+    }
+    const value = textarea.value || "";
+    let start =
+      typeof textarea.selectionStart === "number"
+        ? textarea.selectionStart
+        : 0;
+    let end =
+      typeof textarea.selectionEnd === "number" ? textarea.selectionEnd : start;
+    if (start > end) {
+      const tmp = start;
+      start = end;
+      end = tmp;
+    }
+    const length = value.length;
+    let lineStart = value.lastIndexOf("\n", start - 1);
+    if (lineStart === -1) {
+      lineStart = 0;
+    } else {
+      lineStart += 1;
+    }
+    let lineEnd = value.indexOf("\n", end);
+    if (lineEnd === -1) {
+      lineEnd = length;
+    }
+    const before = value.slice(0, lineStart);
+    const block = value.slice(lineStart, lineEnd);
+    const after = value.slice(lineEnd);
+    return {
+      value,
+      start,
+      end,
+      lineStart,
+      lineEnd,
+      before,
+      block,
+      after,
+    };
+  }
+
+  function replaceSelectedLines(textarea, transformLine) {
+    const info = getSelectedLinesInfo(textarea);
+    const lines = info.block.split("\n");
+    const transformed = lines.map((line) =>
+      typeof transformLine === "function" ? transformLine(line) : line
+    );
+    const nextBlock = transformed.join("\n");
+    const nextValue = info.before + nextBlock + info.after;
+    const nextStart = info.lineStart;
+    const nextEnd = nextStart + nextBlock.length;
+    setTextAndSelection(textarea, nextValue, nextStart, nextEnd);
+  }
+
+  function indentSelectedLines(textarea, tabString) {
+    const indent = tabString || "  ";
+    replaceSelectedLines(textarea, (line) => indent + line);
+  }
+
+  function unindentSelectedLines(textarea, tabString) {
+    const indent = tabString || "  ";
+    replaceSelectedLines(textarea, (line) => {
+      if (!line) {
+        return line;
+      }
+      if (indent && line.startsWith(indent)) {
+        return line.slice(indent.length);
+      }
+      if (line.startsWith("\t")) {
+        return line.slice(1);
+      }
+      if (line.startsWith("    ")) {
+        return line.slice(2);
+      }
+      if (line.startsWith(" ")) {
+        return line.replace(/^ {1,4}/, "");
+      }
+      return line;
+    });
+  }
+
+  function duplicateSelectedLines(textarea) {
+    const info = getSelectedLinesInfo(textarea);
+    const block = info.block || "";
+    const before = info.before;
+    const after = info.after;
+    const insert = block + "\n" + block;
+    const nextValue = before + insert + after;
+    const firstBlockStart = info.lineStart;
+    const secondBlockStart = firstBlockStart + block.length + 1;
+    const secondBlockEnd = secondBlockStart + block.length;
+    setTextAndSelection(textarea, nextValue, secondBlockStart, secondBlockEnd);
+  }
+
+  function toggleChecklistLines(textarea) {
+    replaceSelectedLines(textarea, (line) => {
+      const taskMatch = line.match(/^(\s*)- \[( |x|X)\] (.*)$/);
+      if (taskMatch) {
+        const indent = taskMatch[1] || "";
+        const body = taskMatch[3] || "";
+        return indent + body;
+      }
+      if (!line.trim()) {
+        return line;
+      }
+      const bulletMatch = line.match(/^(\s*)- (.*)$/);
+      if (bulletMatch) {
+        const indent = bulletMatch[1] || "";
+        const body = bulletMatch[2] || "";
+        return indent + "- [ ] " + body;
+      }
+      const genericMatch = line.match(/^(\s*)(.*)$/);
+      const indent = (genericMatch && genericMatch[1]) || "";
+      const body = (genericMatch && genericMatch[2]) || "";
+      return indent + "- [ ] " + body.trim();
+    });
+  }
+
+  function toggleBulletLines(textarea) {
+    replaceSelectedLines(textarea, (line) => {
+      if (/^(\s*)- \[( |x|X)\] /.test(line)) {
+        return line;
+      }
+      const bulletMatch = line.match(/^(\s*)- (.*)$/);
+      if (bulletMatch) {
+        const indent = bulletMatch[1] || "";
+        const body = bulletMatch[2] || "";
+        return indent + body;
+      }
+      if (!line.trim()) {
+        return line;
+      }
+      const genericMatch = line.match(/^(\s*)(.*)$/);
+      const indent = (genericMatch && genericMatch[1]) || "";
+      const body = (genericMatch && genericMatch[2]) || "";
+      return indent + "- " + body.trim();
+    });
+  }
+
+  function toggleOrderedLines(textarea) {
+    replaceSelectedLines(textarea, (line) => {
+      const orderedMatch = line.match(/^(\s*)\d+\.\s+(.*)$/);
+      if (orderedMatch) {
+        const indent = orderedMatch[1] || "";
+        const body = orderedMatch[2] || "";
+        return indent + body;
+      }
+      if (!line.trim()) {
+        return line;
+      }
+      const genericMatch = line.match(/^(\s*)(.*)$/);
+      const indent = (genericMatch && genericMatch[1]) || "";
+      const body = (genericMatch && genericMatch[2]) || "";
+      return indent + "1. " + body.trim();
+    });
+  }
+
+  function toggleHeadingLevel(textarea) {
+    replaceSelectedLines(textarea, (line) => {
+      if (!line.trim()) {
+        return line;
+      }
+      const headingMatch = line.match(/^(\s*)(#{1,6})\s+(.*)$/);
+      let indent = "";
+      let level = 0;
+      let text = line.trim();
+      if (headingMatch) {
+        indent = headingMatch[1] || "";
+        level = (headingMatch[2] || "").length;
+        text = headingMatch[3] || "";
+      } else {
+        const genericMatch = line.match(/^(\s*)(.*)$/);
+        indent = (genericMatch && genericMatch[1]) || "";
+        text = (genericMatch && genericMatch[2]) || "";
+      }
+      let nextLevel = 0;
+      if (level === 0) {
+        nextLevel = 1;
+      } else if (level === 1) {
+        nextLevel = 2;
+      } else if (level === 2) {
+        nextLevel = 3;
+      } else {
+        nextLevel = 0;
+      }
+      if (nextLevel === 0) {
+        return indent + text;
+      }
+      const hashes = "#".repeat(nextLevel);
+      return `${indent}${hashes} ${text}`;
+    });
+  }
+
+  function toggleInlineCodeSelection(textarea) {
+    wrapSelectionWithMarkers(textarea, "`", "`");
+  }
+
+  function toggleFenceBlockSelection(textarea) {
+    const info = getTextSelectionInfo(textarea);
+    const { selected } = info;
+    if (!selected) {
+      const placeholder = "```\n\n```";
+      insertTextAtCursor(textarea, placeholder);
+      return;
+    }
+    const trimmed = selected.trim();
+    if (/^```[\s\S]*```$/.test(trimmed)) {
+      const inner = trimmed
+        .replace(/^```[^\n]*\n?/, "")
+        .replace(/```$/, "");
+      const leading = selected.match(/^\s*/)[0];
+      const trailingMatch = selected.match(/\s*$/);
+      const trailing = trailingMatch ? trailingMatch[0] : "";
+      const plain = leading + inner + trailing;
+      const before = info.before;
+      const after = info.after;
+      const nextValue = before + plain + after;
+      const nextStart = before.length + leading.length;
+      const nextEnd = nextStart + inner.length;
+      setTextAndSelection(textarea, nextValue, nextStart, nextEnd);
+      return;
+    }
+    const before = info.before;
+    const after = info.after;
+    const fenced = `\`\`\`\n${selected}\n\`\`\``;
+    const nextValue = before + fenced + after;
+    const nextStart = before.length + 4;
+    const nextEnd = nextStart + selected.length;
+    setTextAndSelection(textarea, nextValue, nextStart, nextEnd);
+  }
+
+  function insertLinkSelection(textarea, isImage) {
+    const info = getTextSelectionInfo(textarea);
+    const before = info.before;
+    const selected = info.selected || "";
+    const after = info.after;
+    const label = selected || "text";
+    const prefix = isImage ? "![" : "[";
+    const open = prefix;
+    const closeLabel = "](";
+    const suffix = ")";
+    const body = `${open}${label}${closeLabel}${suffix}`;
+    const nextValue = before + body + after;
+    const cursorPos = before.length + open.length + label.length + closeLabel.length;
+    setTextAndSelection(textarea, nextValue, cursorPos, cursorPos);
+  }
+
+  function getEditorCodeState(textarea) {
+    if (!textarea) {
+      return {
+        insideInline: false,
+        insideFence: false,
+        inside: false,
+      };
+    }
+    const value = textarea.value || "";
+    const index =
+      typeof textarea.selectionStart === "number"
+        ? textarea.selectionStart
+        : 0;
+    const upToIndex = value.slice(0, index);
+    const fenceMatches = upToIndex.match(/```/g);
+    const insideFence = !!(fenceMatches && fenceMatches.length % 2 === 1);
+    let insideInline = false;
+    if (!insideFence) {
+      const lastBacktick = upToIndex.lastIndexOf("`");
+      if (lastBacktick !== -1) {
+        const nextBacktick = value.indexOf("`", lastBacktick + 1);
+        if (nextBacktick !== -1 && nextBacktick >= index) {
+          const segment = value.slice(lastBacktick, nextBacktick + 1);
+          if (!segment.includes("\n")) {
+            insideInline = true;
+          }
+        }
+      }
+    }
+    return {
+      insideInline,
+      insideFence,
+      inside: insideInline || insideFence,
+    };
+  }
+
   function getEffectiveSettings() {
     if (savedSettings && typeof savedSettings === "object") {
       return savedSettings;
@@ -2853,23 +3250,56 @@
       handleEditorPaste(e);
     });
     editorEl.addEventListener("keydown", (e) => {
-      if (e.key === "Tab") {
-        e.preventDefault();
-        const tabString = getTabStringFromSettings();
-        insertTextAtCursor(editorEl, tabString);
-        updateEditorLineNumbers();
-        return;
-      }
-
-      const isCtrlOrMeta = e.ctrlKey || e.metaKey;
-      if (!isCtrlOrMeta || e.altKey) {
-        return;
-      }
-
       const key = e.key;
       const code = e.code || "";
+      const isTab = key === "Tab";
+      const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+      const isAlt = e.altKey;
 
-      if (key === "s" || key === "S") {
+      function refreshEditorAfterShortcut() {
+        updateEditorLineNumbers();
+        if (
+          window.markdownEditorHighlighter &&
+          typeof window.markdownEditorHighlighter.refresh === "function"
+        ) {
+          window.markdownEditorHighlighter.refresh();
+        }
+      }
+
+      if (isTab) {
+        e.preventDefault();
+        const tabString = getTabStringFromSettings();
+        if (e.shiftKey) {
+          unindentSelectedLines(editorEl, tabString);
+        } else {
+          indentSelectedLines(editorEl, tabString);
+        }
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (isAlt && e.shiftKey && (key === "F" || key === "f")) {
+        e.preventDefault();
+        return;
+      }
+
+      if (!isCtrlOrMeta) {
+        return;
+      }
+
+      const codeState = getEditorCodeState(editorEl);
+      const lowerKey = (key || "").toLowerCase();
+      const isSaveCombo = !isAlt && !e.shiftKey && (lowerKey === "s");
+      const isIndentCombo =
+        e.shiftKey && (key === ">" || key === "<");
+      const isDuplicateCombo = e.shiftKey && lowerKey === "d";
+
+      if (codeState.inside && !isSaveCombo && !isIndentCombo && !isDuplicateCombo) {
+        e.preventDefault();
+        return;
+      }
+
+      if (isSaveCombo) {
         e.preventDefault();
         if (!currentNote) {
           return;
@@ -2878,25 +3308,115 @@
         return;
       }
 
-      if (!e.shiftKey && code === "Semicolon") {
+      if (!isAlt && !e.shiftKey && code === "Semicolon") {
         e.preventDefault();
         const formatted = formatCurrentDateFromSettings();
         if (!formatted) {
           return;
         }
         insertTextAtCursor(editorEl, formatted);
-        updateEditorLineNumbers();
+        refreshEditorAfterShortcut();
         return;
       }
 
-      if (e.shiftKey && code === "Semicolon") {
+      if (!isAlt && e.shiftKey && code === "Semicolon") {
         e.preventDefault();
         const formatted = formatCurrentTimeFromSettings();
         if (!formatted) {
           return;
         }
         insertTextAtCursor(editorEl, formatted);
-        updateEditorLineNumbers();
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (isIndentCombo) {
+        e.preventDefault();
+        const tabString = getTabStringFromSettings();
+        if (key === ">") {
+          indentSelectedLines(editorEl, tabString);
+        } else {
+          unindentSelectedLines(editorEl, tabString);
+        }
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (isDuplicateCombo) {
+        e.preventDefault();
+        duplicateSelectedLines(editorEl);
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && !e.shiftKey && lowerKey === "b") {
+        e.preventDefault();
+        wrapSelectionWithMarkers(editorEl, "**", "**");
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && !e.shiftKey && lowerKey === "i") {
+        e.preventDefault();
+        wrapSelectionWithMarkers(editorEl, "*", "*");
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && !e.shiftKey && lowerKey === "k") {
+        e.preventDefault();
+        insertLinkSelection(editorEl, false);
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && e.shiftKey && lowerKey === "k") {
+        e.preventDefault();
+        toggleInlineCodeSelection(editorEl);
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && e.shiftKey && lowerKey === "c") {
+        e.preventDefault();
+        toggleFenceBlockSelection(editorEl);
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && e.shiftKey && lowerKey === "i") {
+        e.preventDefault();
+        insertLinkSelection(editorEl, true);
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && !e.shiftKey && lowerKey === "h") {
+        e.preventDefault();
+        toggleHeadingLevel(editorEl);
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && !e.shiftKey && lowerKey === "l") {
+        e.preventDefault();
+        toggleChecklistLines(editorEl);
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && !e.shiftKey && lowerKey === "u") {
+        e.preventDefault();
+        toggleBulletLines(editorEl);
+        refreshEditorAfterShortcut();
+        return;
+      }
+
+      if (!isAlt && e.shiftKey && lowerKey === "o") {
+        e.preventDefault();
+        toggleOrderedLines(editorEl);
+        refreshEditorAfterShortcut();
+        return;
       }
     });
   }
