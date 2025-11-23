@@ -1,4 +1,23 @@
-## 1.4.0 - Gitignore context menu
+## v1.4.3 - Notes git automation without local git CLI
+
+- [ ] Decide on a strategy for notes auto-commit and auto-pull that does not rely on the git CLI (disable, make optional, or reimplement using the GitHub API only).
+- [ ] Implement the chosen notes synchronization approach and remove direct git CLI usage from notes auto-commit and auto-pull helpers.
+- [ ] Update settings and documentation text to describe the new notes synchronization behavior.
+
+
+## v1.4.2 - Remove git CLI from app metadata
+
+- [x] Remove git CLI fallbacks from `/api/versioning/app/history`, `/api/versioning/notes/history`, and `/api/versioning/status` by requiring `APP_REPO_REMOTE_URL` and `NOTES_REPO_REMOTE_URL`.
+- [x] Replace `get_git_last_commit_timestamp` with a GitHub API-based lookup so exports and imports no longer require git CLI.
+- [ ] Verify the Docker image runs correctly without git installed for app metadata and history features.
+
+
+## v1.4.1 - Remove git cli usage (footer)
+
+- [x] We have a Github fine-grained personal access token with Content read/write access. The API key is within .env named `GITHUB_API_KEY`. On the index page file tree footer, we are generating a numbered string using the last release name and the build number. This is now done using the GitHub API instead of the git CLI, preserving the number.
+
+
+## v1.4.0 - Gitignore context menu
 
 - [x] Expand all and Callapse all should also be in the content menu for files
 - [x] Add context menu item for folders and files to add and remove it from the notes repository .gitignore. Only show these items if `Automatically commit and push notes after saving` is enabled.

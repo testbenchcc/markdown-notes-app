@@ -29,6 +29,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
+from urllib.parse import urlparse, parse_qs
 import html as html_module
 
 from dotenv import load_dotenv
@@ -265,26 +266,65 @@ def _guess_image_mime_type(path: Path) -> str:
 
 
 def get_git_last_commit_timestamp(path: Path) -> int | None:
+    rel_path: str | None = None
+    remote_url: str | None = None
+
     try:
-        rel = path.relative_to(APP_ROOT)
+        rel_notes = path.relative_to(NOTES_ROOT)
+    except ValueError:
+        rel_notes = None
+    else:
+        if NOTES_REPO_REMOTE_URL:
+            rel_path = rel_notes.as_posix()
+            remote_url = NOTES_REPO_REMOTE_URL
+
+    if rel_path is None:
+        try:
+            rel_app = path.relative_to(APP_ROOT)
+        except ValueError:
+            return None
+        if not APP_REPO_REMOTE_URL:
+            return None
+        rel_path = rel_app.as_posix()
+        remote_url = APP_REPO_REMOTE_URL
+
+    if not remote_url or not rel_path:
+        return None
+
+    try:
+        owner, repo = _parse_github_remote_url(remote_url)
     except ValueError:
         return None
+
     try:
-        completed = subprocess.run(
-            ["git", "log", "-1", "--format=%ct", "--", str(rel)],
-            cwd=str(APP_ROOT),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            check=False,
-        )
-    except Exception:
+        session = _make_github_session()
+    except HTTPException:
         return None
-    output = completed.stdout.strip()
-    if not output:
-        return None
+
     try:
-        return int(output.splitlines()[0])
+        url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/commits"
+        resp = session.get(url, params={"per_page": 1, "path": rel_path})
+        resp.raise_for_status()
+        body = resp.json()
+        if not isinstance(body, list) or not body:
+            return None
+        commit = body[0].get("commit") or {}
+        committer = commit.get("committer") or {}
+        date_str = (committer.get("date") or "").strip()
+        if not date_str:
+            author = commit.get("author") or {}
+            date_str = (author.get("date") or "").strip()
+        if not date_str:
+            return None
+        if date_str.endswith("Z"):
+            date_str = date_str[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(date_str)
+        except Exception:
+            return None
+        return int(dt.timestamp())
+    except requests.RequestException:
+        return None
     except Exception:
         return None
 
@@ -579,6 +619,69 @@ def _fetch_github_tags_with_messages(
             }
         )
     return items
+
+
+def _fetch_github_commit_count(
+    session: requests.Session, owner: str, repo: str
+) -> int | None:
+    repo_url = f"{GITHUB_API_URL}/repos/{owner}/{repo}"
+    repo_resp = session.get(repo_url)
+    repo_resp.raise_for_status()
+    repo_data = repo_resp.json()
+    default_branch = (repo_data.get("default_branch") or "main").strip() or "main"
+
+    commits_url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/commits"
+    commits_resp = session.get(
+        commits_url, params={"per_page": 1, "sha": default_branch}
+    )
+    commits_resp.raise_for_status()
+
+    link_header = commits_resp.headers.get("Link") or ""
+    if link_header:
+        for part in link_header.split(","):
+            section = part.strip()
+            if 'rel="last"' not in section:
+                continue
+            url_part = section.split(";", 1)[0].strip()
+            if url_part.startswith("<") and url_part.endswith(">"):
+                url_text = url_part[1:-1]
+            else:
+                url_text = url_part
+            parsed = urlparse(url_text)
+            query = parse_qs(parsed.query)
+            pages = query.get("page")
+            if not pages:
+                continue
+            try:
+                return int(pages[0])
+            except (TypeError, ValueError):
+                return None
+
+    body = commits_resp.json()
+    if isinstance(body, list):
+        return len(body)
+    return None
+
+
+def _fetch_latest_release_tag_name(
+    session: requests.Session, owner: str, repo: str
+) -> str | None:
+    releases = _fetch_github_releases(session, owner, repo)
+    for r in releases:
+        tag_name = (r.get("tag_name") or "").strip()
+        if tag_name:
+            return tag_name
+        name = (r.get("name") or "").strip()
+        if name:
+            return name
+
+    tags = _fetch_github_tags_with_messages(session, owner, repo)
+    for t in tags:
+        name = (t.get("name") or "").strip()
+        if name:
+            return name
+
+    return None
 
 
 def _ensure_app_repo_initialized() -> None:
@@ -1427,16 +1530,6 @@ async def versioning_app_pull() -> Dict[str, Any]:
 async def versioning_app_history() -> Dict[str, Any]:
     remote_url = APP_REPO_REMOTE_URL
     if not remote_url:
-        try:
-            result = _run_app_git(["remote", "get-url", "origin"])
-        except HTTPException:
-            result = None
-        else:
-            if result.returncode == 0:
-                value = result.stdout.strip()
-                if value:
-                    remote_url = value.splitlines()[0]
-    if not remote_url:
         raise HTTPException(status_code=500, detail="App remote URL for GitHub not configured")
     try:
         owner, repo = _parse_github_remote_url(remote_url)
@@ -1465,16 +1558,6 @@ async def versioning_app_history() -> Dict[str, Any]:
 async def versioning_notes_history() -> Dict[str, Any]:
     remote_url = NOTES_REPO_REMOTE_URL
     if not remote_url:
-        try:
-            result = _run_notes_git(["remote", "get-url", "origin"])
-        except HTTPException:
-            result = None
-        else:
-            if result.returncode == 0:
-                value = result.stdout.strip()
-                if value:
-                    remote_url = value.splitlines()[0]
-    if not remote_url:
         raise HTTPException(status_code=500, detail="Notes remote URL for GitHub not configured")
     try:
         owner, repo = _parse_github_remote_url(remote_url)
@@ -1500,32 +1583,32 @@ async def versioning_notes_history() -> Dict[str, Any]:
 
 
 def get_app_version_info() -> Dict[str, Any]:
-    git_dir = APP_ROOT / ".git"
-    if not git_dir.is_dir():
+    remote_url = APP_REPO_REMOTE_URL
+    if not remote_url:
         return {
             "build_number": None,
             "latest_tag": None,
             "git_available": False,
         }
 
-    build_number: int | None = None
     try:
-        count_proc = _run_app_git(["rev-list", "--count", "HEAD"])  # type: ignore[list-item]
-        raw_count = count_proc.stdout.strip()
-        if raw_count:
-            build_number = int(raw_count.splitlines()[0])
-    except Exception:
-        build_number = None
+        owner, repo = _parse_github_remote_url(remote_url)
+    except ValueError:
+        return {
+            "build_number": None,
+            "latest_tag": None,
+            "git_available": False,
+        }
 
-    latest_tag: str | None = None
+    session = _make_github_session()
+
     try:
-        describe_proc = _run_app_git(["describe", "--tags", "--abbrev=0"])  # type: ignore[list-item]
-        if describe_proc.returncode == 0:
-            raw_tag = describe_proc.stdout.strip()
-            if raw_tag:
-                latest_tag = raw_tag.splitlines()[0]
-    except Exception:
-        latest_tag = None
+        build_number = _fetch_github_commit_count(session, owner, repo)
+        latest_tag = _fetch_latest_release_tag_name(session, owner, repo)
+    except requests.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except requests.RequestException:
+        raise HTTPException(status_code=502, detail="GitHub API request failed")
 
     return {
         "build_number": build_number,
@@ -1544,31 +1627,12 @@ async def versioning_app_info() -> Dict[str, Any]:
 @app.get("/api/versioning/status")
 async def versioning_status() -> Dict[str, Any]:
     ensure_notes_root()
-    _ensure_notes_repo_initialized()
     notes_root_str = str(NOTES_ROOT.resolve())
-    notes_remote = None
-    try:
-        notes_remote_result = _run_notes_git(["remote", "get-url", "origin"])
-        if notes_remote_result.returncode == 0:
-            value = notes_remote_result.stdout.strip()
-            if value:
-                notes_remote = value.splitlines()[0]
-    except HTTPException:
-        notes_remote = None
-    app_remote = None
-    try:
-        app_remote_result = _run_app_git(["remote", "get-url", "origin"])
-        if app_remote_result.returncode == 0:
-            value = app_remote_result.stdout.strip()
-            if value:
-                app_remote = value.splitlines()[0]
-    except HTTPException:
-        app_remote = None
     github_configured = bool(os.getenv("GITHUB_API_KEY"))
     return {
         "notes_root": notes_root_str,
-        "notes_remote_url": notes_remote or NOTES_REPO_REMOTE_URL,
+        "notes_remote_url": NOTES_REPO_REMOTE_URL,
         "app_root": str(APP_ROOT),
-        "app_remote_url": app_remote or APP_REPO_REMOTE_URL,
+        "app_remote_url": APP_REPO_REMOTE_URL,
         "github_api_key_configured": github_configured,
     }
