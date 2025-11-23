@@ -2696,6 +2696,55 @@
     }
   }
 
+  function buildSharedUrlFromState(notePath, logicalMode) {
+    if (typeof window === "undefined" || !window.location) {
+      return "";
+    }
+    const origin = window.location.origin || "";
+    const basePath = window.location.pathname || "/";
+    const params = new URLSearchParams();
+    if (notePath) {
+      params.set("note", "/notes/" + notePath);
+    }
+    let modeParam = "";
+    if (logicalMode === "edit") {
+      modeParam = "edit";
+    } else if (logicalMode === "view") {
+      modeParam = "read";
+    }
+    if (modeParam) {
+      params.set("mode", modeParam);
+    }
+    const query = params.toString();
+    const baseUrl = origin + basePath;
+    if (!query) {
+      return baseUrl;
+    }
+    return baseUrl + "?" + query;
+  }
+
+  function syncLocationToCurrentState() {
+    if (
+      typeof window === "undefined" ||
+      !window.location ||
+      !window.history ||
+      typeof window.history.replaceState !== "function"
+    ) {
+      return;
+    }
+    let notePath = "";
+    if (currentNote && currentNote.path) {
+      notePath = currentNote.path;
+    } else if (currentImage && currentImage.path) {
+      notePath = currentImage.path;
+    }
+    const url = buildSharedUrlFromState(notePath, mode);
+    if (!url || window.location.href === url) {
+      return;
+    }
+    window.history.replaceState(null, "", url);
+  }
+
   function getVisibleTreeItems() {
     if (!treeContainer) return [];
     const items = Array.from(treeContainer.querySelectorAll(".tree-item"));
