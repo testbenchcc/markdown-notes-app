@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Markdown Notes App</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="app-header">
+        <h1 id="nav-title">Markdown Notes</h1>
+        <div id="app-meta">
+          <span id="app-status" data-status="bootstrapped">Loading…</span>
+        </div>
+      </header>
+
+      <main id="layout">
+        <section id="nav-pane">
+          <div id="nav-header">
+            <div id="nav-actions">
+              <button id="new-folder-btn" type="button">New Folder</button>
+              <button id="new-note-btn" type="button">New Note</button>
+            </div>
+            <div id="nav-search">
+              <input id="search-input" placeholder="Search notes" />
+            </div>
+          </div>
+          <div id="tree" aria-label="Notes tree"></div>
+          <div id="search-results" aria-label="Search results"></div>
+        </section>
+
+        <section id="content-pane">
+          <header id="content-header">
+            <div id="note-meta">
+              <h2 id="note-title">Welcome</h2>
+              <div id="note-path">/welcome.md</div>
+            </div>
+            <div id="content-actions">
+              <button id="mode-toggle" type="button">View</button>
+              <button id="export-note" type="button">Export</button>
+            </div>
+          </header>
+
+          <section id="content-body">
+            <article id="viewer">
+              <p>
+                Markdown preview will appear here once the full editor and
+                rendering pipeline are implemented.
+              </p>
+            </article>
+            <section id="editor-wrapper">
+              <textarea
+                id="editor"
+                spellcheck="false"
+                placeholder="Start typing markdown…"
+              ></textarea>
+            </section>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js" type="module"></script>
+  </body>
+</html>

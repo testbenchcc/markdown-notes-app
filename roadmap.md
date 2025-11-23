@@ -5,24 +5,23 @@
  The focus is on:
 
  - Small, related increments.
- - Preserving the existing UX while modernizing internals (Monaco, markdown-it, Fancytree, GitPython).
 
- ---
+---
 
- ## v0.1.0 – Project Bootstrap
+## v0.1.0 – Project Bootstrap
 
- - **Backend (FastAPI)**
-  - [ ] Initialize FastAPI project structure (app package, entrypoint, config management).
-  - [ ] Ensure notes root and settings paths are clearly defined and configurable.
-  - [ ] Add basic health route (`GET /health`).
+- **Backend (FastAPI)**
+  - [x] Initialize FastAPI project structure (app package, entrypoint, config management).
+  - [x] Ensure notes root and settings paths are clearly defined and configurable.
+  - [x] Add basic health route (`GET /health`).
 
- - **Frontend (JS)**
-  - [ ] Confirm or scaffold a minimal SPA shell that can host the existing layout.
-  - [ ] Wire up a simple build/dev workflow (e.g., existing static assets or a bundler).
+- **Frontend (JS)**
+  - [x] Confirm or scaffold a minimal SPA shell that can host the existing layout.
+  - [x] Wire up a simple build/dev workflow (FastAPI app + static assets served via `uvicorn main:app --reload`).
 
- - **Tooling**
-  - [ ] Confirm Python tooling (formatter, linter, test runner).
-  - [ ] Confirm JS tooling (formatter, linter, bundler or dev server).
+- **Tooling**
+  - [x] Confirm Python tooling (formatter, linter, test runner: Black, Ruff, pytest).
+  - [x] Confirm JS tooling (formatter, linter, dev workflow: Prettier, ESLint, static assets without a bundler for now).
 
  ---
 
