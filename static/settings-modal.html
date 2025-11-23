@@ -72,57 +72,6 @@
             </p>
           </div>
           <div class="settings-field">
-            <label class="settings-field-label" for="settings-auto-save-interval">
-              Auto-save interval (seconds)
-            </label>
-            <input
-              type="number"
-              id="settings-auto-save-interval"
-              class="settings-input-number"
-              min="0"
-            />
-            <p class="settings-field-description">
-              When greater than 0, notes in edit mode are automatically saved at this interval. Leave blank or set to 0 to disable periodic auto-save.
-            </p>
-          </div>
-          <div class="settings-field">
-            <label class="settings-field-label" for="settings-image-storage-path">
-              Image storage subfolder
-            </label>
-            <input
-              type="text"
-              id="settings-image-storage-path"
-              class="settings-input-text"
-              placeholder="images"
-            />
-            <p class="settings-field-description">
-              Folder under the notebook root where pasted images are stored (for example <code>images</code>). Must stay within the notes folder.
-            </p>
-          </div>
-          <div class="settings-field">
-            <label class="settings-field-label" for="settings-image-max-size-mb">
-              Max pasted image size (MB)
-            </label>
-            <input
-              type="number"
-              id="settings-image-max-size-mb"
-              class="settings-input-number"
-              min="1"
-            />
-            <p class="settings-field-description">
-              Soft limit for image size when pasting into a note. If exceeded, you will be asked to confirm before the image is uploaded.
-            </p>
-          </div>
-          <div class="settings-field">
-            <div class="settings-field-label">Images maintenance</div>
-            <button type="button" id="settings-images-cleanup-btn" class="settings-btn">
-              Run image cleanup
-            </button>
-            <p class="settings-field-description">
-              Scans notes for referenced images and deletes unreferenced image files from the configured image storage folder.
-            </p>
-          </div>
-          <div class="settings-field">
             <div class="settings-field-label">Notebook export / import</div>
             <button type="button" id="settings-export-notebook-btn" class="settings-btn">
               Export Notebook
@@ -193,6 +142,43 @@
               Controls how images are aligned in the note viewer.
             </p>
           </div>
+          <div class="settings-field">
+            <label class="settings-field-label" for="settings-image-storage-path">
+              Image storage subfolder
+            </label>
+            <input
+              type="text"
+              id="settings-image-storage-path"
+              class="settings-input-text"
+              placeholder="images"
+            />
+            <p class="settings-field-description">
+              Folder under the notebook root where pasted images are stored (for example <code>images</code>). Must stay within the notes folder.
+            </p>
+          </div>
+          <div class="settings-field">
+            <label class="settings-field-label" for="settings-image-max-size-mb">
+              Max pasted image size (MB)
+            </label>
+            <input
+              type="number"
+              id="settings-image-max-size-mb"
+              class="settings-input-number"
+              min="1"
+            />
+            <p class="settings-field-description">
+              Soft limit for image size when pasting into a note. If exceeded, you will be asked to confirm before the image is uploaded.
+            </p>
+          </div>
+          <div class="settings-field">
+            <div class="settings-field-label">Images maintenance</div>
+            <button type="button" id="settings-images-cleanup-btn" class="settings-btn">
+              Run image cleanup
+            </button>
+            <p class="settings-field-description">
+              Scans notes for referenced images and deletes unreferenced image files from the configured image storage folder.
+            </p>
+          </div>
         </section>
         <section class="settings-category-panel hidden" data-category="versioning">
           <h3 class="settings-category-title">Versioning</h3>
@@ -226,6 +212,20 @@
             />
             <p class="settings-field-description">
               How often to check for and pull updates when automatic notes pulling is enabled.
+            </p>
+          </div>
+          <div class="settings-field">
+            <label class="settings-field-label" for="settings-auto-save-interval">
+              Auto-save interval (seconds)
+            </label>
+            <input
+              type="number"
+              id="settings-auto-save-interval"
+              class="settings-input-number"
+              min="0"
+            />
+            <p class="settings-field-description">
+              When greater than 0, notes in edit mode are automatically saved at this interval. Leave blank or set to 0 to disable periodic auto-save.
             </p>
           </div>
           <div class="settings-field">
