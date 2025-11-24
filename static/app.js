@@ -10,6 +10,8 @@ let searchDebounceTimerId = null;
 let latestSearchRequestId = 0;
 let isSyncingScrollFromEditor = false;
 let isSyncingScrollFromViewer = false;
+let pasteUploadInProgress = false;
+let pasteBannerHideTimeoutId = null;
 
 const VALID_MODES = new Set(["view", "edit", "export", "download"]);
 const DEFAULT_MODE = "view";
@@ -188,6 +190,8 @@ function clearCurrentNoteDisplay() {
     downloadBtn.disabled = true;
     downloadBtn.onclick = null;
   }
+
+  hidePasteProgressBanner();
 
   currentNotePath = null;
   currentNoteContent = "";
@@ -401,6 +405,188 @@ async function handleNoteDownload() {
   }
 }
 
+function insertTextAtEditorCursor(text) {
+  if (!monacoEditor || typeof monaco === "undefined") return;
+  if (!text) return;
+
+  const model = monacoEditor.getModel();
+  if (!model) return;
+
+  const selection = monacoEditor.getSelection();
+  const range = selection || model.getFullModelRange();
+
+  monacoEditor.executeEdits("paste-image", [
+    {
+      range,
+      text,
+      forceMoveMarkers: true,
+    },
+  ]);
+
+  monacoEditor.focus();
+}
+
+function handleEditorPasteEvent(event) {
+  if (!monacoEditor || currentMode !== "edit") {
+    return;
+  }
+
+  const editorWrapperEl = document.getElementById("editor-wrapper");
+  if (!editorWrapperEl) return;
+
+  const activeElement = document.activeElement;
+  if (!editorWrapperEl.contains(activeElement)) {
+    return;
+  }
+
+  const clipboard = event.clipboardData;
+  if (!clipboard) {
+    return;
+  }
+
+  const items = clipboard.items || [];
+  const files = [];
+
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    if (!item) continue;
+    if (item.kind === "file" && item.type && item.type.startsWith("image/")) {
+      const file = item.getAsFile();
+      if (file) {
+        files.push(file);
+      }
+    }
+  }
+
+  if (!files.length) {
+    return;
+  }
+
+  if (!currentNotePath) {
+    event.preventDefault();
+    showError("Paste requires an active note.");
+    return;
+  }
+
+  event.preventDefault();
+
+  if (pasteUploadInProgress) {
+    showError("An image paste is already in progress.");
+    return;
+  }
+
+  pasteUploadInProgress = true;
+
+  void uploadPastedImages(files)
+    .catch(() => {
+      // Error feedback is handled inside upload helpers.
+    })
+    .finally(() => {
+      pasteUploadInProgress = false;
+    });
+}
+
+function uploadPastedImages(files) {
+  if (!files || !files.length) {
+    return Promise.resolve();
+  }
+
+  const total = files.length;
+
+  const run = (index) => {
+    if (index >= total) {
+      pasteBannerHideTimeoutId = window.setTimeout(() => {
+        hidePasteProgressBanner();
+      }, 800);
+      return Promise.resolve();
+    }
+
+    const file = files[index];
+    return uploadSinglePastedImage(file, index + 1, total).then(() => run(index + 1));
+  };
+
+  return run(0);
+}
+
+function uploadSinglePastedImage(file, index, total) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve();
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/images/paste");
+    xhr.responseType = "json";
+
+    renderPasteProgressBanner(`Pasting image ${index}/${total}`, 0);
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) {
+        renderPasteProgressBanner(`Pasting image ${index}/${total}`);
+        return;
+      }
+
+      const percent = Math.round((event.loaded / event.total) * 100);
+      renderPasteProgressBanner(`Pasting image ${index}/${total}`, percent);
+    };
+
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const payload = xhr.response || JSON.parse(xhr.responseText || "{}");
+        const markdown =
+          payload && typeof payload.markdown === "string" ? payload.markdown : "";
+
+        if (markdown) {
+          const text = markdown.endsWith("\n") ? markdown : `${markdown}\n`;
+          insertTextAtEditorCursor(text);
+        }
+
+        renderPasteProgressBanner(`Image pasted ${index}/${total}`, 100);
+        resolve();
+        return;
+      }
+
+      let detail = "";
+      try {
+        const parsed = xhr.response || JSON.parse(xhr.responseText || "{}");
+        if (parsed && typeof parsed.detail === "string") {
+          detail = parsed.detail;
+        }
+      } catch (_error) {
+        // ignore parse failure
+      }
+
+      const message = detail
+        ? `Image paste failed: ${detail}`
+        : "Image paste failed.";
+      showError(message);
+      renderPasteProgressBanner(message, 100, { isError: true });
+      pasteBannerHideTimeoutId = window.setTimeout(() => {
+        hidePasteProgressBanner();
+      }, 1500);
+      reject(new Error(message));
+    };
+
+    xhr.onerror = () => {
+      const message = "Unable to upload pasted image.";
+      showError(message);
+      renderPasteProgressBanner(message, 100, { isError: true });
+      pasteBannerHideTimeoutId = window.setTimeout(() => {
+        hidePasteProgressBanner();
+      }, 1500);
+      reject(new Error(message));
+    };
+
+    const formData = new FormData();
+    formData.append("note_path", currentNotePath || "");
+    const filename = file.name || `pasted-image-${Date.now()}.png`;
+    formData.append("file", file, filename);
+
+    xhr.send(formData);
+  });
+}
+
 function setupModeToggle() {
   const modeToggleBtn = document.getElementById("mode-toggle-btn");
   if (!modeToggleBtn) return;
@@ -488,6 +674,53 @@ function showError(message) {
   if (!banner) return;
   banner.textContent = message;
   banner.classList.remove("hidden");
+}
+
+function getPasteProgressBanner() {
+  return document.getElementById("paste-progress-banner");
+}
+
+function renderPasteProgressBanner(message, percent, options = {}) {
+  const banner = getPasteProgressBanner();
+  if (!banner) return;
+
+  const { isError = false } = options;
+
+  if (pasteBannerHideTimeoutId !== null) {
+    window.clearTimeout(pasteBannerHideTimeoutId);
+    pasteBannerHideTimeoutId = null;
+  }
+
+  banner.classList.remove("hidden");
+  banner.classList.toggle("paste-progress-banner-error", Boolean(isError));
+
+  const width = 40;
+  if (typeof percent === "number" && Number.isFinite(percent)) {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+    const filled = Math.round((clamped / 100) * width);
+    const empty = Math.max(0, width - filled);
+    const bar = `[${"#".repeat(filled)}${"-".repeat(empty)}]`;
+    const prefix = message ? `${message} ` : "";
+    banner.textContent = `${prefix}${clamped}% ${bar}`.trim();
+  } else {
+    const bar = `[${"-".repeat(width)}]`;
+    const prefix = message || "Uploading image";
+    banner.textContent = `${prefix} ${bar}`;
+  }
+}
+
+function hidePasteProgressBanner() {
+  const banner = getPasteProgressBanner();
+  if (!banner) return;
+
+  if (pasteBannerHideTimeoutId !== null) {
+    window.clearTimeout(pasteBannerHideTimeoutId);
+    pasteBannerHideTimeoutId = null;
+  }
+
+  banner.classList.add("hidden");
+  banner.classList.remove("paste-progress-banner-error");
+  banner.textContent = "";
 }
 
 function toSafePath(relPath) {
@@ -1504,6 +1737,12 @@ function setupViewerScrollSync() {
   });
 }
 
+function setupEditorPasteHandling() {
+  window.addEventListener("paste", (event) => {
+    handleEditorPasteEvent(event);
+  });
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   updateHealthStatus();
   loadTree();
@@ -1513,6 +1752,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initMonacoEditor();
   setupSettingsModal();
   setupSearch();
+   setupEditorPasteHandling();
   initializeNavigationFromUrl();
   setupViewerScrollSync();
 });

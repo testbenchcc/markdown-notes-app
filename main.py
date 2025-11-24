@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import markdown
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, conint
@@ -74,6 +74,12 @@ def get_config() -> AppConfig:
 
 class NotebookSettings(BaseModel):
     tabLength: conint(ge=2, le=8) = 4
+    imageStorageMode: str = "local"  # "flat", "matched", or "local"
+    imageStorageSubfolder: str = "Images"
+    localImageSubfolderName: str = "Images"
+    imageMaxWidthPx: conint(ge=1, le=10000) = 768
+    imageMaxHeightPx: conint(ge=1, le=10000) = 768
+    imageMaxPasteBytes: conint(ge=1) = 5 * 1024 * 1024
 
     class Config:
         extra = "ignore"
@@ -510,6 +516,104 @@ def get_file(file_rel_path: str) -> FileResponse:
 
     content_type, _ = mimetypes.guess_type(str(file_path))
     return FileResponse(file_path, media_type=content_type or "application/octet-stream")
+
+
+@app.post("/api/images/paste", tags=["images"])
+async def paste_image(
+    note_path: str = Form(...),
+    file: UploadFile = File(...),
+) -> Dict[str, Any]:
+
+    try:
+        safe_note_rel = _validate_relative_path(note_path)
+    except ValueError as exc:  # pragma: no cover - validation branch
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    settings = _load_settings()
+    cfg = get_config()
+
+    max_bytes = getattr(settings, "imageMaxPasteBytes", 0) or 0
+    if max_bytes and max_bytes > 0:
+        raw_bytes = await file.read(max_bytes + 1)
+        if len(raw_bytes) > max_bytes:
+            raise HTTPException(status_code=413, detail="Pasted image is too large")
+    else:
+        raw_bytes = await file.read()
+
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Empty image upload")
+
+    original_filename = file.filename or "pasted-image"
+    suffix = Path(original_filename).suffix.lower()
+    content_type = (file.content_type or "").lower()
+
+    if suffix not in IMAGE_EXTENSIONS:
+        if content_type.startswith("image/"):
+            guessed_ext_map = {
+                "image/png": ".png",
+                "image/jpeg": ".jpg",
+                "image/jpg": ".jpg",
+                "image/gif": ".gif",
+                "image/webp": ".webp",
+                "image/bmp": ".bmp",
+                "image/svg+xml": ".svg",
+            }
+            guessed = guessed_ext_map.get(content_type)
+            if guessed:
+                suffix = guessed
+
+    if suffix not in IMAGE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Unsupported image type")
+
+    note_rel_path = Path(safe_note_rel)
+    parent_rel = note_rel_path.parent.as_posix()
+
+    storage_mode = getattr(settings, "imageStorageMode", "local") or "local"
+    storage_subfolder = getattr(settings, "imageStorageSubfolder", "Images").strip("/")
+
+    if storage_mode == "flat":
+        dest_dir_rel = storage_subfolder or "Images"
+    elif storage_mode == "matched":
+        if parent_rel:
+            dest_dir_rel = f"{storage_subfolder}/{parent_rel}" if storage_subfolder else parent_rel
+        else:
+            dest_dir_rel = storage_subfolder or "Images"
+    else:  # "local" and any unknown value fall back to local behavior
+        local_name = getattr(settings, "localImageSubfolderName", "Images").strip("/") or "Images"
+        dest_dir_rel = f"{parent_rel}/{local_name}" if parent_rel else local_name
+
+    dest_dir_rel = dest_dir_rel.strip("/")
+
+    if dest_dir_rel:
+        try:
+            dest_dir = _resolve_relative_path(dest_dir_rel)
+        except ValueError as exc:  # pragma: no cover - defensive branch
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    else:
+        dest_dir = cfg.notes_root
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    base_stem = Path(original_filename).stem or "pasted-image"
+    safe_stem = base_stem.replace(" ", "-") or "pasted-image"
+    candidate = f"{safe_stem}{suffix}"
+    dest_path = dest_dir / candidate
+    counter = 1
+    while dest_path.exists():
+        candidate = f"{safe_stem}-{counter}{suffix}"
+        dest_path = dest_dir / candidate
+        counter += 1
+
+    dest_path.write_bytes(raw_bytes)
+
+    rel_path = _relative_to_notes_root(dest_path)
+    markdown_snippet = f"![image](/files/{rel_path})"
+
+    return {
+        "path": rel_path,
+        "name": dest_path.name,
+        "markdown": markdown_snippet,
+    }
 
 
 @app.post("/api/folders", tags=["notes"], status_code=201)

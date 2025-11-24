@@ -218,25 +218,26 @@ $(function(){
  - **Frontend**
   - [x] Integrate search results more tightly with the tree and content pane.
     - Search box calls `/api/search` and clicking a result opens the note and syncs tree selection.
-  - [ ] Provide filters (e.g., note vs image, path-based narrowing) as reasonable.
+  - [-] Provide filters (e.g., note vs image, path-based narrowing) as reasonable. (ignore for now)
   - [x] Optionally highlight search matches within notes.
     - Clicking a search result switches to edit mode and highlights the full line in Monaco so the match is visually located.
-
- ---
-
- ## v0.6.0 – Images & Paste Workflow Hardening
-
- - **Backend**
-  - [ ] Revisit `/api/images/paste` to ensure:
-    - [ ] File type validation and size limits from settings.
-    - [ ] Robust error responses for oversized or invalid images.
-  - [ ] Confirm image storage structure (subfolder, naming scheme) is stable.
+  - [ ] Cleanup routine for unused images (if selected)
 
  - **Frontend**
-  - [ ] Ensure pasted images integrate smoothly with Monaco editor:
-    - [ ] Insert returned markdown snippets at cursor.
-    - [ ] Provide clear error messages for rejected pastes.
+  - [x] Ensure pasted images integrate smoothly with Monaco editor:
+    - [x] Insert returned markdown snippets at cursor.
+    - [x] Provide clear error messages for rejected pastes.
+  - [x] display upload progress using a progress bar made of hash markd [##############################################------------------------]
+    - Use a banner in the editor panel. Do not shift the panel downd overlay the banner so contents do not shift.
+    - The width of the progress bar should expand to fit, leave a little padding on the sides.
+    - apear when the download starts, display during upload, and when finished, quickly display the response, then go away. 
   - [ ] Confirm viewer behavior for images (fit-width, max-size, alignment) matches settings.
+  - [ ] Three storeage options for images
+    - [ ] flat: dump everything in one folder
+    - [ ] matched: put everything in a matched structure inside the Image storage subfolder
+    - [ ] local: save them in a subfolder within the same folder as the note. (include setting for folder name) (default option)
+  - [ ] Additional settings for settings modal.
+    - [ ] File handling, Image display mode, Fit to note width, Max image width (px) (default of 768), Max image height (px) (default of 768), Image storage subfolder (default of /Images) (only used if local not selected), Max pasted image size (MB), Images maintenance, Run image cleanup
 
  ---
 

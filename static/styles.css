@@ -500,6 +500,7 @@ body.resizing {
   display: flex;
   min-height: 0;
   background: var(--md-bg-alt);
+  position: relative;
 }
 
 .editor-visual-wrapper {
@@ -1000,4 +1001,27 @@ div.mermaid[data-processed="true"] {
 .tree-item.folder.expanded .tree-icon,
 .icon-btn-image {
   filter: invert(1);
+}
+
+.paste-progress-banner {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0.4rem 0.6rem;
+  background: rgba(0, 0, 0, 0.85);
+  border-radius: 4px;
+  border: 1px solid var(--md-border-subtle);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.75rem;
+  color: var(--md-text-main);
+  z-index: 1200;
+  pointer-events: none;
+}
+
+.paste-progress-banner.paste-progress-banner-error {
+  border-color: var(--md-h1);
+  color: var(--md-h1);
 }
