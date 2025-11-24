@@ -240,7 +240,7 @@ The goal is to preserve the existing layout, button placements, search position,
 
 - **Mode switching and scroll sync**
   - The app tracks `mode = "view" | "edit"` and shows/hides viewer/editor accordingly.
-  - Scroll position (as percentage) is synchronized between viewer and editor when switching modes.
+  - Scroll position (as percentage) is synchronized between viewer and editor when switching modes and while scrolling in edit mode.
   - When Monaco loads lazily, the editor initializes from the currently loaded note so entering edit mode never shows a blank document.
 
 - **Keyboard shortcuts** (per roadmap + `settings-modal.html`)

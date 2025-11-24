@@ -28,6 +28,7 @@ body {
   --md-link: #8ec07c;
   --md-link-hover: #fe8019;
   --md-code: #83a598;
+  --md-menu-bg: #615d5b;
 }
 
 body {
@@ -261,7 +262,7 @@ body {
   padding: 0.25rem 0.25rem 0.75rem;
   overflow-y: auto;
   font-size: 0.85rem;
-  background: whitesmoke;
+  background: var(--md-menu-bg);
 }
 
 #tree:focus {
@@ -273,7 +274,7 @@ body {
 
 #tree ul.fancytree-container {
   border: none;
-  background: whitesmoke;
+  background: var(--md-menu-bg);
 }
 
 #tree span.fancytree-node {

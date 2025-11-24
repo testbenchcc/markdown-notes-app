@@ -8,6 +8,8 @@ let treeInitialized = false;
 let currentSearchHighlightIds = [];
 let searchDebounceTimerId = null;
 let latestSearchRequestId = 0;
+let isSyncingScrollFromEditor = false;
+let isSyncingScrollFromViewer = false;
 
 const VALID_MODES = new Set(["view", "edit", "export", "download"]);
 const DEFAULT_MODE = "view";
@@ -249,6 +251,7 @@ function initMonacoEditor() {
     monacoEditor.onDidScrollChange(() => {
       const viewerEl = document.getElementById("viewer");
       if (!viewerEl) return;
+      if (isSyncingScrollFromViewer) return;
 
       const scrollTop = monacoEditor.getScrollTop();
       const scrollHeight = monacoEditor.getScrollHeight();
@@ -257,7 +260,9 @@ function initMonacoEditor() {
       const ratio = scrollTop / scrollHeight;
       const viewerScrollable = viewerEl.scrollHeight - viewerEl.clientHeight;
       if (viewerScrollable > 0) {
+        isSyncingScrollFromEditor = true;
         viewerEl.scrollTop = ratio * viewerScrollable;
+        isSyncingScrollFromEditor = false;
       }
     });
   });
@@ -575,6 +580,7 @@ function setupNewItemButtons() {
     });
   }
 }
+
 async function loadTree() {
   const treeRootEl = document.getElementById("tree");
   if (!treeRootEl) return;
@@ -1476,6 +1482,28 @@ function setupSettingsModal() {
   });
 }
 
+function setupViewerScrollSync() {
+  const viewerEl = document.getElementById("viewer");
+  if (!viewerEl) return;
+
+  viewerEl.addEventListener("scroll", () => {
+    if (!monacoEditor) return;
+    if (currentMode !== "edit") return;
+    if (isSyncingScrollFromEditor) return;
+
+    const viewerScrollable = viewerEl.scrollHeight - viewerEl.clientHeight;
+    if (viewerScrollable <= 0) return;
+
+    const ratio = viewerEl.scrollTop / viewerScrollable;
+    const editorScrollHeight = monacoEditor.getScrollHeight();
+    if (!editorScrollHeight) return;
+
+    isSyncingScrollFromViewer = true;
+    monacoEditor.setScrollTop(ratio * editorScrollHeight);
+    isSyncingScrollFromViewer = false;
+  });
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   updateHealthStatus();
   loadTree();
@@ -1486,12 +1514,17 @@ window.addEventListener("DOMContentLoaded", () => {
   setupSettingsModal();
   setupSearch();
   initializeNavigationFromUrl();
+  setupViewerScrollSync();
 });
 
 window.addEventListener("popstate", () => {
   const { note, mode } = getUrlState();
   if (note) {
-    void loadNote(note, { skipUrlUpdate: true, modeOverride: mode, triggerAction: true });
+    void loadNote(note, {
+      skipUrlUpdate: true,
+      modeOverride: mode,
+      triggerAction: true,
+    });
   } else {
     currentMode = normalizeMode(mode);
     clearCurrentNoteDisplay();
