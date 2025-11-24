@@ -5,6 +5,87 @@ let currentNoteContent = "";
 let currentMode = "view";
 let treeInitialized = false;
 
+const VALID_MODES = new Set(["view", "edit", "export", "download"]);
+const DEFAULT_MODE = "view";
+let desiredTreeSelectionPath = null;
+const NOTE_MODE_ACTIONS = {
+  export: handleNoteExport,
+  download: handleNoteDownload,
+};
+
+function normalizeMode(mode) {
+  if (!mode || typeof mode !== "string") {
+    return DEFAULT_MODE;
+  }
+
+  const lower = mode.toLowerCase();
+  return VALID_MODES.has(lower) ? lower : DEFAULT_MODE;
+}
+
+function encodeNoteParam(notePath) {
+  if (!notePath) {
+    return "";
+  }
+
+  const normalized = notePath.startsWith("/") ? notePath.slice(1) : notePath;
+
+  const encoded = normalized
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+
+  return `/${encoded}`;
+}
+
+function decodeNoteParam(rawValue) {
+  if (!rawValue) {
+    return null;
+  }
+
+  const trimmed = rawValue.startsWith("/") ? rawValue.slice(1) : rawValue;
+
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed
+    .split("/")
+    .map((segment) => decodeURIComponent(segment))
+    .join("/");
+}
+
+function getUrlState() {
+  const params = new URLSearchParams(window.location.search);
+  const noteParam = params.get("note");
+  const modeParam = params.get("mode");
+
+  return {
+    note: decodeNoteParam(noteParam),
+    mode: normalizeMode(modeParam || DEFAULT_MODE),
+  };
+}
+
+function updateUrlState(notePath, mode, options = {}) {
+  const { replace = false } = options;
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+
+  if (notePath) {
+    params.set("note", encodeNoteParam(notePath));
+  } else {
+    params.delete("note");
+  }
+
+  if (mode) {
+    params.set("mode", normalizeMode(mode));
+  } else {
+    params.delete("mode");
+  }
+
+  const method = replace ? "replaceState" : "pushState";
+  window.history[method](null, "", url);
+}
+
 function ensureMarkdownRenderer() {
   if (markdownRenderer || typeof window === "undefined") return markdownRenderer;
 
@@ -71,6 +152,41 @@ function renderViewerHtml(html) {
       console.error("Mermaid rendering failed", error);
     }
   }
+}
+
+function clearCurrentNoteDisplay() {
+  const viewerEl = document.getElementById("viewer");
+  const noteNameEl = document.getElementById("note-name");
+  const notePathEl = document.getElementById("note-path");
+  const exportBtn = document.getElementById("note-export-btn");
+  const downloadBtn = document.getElementById("note-download-btn");
+
+  if (viewerEl) {
+    viewerEl.textContent = "Select a note to begin.";
+  }
+
+  if (noteNameEl) {
+    noteNameEl.textContent = "No note selected";
+  }
+
+  if (notePathEl) {
+    notePathEl.textContent = "";
+  }
+
+  if (exportBtn) {
+    exportBtn.disabled = true;
+    exportBtn.onclick = null;
+  }
+
+  if (downloadBtn) {
+    downloadBtn.disabled = true;
+    downloadBtn.onclick = null;
+  }
+
+  currentNotePath = null;
+  currentNoteContent = "";
+  setMode(DEFAULT_MODE, { skipUrlUpdate: true });
+  updateUrlState(null, DEFAULT_MODE, { replace: true });
 }
 
 function updatePreviewFromEditor() {
@@ -157,24 +273,36 @@ async function saveCurrentNote() {
   }
 }
 
-function setMode(mode) {
-  currentMode = mode;
+function setMode(mode, options = {}) {
+  const { skipUrlUpdate = false, replaceUrl = false, triggerAction = false } = options;
+  const normalizedMode = normalizeMode(mode);
+  currentMode = normalizedMode;
 
   const viewerEl = document.getElementById("viewer");
   const editorWrapperEl = document.getElementById("editor-wrapper");
   const modeToggleBtn = document.getElementById("mode-toggle-btn");
+  const exportBtn = document.getElementById("note-export-btn");
+  const downloadBtn = document.getElementById("note-download-btn");
 
-  if (!viewerEl || !editorWrapperEl || !modeToggleBtn) return;
+  if (!viewerEl || !editorWrapperEl || !modeToggleBtn || !exportBtn || !downloadBtn) {
+    return;
+  }
 
   if (!currentNotePath) {
     modeToggleBtn.disabled = true;
     editorWrapperEl.classList.add("hidden");
+    exportBtn.disabled = true;
+    exportBtn.onclick = null;
+    downloadBtn.disabled = true;
+    downloadBtn.onclick = null;
     return;
   }
 
   modeToggleBtn.disabled = false;
+  exportBtn.disabled = false;
+  downloadBtn.disabled = false;
 
-  if (mode === "edit") {
+  if (normalizedMode === "edit") {
     editorWrapperEl.classList.remove("hidden");
     modeToggleBtn.setAttribute("aria-label", "View");
     modeToggleBtn.setAttribute("title", "View");
@@ -189,6 +317,70 @@ function setMode(mode) {
     modeToggleBtn.setAttribute("aria-label", "Edit");
     modeToggleBtn.setAttribute("title", "Edit");
   }
+
+  if (!skipUrlUpdate && currentNotePath) {
+    updateUrlState(currentNotePath, normalizedMode, { replace: replaceUrl });
+  }
+
+  exportBtn.onclick = () => setMode("export", { triggerAction: true });
+  downloadBtn.onclick = () => setMode("download", { triggerAction: true });
+
+  if (triggerAction && (normalizedMode === "export" || normalizedMode === "download")) {
+    void triggerNoteAction(normalizedMode);
+  }
+}
+
+function triggerNoteAction(mode) {
+  if (!currentNotePath) return;
+  const action = NOTE_MODE_ACTIONS[mode];
+  if (typeof action === "function") {
+    return action();
+  }
+}
+
+function handleNoteExport() {
+  if (!currentNotePath) {
+    showError("No note selected to export.");
+    return;
+  }
+
+  const safePath = toSafePath(currentNotePath);
+  window.open(`/api/export-note/${safePath}`, "_blank");
+}
+
+async function handleNoteDownload() {
+  if (!currentNotePath) {
+    showError("No note selected to download.");
+    return;
+  }
+
+  const safePath = toSafePath(currentNotePath);
+
+  try {
+    const response = await fetch(`/api/notes/${safePath}`);
+
+    if (!response.ok) {
+      throw new Error(`Download request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.content ?? "";
+    const filename = data.name ?? currentNotePath.split("/").pop() ?? "note.md";
+
+    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Download note request failed", error);
+    showError("Unable to download note.");
+  }
 }
 
 function setupModeToggle() {
@@ -200,14 +392,20 @@ function setupModeToggle() {
 
     if (currentMode === "view") {
       setMode("edit");
-    } else {
+      return;
+    }
+
+    if (currentMode === "edit") {
       try {
         await saveCurrentNote();
-        await loadNote(currentNotePath);
+        await loadNote(currentNotePath, { replaceUrl: true });
       } finally {
-        setMode("view");
+        setMode("view", { replaceUrl: true });
       }
+      return;
     }
+
+    setMode("view", { replaceUrl: true });
   });
 }
 
@@ -289,6 +487,33 @@ function getFancytreeInstance() {
   if (typeof $tree.fancytree !== "function") return null;
 
   return $tree.fancytree("getTree");
+}
+
+function selectTreeNodeByPath(path) {
+  if (!path) return false;
+  const tree = getFancytreeInstance();
+  if (!tree) return false;
+
+  const node = tree.getNodeByKey(path);
+  if (!node) return false;
+
+  node.makeVisible({ scrollIntoView: true, noAnimation: true });
+  node.setFocus();
+  node.setActive();
+  return true;
+}
+
+function syncTreeSelection() {
+  if (!desiredTreeSelectionPath) return;
+  if (selectTreeNodeByPath(desiredTreeSelectionPath)) {
+    desiredTreeSelectionPath = null;
+  }
+}
+
+function ensureNoteTreeSelection(path) {
+  if (!path) return;
+  desiredTreeSelectionPath = path;
+  syncTreeSelection();
 }
 
 function mapApiNodesToFancytree(nodes) {
@@ -388,7 +613,7 @@ async function loadTree() {
           if (!nodePath) return;
 
           if (nodeType === "note") {
-            loadNote(nodePath);
+            void loadNote(nodePath);
           } else if (nodeType === "image") {
             loadImage(nodePath);
           }
@@ -404,9 +629,13 @@ async function loadTree() {
         },
       });
       treeInitialized = true;
+      syncTreeSelection();
     } else {
       const tree = $tree.fancytree("getTree");
-      tree.reload(source);
+      if (tree) {
+        await tree.reload(source);
+        syncTreeSelection();
+      }
     }
   } catch (error) {
     console.error("/api/tree request failed", error);
@@ -415,7 +644,15 @@ async function loadTree() {
   }
 }
 
-async function loadNote(notePath) {
+async function loadNote(notePath, options = {}) {
+  if (!notePath) return;
+
+  const {
+    skipUrlUpdate = false,
+    replaceUrl = false,
+    modeOverride = null,
+    triggerAction = false,
+  } = options;
   const noteNameEl = document.getElementById("note-name");
   const notePathEl = document.getElementById("note-path");
   const viewerEl = document.getElementById("viewer");
@@ -441,12 +678,22 @@ async function loadNote(notePath) {
 
     renderViewerHtml(data.html ?? "");
 
+    if (typeof modeOverride === "string") {
+      currentMode = normalizeMode(modeOverride);
+    }
+
     if (monacoEditor && currentMode === "edit") {
       monacoEditor.setValue(currentNoteContent);
       updatePreviewFromEditor();
     }
 
-    setMode(currentMode);
+    setMode(currentMode, { skipUrlUpdate: true, triggerAction });
+
+    ensureNoteTreeSelection(currentNotePath);
+
+    if (!skipUrlUpdate) {
+      updateUrlState(currentNotePath, currentMode, { replace: replaceUrl });
+    }
   } catch (error) {
     console.error("/api/notes request failed", error);
     showError("Unable to load the selected note from the server.");
@@ -528,7 +775,7 @@ async function handleNewNoteClick() {
 
     await loadTree();
     if (notePath) {
-      loadNote(notePath);
+      void loadNote(notePath);
     }
   } catch (error) {
     console.error("/api/notes (create) request failed", error);
@@ -582,7 +829,7 @@ async function handleRenameSelectedItem() {
       const data = await response.json();
       await loadTree();
       if (data.path) {
-        loadNote(data.path);
+        void loadNote(data.path);
       }
     } else if (item.data?.type === "folder") {
       const response = await fetch("/api/folders/rename", {
@@ -851,4 +1098,39 @@ window.addEventListener("DOMContentLoaded", () => {
   setupModeToggle();
   initMonacoEditor();
   setupSettingsModal();
+  initializeNavigationFromUrl();
 });
+
+window.addEventListener("popstate", () => {
+  const { note, mode } = getUrlState();
+  if (note) {
+    void loadNote(note, { skipUrlUpdate: true, modeOverride: mode, triggerAction: true });
+  } else {
+    currentMode = normalizeMode(mode);
+    clearCurrentNoteDisplay();
+    const tree = getFancytreeInstance();
+    if (tree) {
+      const active = tree.getActiveNode();
+      if (active) {
+        active.setActive(false);
+      }
+    }
+  }
+});
+
+function initializeNavigationFromUrl() {
+  const { note, mode } = getUrlState();
+  currentMode = mode;
+
+  if (note) {
+    void loadNote(note, {
+      skipUrlUpdate: true,
+      modeOverride: mode,
+      replaceUrl: true,
+      triggerAction: true,
+    });
+  } else {
+    clearCurrentNoteDisplay();
+    setMode(currentMode, { skipUrlUpdate: true });
+  }
+}

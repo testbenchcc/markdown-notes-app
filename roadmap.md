@@ -78,22 +78,16 @@
 
 ## v0.4.1 - Switch all navigation routes to GET
 
-- [ ] Update the interface so **all navigation inside the app actually uses GET URLs**, not just external links. When I click notes or use editor controls, the browser URL must update to reflect the current note and mode.
+- [x] Update the interface so **all navigation inside the app actually uses GET URLs**, not just external links. When I click notes or use editor controls, the browser URL updates to reflect the current note and mode.
   - [www.site.com/?note=/markdown.md&mode=edit](http://www.site.com/?note=/markdown.md&mode=edit)
   - [www.site.com/?note=/markdown.md&mode=view](http://www.site.com/?note=/markdown.md&mode=view)
   - [www.site.com/?note=/markdown.md&mode=export](http://www.site.com/?note=/markdown.md&mode=export)
   - [www.site.com/?note=/markdown.md&mode=download](http://www.site.com/?note=/markdown.md&mode=download)
-- [ ] When a note is opened, ensure its tree item is expanded, visible, and selected.
- the URL should look like:
-   - [www.site.com/?note=/markdown.md&mode=edit](http://www.site.com/?note=/markdown.md&mode=edit)
-   - [www.site.com/?note=/markdown.md&mode=view](http://www.site.com/?note=/markdown.md&mode=view)
-   - [www.site.com/?note=/markdown.md&mode=export](http://www.site.com/?note=/markdown.md&mode=export)
-   - [www.site.com/?note=/markdown.md&mode=download](http://www.site.com/?note=/markdown.md&mode=download)
- - [ ] When a note is opened, ensure its tree item is expanded, visible, and selected.
+- [x] When a note is opened, ensure its tree item is expanded, visible, and selected.
 
- ## v0.5.0 – Search & Filters Enhancements
+## v0.5.0 – Search & Filters Enhancements
 
- - **Backend**
+- **Backend**
   - [ ] Review and, if necessary, optimize `/api/search` for typical notebook sizes.
   - [ ] Ensure safe handling of search queries and limits on results.
 
