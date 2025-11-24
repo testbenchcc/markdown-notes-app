@@ -285,6 +285,8 @@ app = FastAPI(title="Markdown Notes App", version="0.1.0")
 STATIC_DIR = APP_ROOT / "static"
 MONACO_STATIC_DIR = APP_ROOT / "node_modules" / "monaco-editor" / "min"
 MARKDOWN_IT_STATIC_DIR = APP_ROOT / "node_modules" / "markdown-it" / "dist"
+JQUERY_STATIC_DIR = APP_ROOT / "node_modules" / "jquery" / "dist"
+JQUERY_UI_STATIC_DIR = APP_ROOT / "node_modules" / "jquery-ui" / "dist"
 FANCYTREE_STATIC_DIR = APP_ROOT / "node_modules" / "jquery.fancytree" / "dist"
 
 if STATIC_DIR.is_dir():
@@ -299,6 +301,12 @@ if MARKDOWN_IT_STATIC_DIR.is_dir():
         StaticFiles(directory=MARKDOWN_IT_STATIC_DIR),
         name="markdown_it",
     )
+
+if JQUERY_STATIC_DIR.is_dir():
+    app.mount("/vendor/jquery", StaticFiles(directory=JQUERY_STATIC_DIR), name="jquery")
+
+if JQUERY_UI_STATIC_DIR.is_dir():
+    app.mount("/vendor/jquery-ui", StaticFiles(directory=JQUERY_UI_STATIC_DIR), name="jquery_ui")
 
 if FANCYTREE_STATIC_DIR.is_dir():
     app.mount("/vendor/fancytree", StaticFiles(directory=FANCYTREE_STATIC_DIR), name="fancytree")
