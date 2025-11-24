@@ -1933,6 +1933,64 @@ function setupTreeSelection() {
 
 let activeContextMenu = null;
 
+async function handleManageGitignore() {
+  const actionRaw = window.prompt("Gitignore action (add or remove)?", "add");
+  if (!actionRaw) return;
+
+  const action = actionRaw.trim().toLowerCase();
+  if (action !== "add" && action !== "remove") {
+    showError("Gitignore action must be 'add' or 'remove'.");
+    return;
+  }
+
+  const patternRaw = window.prompt(
+    `Pattern to ${action} in .gitignore (relative to the notes root)`,
+    "*.log",
+  );
+  if (!patternRaw) return;
+
+  const pattern = patternRaw.trim();
+  if (!pattern) {
+    showError("Pattern cannot be empty.");
+    return;
+  }
+
+  const endpoint =
+    action === "add"
+      ? "/api/versioning/notes/gitignore/add"
+      : "/api/versioning/notes/gitignore/remove";
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pattern }),
+    });
+
+    if (!response.ok) {
+      let detail = `request failed with status ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data && data.detail) {
+          detail = data.detail;
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+      showError(`Gitignore ${action} failed: ${detail}`);
+      return;
+    }
+
+    const data = await response.json();
+    const flag = action === "add" ? data.added : data.removed;
+    const statusText = flag ? "applied" : "no changes were necessary";
+    showError(`Gitignore ${action} for '${pattern}': ${statusText}.`);
+  } catch (error) {
+    console.error("Gitignore management request failed", error);
+    showError("Unable to update .gitignore.");
+  }
+}
+
 function closeTreeContextMenu() {
   if (activeContextMenu && activeContextMenu.parentNode) {
     activeContextMenu.parentNode.removeChild(activeContextMenu);
@@ -1989,9 +2047,13 @@ function openTreeContextMenu(event, node) {
   sep2.className = "context-menu-separator";
   menu.appendChild(sep2);
 
-  addItem("Manage .gitignore (not yet implemented)", () => {
-    showError("Gitignore management is not implemented yet.");
-  }, false);
+  addItem(
+    "Manage .gitignore for notes…",
+    () => {
+      void handleManageGitignore();
+    },
+    false,
+  );
 
   document.body.appendChild(menu);
   activeContextMenu = menu;

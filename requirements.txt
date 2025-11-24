@@ -6,3 +6,4 @@ requests>=2.31.0,<3.0.0
 markdown>=3.4.0,<4.0.0
 pymdown-extensions>=10.0,<11.0
 python-multipart
+GitPython>=3.1.30,<4.0.0

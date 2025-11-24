@@ -186,15 +186,17 @@ The goal is to preserve the existing layout, button placements, search position,
   - `APP_REPO_REMOTE_URL` for the app repo.
   - `NOTES_REPO_REMOTE_URL` for the notes repo.
 
-- **Endpoints** include:
-  - `POST /api/versioning/notes/commit-and-push` and `/api/versioning/notes/pull` for notes sync.
-  - `POST /api/versioning/notes/gitignore/add` and `/remove` for adjusting a `.gitignore` under the notes root.
+- **Notes repository endpoints (implemented)**
+  - `POST /api/versioning/notes/commit-and-push` and `/api/versioning/notes/pull` operate on the local notes repository under `NOTES_ROOT`, using GitPython for commit/push and conflict-aware pull behaviour.
+  - `POST /api/versioning/notes/gitignore/add` and `/remove` adjust a `.gitignore` file under the notes root to include or remove ignore patterns.
+
+- **Additional endpoints (planned)**
   - `GET /api/versioning/app/history` and `/api/versioning/notes/history` to view commits, releases, and tags via GitHub APIs.
   - `GET /api/versioning/app/info` and `/api/versioning/status` for summarized version/build and configuration status.
 
-- **Planned rework (GitPython-based versioning)**
-  - In the rework, GitPython will be used to manage local git repositories for the notes and app, handling commits, branches, tags, history, and push/pull to configured remotes.
-  - Direct use of the GitHub REST API will be minimized and limited to optional metadata (for example, release notes), with GitPython providing the primary versioning functionality.
+- **GitPython-based versioning**
+  - GitPython is used to manage the local notes repository for commits, branches, and push/pull to a configured remote; future work may extend this to the app repository as needed.
+  - Direct use of the GitHub REST API is reserved for optional metadata (for example, release notes and hosted history views), with GitPython providing the primary versioning functionality.
 
 ---
 

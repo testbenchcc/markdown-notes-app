@@ -266,16 +266,49 @@ $(function(){
  ## v0.8.0 – GitPython-based Versioning
 
  - **Backend**
-  - [ ] Integrate **GitPython*- for local notes and app repositories.
-  - [ ] Implement operations:
-    - [ ] Commit and push notes repo.
-    - [ ] Pull notes repo safely, with conflict awareness.
-    - [ ] Manage `.gitignore` entries under notes root.
+  - [x] Integrate **GitPython** for the local notes repository (app repository integration can follow in a later increment if needed).
+  - [x] Implement operations:
+    - [x] Commit and push notes repo.
+    - [x] Pull notes repo safely, with conflict awareness.
+    - [x] Manage `.gitignore` entries under notes root.
   - [ ] Minimize direct GitHub REST usage, reserving it for optional metadata.
+  - API key is located within .env file along with repo URL: GHUB_API_KEY, NOTES_REPO_REMOTE_URL
+  - refer to Frontend checklist to determin any needed endpoints.
+  - Seperate this code into its own local library and call it into the project. 
 
  - **Frontend**
   - [ ] Ensure versioning UI (history views, status, gitignore management) uses the new backend flows.
   - [ ] Provide clear error and success feedback for git operations.
+  - [ ] Add any needed settings to the settings modal Versioning category.
+
+  - [ ] Add settings for automatically performing sync actions. All actions must be fully non-interactive and must never wait for user input. Each action can have its own timer:
+
+    - [ ] Enable auto commit  
+      - Interval: seconds or minutes  
+      - Behavior: automatically stage and commit configured paths if there are changes.  
+        If commit fails, log the error and skip to the next run.
+
+    - [ ] Enable auto pull  
+      - Interval: minutes  
+      - Behavior: `git pull --rebase origin <branch>`.  
+        If pull succeeds, mark last pull status as OK.  
+        If pull or rebase fails (conflict or error), automatically:
+          - Abort the rebase.  
+          - Create a new branch like `conflict-<timestamp>-<hostname>` that contains the local changes.  
+          - Reset `<branch>` back to the last known good state that matches origin.  
+          - Log the conflict, but do not require user interaction.  
+        Never discard local changes.
+
+    - [ ] Enable auto push  
+      - Interval: minutes  
+      - Behavior: `git push origin <branch>` only if:
+          - Last pull status is OK, and  
+          - There is no active conflict state recorded.  
+        If push fails (non fast forward, permission, network), log the error and skip to the next run.
+
+    - [ ] Require successful auto commit and auto pull before auto push  
+      - Auto push is skipped if the previous auto commit or auto pull failed or produced a conflict.
+
 
  ---
 

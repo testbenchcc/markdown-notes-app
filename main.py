@@ -28,6 +28,13 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, conint
 
+from git_versioning import (
+    add_gitignore_pattern,
+    commit_and_push_notes,
+    pull_notes_with_rebase,
+    remove_gitignore_pattern,
+)
+
 
 APP_ROOT = Path(__file__).resolve().parent
 
@@ -364,6 +371,14 @@ class CreateNoteRequest(BaseModel):
 class RenameRequest(BaseModel):
     sourcePath: str
     destinationPath: str
+
+
+class CommitAndPushRequest(BaseModel):
+    message: Optional[str] = None
+
+
+class GitignorePatternRequest(BaseModel):
+    pattern: str
 
 
 app = FastAPI(title="Markdown Notes App", version="0.1.0")
@@ -736,6 +751,66 @@ def create_note(payload: CreateNoteRequest) -> Dict[str, Any]:
         "path": _relative_to_notes_root(note_file),
         "name": note_file.name,
     }
+
+
+@app.post("/api/versioning/notes/commit-and-push", tags=["versioning"])
+def versioning_notes_commit_and_push(
+    payload: CommitAndPushRequest | None = None,
+) -> Dict[str, Any]:
+    cfg = get_config()
+    remote_url = os.getenv("NOTES_REPO_REMOTE_URL") or None
+
+    try:
+        result = commit_and_push_notes(
+            notes_root=cfg.notes_root,
+            remote_url=remote_url,
+            commit_message=payload.message if payload else None,
+        )
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return result
+
+
+@app.post("/api/versioning/notes/pull", tags=["versioning"])
+def versioning_notes_pull() -> Dict[str, Any]:
+    cfg = get_config()
+    remote_url = os.getenv("NOTES_REPO_REMOTE_URL") or None
+
+    try:
+        result = pull_notes_with_rebase(notes_root=cfg.notes_root, remote_url=remote_url)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return result
+
+
+@app.post("/api/versioning/notes/gitignore/add", tags=["versioning"])
+def versioning_notes_gitignore_add(payload: GitignorePatternRequest) -> Dict[str, Any]:
+    cfg = get_config()
+
+    try:
+        result = add_gitignore_pattern(cfg.notes_root, payload.pattern)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return result
+
+
+@app.post("/api/versioning/notes/gitignore/remove", tags=["versioning"])
+def versioning_notes_gitignore_remove(payload: GitignorePatternRequest) -> Dict[str, Any]:
+    cfg = get_config()
+
+    try:
+        result = remove_gitignore_pattern(cfg.notes_root, payload.pattern)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return result
 
 
 class SearchResultLine(BaseModel):
