@@ -27,7 +27,10 @@ def test_get_settings_returns_default_when_missing(tmp_path):
     assert resp.status_code == 200
     data = resp.json()
     assert "settings" in data
-    assert data["settings"]["tabLength"] == 4
+    settings = data["settings"]
+    assert settings["tabLength"] == 4
+    assert settings["theme"] == "base"
+    assert settings["indexPageTitle"] == "NoteBooks"
 
 
 def test_put_settings_validates_and_persists(tmp_path):
@@ -55,6 +58,27 @@ def test_put_settings_rejects_out_of_range_values(tmp_path):
     for bad in (1, 9):
         resp = client.put("/api/settings", json={"tabLength": bad})
         assert resp.status_code == 422
+
+
+def test_put_settings_updates_theme_and_title(tmp_path):
+    main = reload_main_with_temp_root(tmp_path)
+
+    client = TestClient(main.app)
+
+    resp = client.put(
+        "/api/settings",
+        json={"theme": "high-contrast", "indexPageTitle": "My Notebook"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["settings"]["theme"] == "high-contrast"
+    assert data["settings"]["indexPageTitle"] == "My Notebook"
+
+    resp = client.get("/api/settings")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["settings"]["theme"] == "high-contrast"
+    assert data["settings"]["indexPageTitle"] == "My Notebook"
 
 
 def test_get_note_uses_settings_tab_length(tmp_path):

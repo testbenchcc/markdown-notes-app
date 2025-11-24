@@ -253,13 +253,13 @@ $(function(){
  ## v0.7.0 – Settings UX and Persistence Refinement
 
  - **Backend**
-  - [ ] Confirm `NotebookSettings` fields fully cover new editor/tree/versioning needs.
-  - [ ] Add tests for settings load/merge/save behavior.
+  - [x] Confirm `NotebookSettings` fields fully cover new editor/tree/versioning needs.
+  - [x] Add tests for settings load/merge/save behavior.
 
  - **Frontend**
-  - [ ] Refine settings modal categories and visual feedback for unsaved changes.
-  - [ ] Ensure live updates for theme, title, and key editor preferences.
-  - [ ] Keep local caching behavior consistent and robust.
+  - [x] Refine settings modal categories and visual feedback for unsaved changes.
+  - [x] Ensure live updates for theme, title, and key editor preferences.
+  - [x] Keep local caching behavior consistent and robust.
 
  ---
 

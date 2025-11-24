@@ -20,13 +20,13 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import markdown
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, conint
+from pydantic import BaseModel, ConfigDict, conint
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -77,6 +77,8 @@ def get_config() -> AppConfig:
 
 class NotebookSettings(BaseModel):
     tabLength: conint(ge=2, le=8) = 4
+    theme: str = "base"
+    indexPageTitle: str = "NoteBooks"
     imageStorageMode: str = "local"
     imageStorageSubfolder: str = "Images"
     imageLocalSubfolderName: str = "Images"
@@ -85,8 +87,7 @@ class NotebookSettings(BaseModel):
     imageMaxHeight: conint(gt=0) = 768
     imageMaxPasteBytes: Optional[conint(gt=0)] = None
 
-    class Config:
-        extra = "ignore"
+    model_config = ConfigDict(extra="ignore")
 
 
 _DEFAULT_SETTINGS = NotebookSettings()
@@ -110,7 +111,7 @@ def _load_settings() -> NotebookSettings:
         return _DEFAULT_SETTINGS
 
     try:
-        return NotebookSettings.parse_obj(data)
+        return NotebookSettings.model_validate(data)
     except Exception:  # pragma: no cover - defensive fallback
         return _DEFAULT_SETTINGS
 
@@ -119,7 +120,8 @@ def _save_settings(settings: NotebookSettings) -> None:
     cfg = get_config()
     path = cfg.settings_path
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(settings.json(indent=2, sort_keys=True), encoding="utf8")
+    data = settings.model_dump(mode="json")
+    path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf8")
 
 
 NOTE_FILE_EXTENSION = ".md"
@@ -151,6 +153,9 @@ def _validate_relative_path(path_str: str) -> str:
     raw = path_str.strip()
     if not raw:
         raise ValueError("Path must not be empty")
+
+    if raw.startswith(("/", "\\")):
+        raise ValueError("Path must be relative and must not start with a path separator")
 
     if ":" in raw:
         raise ValueError("Path must be relative and must not contain drive specifiers")
@@ -438,14 +443,15 @@ def _relative_to_notes_root(path: Path) -> str:
 @app.get("/api/settings", tags=["settings"])
 def get_settings() -> Dict[str, Any]:
     settings = _load_settings()
-    return {"settings": settings.dict()}
+    return {"settings": settings.model_dump()}
 
 
 @app.put("/api/settings", tags=["settings"])
 def update_settings(payload: NotebookSettings) -> Dict[str, Any]:
-    settings = NotebookSettings.parse_obj({**_DEFAULT_SETTINGS.dict(), **payload.dict()})
+    merged_data = {**_DEFAULT_SETTINGS.model_dump(), **payload.model_dump()}
+    settings = NotebookSettings.model_validate(merged_data)
     _save_settings(settings)
-    return {"settings": settings.dict()}
+    return {"settings": settings.model_dump()}
 
 
 @app.get("/api/notes/{note_path:path}", tags=["notes"])
@@ -777,7 +783,7 @@ def search_notes(q: str) -> Dict[str, Any]:
                         path=rel_path,
                         lineNumber=index,
                         lineText=line,
-                    ).dict()
+                    ).model_dump()
                 )
                 per_file_count += 1
                 total_results += 1

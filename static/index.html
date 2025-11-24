@@ -233,19 +233,49 @@
               data-settings-category="editor"
             >
               <div class="settings-category-title">Editor</div>
-              <p class="settings-field-description">
-                Editor preferences for Monaco and markdown preview will be
-                surfaced here.
-              </p>
+              <div class="settings-field">
+                <div class="settings-field-label">Tab width</div>
+                <p class="settings-field-description">
+                  Number of spaces used when rendering tabs in markdown.
+                </p>
+                <input
+                  id="settings-tab-length"
+                  type="number"
+                  min="2"
+                  max="8"
+                  class="search-input"
+                />
+              </div>
             </section>
             <section
               class="settings-category hidden"
               data-settings-category="appearance"
             >
               <div class="settings-category-title">Appearance</div>
-              <p class="settings-field-description">
-                Theme and appearance controls will be added here.
-              </p>
+              <div class="settings-field">
+                <div class="settings-field-label">Notebook title</div>
+                <p class="settings-field-description">
+                  Title shown in the navigation header and browser tab.
+                </p>
+                <input
+                  id="settings-index-page-title"
+                  type="text"
+                  class="search-input"
+                />
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Theme</div>
+                <p class="settings-field-description">
+                  Choose a color theme for the app. Changes apply immediately.
+                </p>
+                <select id="settings-theme" class="settings-select">
+                  <option value="base">Base</option>
+                  <option value="office">Office</option>
+                  <option value="high-contrast">High contrast</option>
+                  <option value="midnight">Midnight</option>
+                </select>
+              </div>
             </section>
             <section
               class="settings-category hidden"

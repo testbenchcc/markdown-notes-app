@@ -12,6 +12,9 @@ let isSyncingScrollFromEditor = false;
 let isSyncingScrollFromViewer = false;
 let uploadBannerHideTimerId = null;
 let notebookSettings = null;
+let settingsDirty = false;
+let suppressSettingsDirtyTracking = false;
+const SETTINGS_LOCAL_STORAGE_KEY = "markdown-notes-app-settings";
 
 const VALID_MODES = new Set(["view", "edit", "export", "download"]);
 const DEFAULT_MODE = "view";
@@ -181,6 +184,192 @@ function applyImageSettingsFromSettings(settings) {
   root.style.setProperty("--viewer-image-max-height", `${maxHeight}px`);
 }
 
+function applySettingsToEditorSection(settings) {
+  if (!settings || typeof document === "undefined") return;
+
+  const tabLengthEl = document.getElementById("settings-tab-length");
+  if (tabLengthEl) {
+    const value = Number.isFinite(settings.tabLength) ? settings.tabLength : 4;
+    tabLengthEl.value = String(value);
+  }
+}
+
+function applyIndexTitleLive(title) {
+  if (typeof document === "undefined") return;
+
+  const navTitleEl = document.getElementById("nav-title");
+  const safeTitle = title && String(title).trim() ? String(title).trim() : "NoteBooks";
+
+  if (navTitleEl) {
+    navTitleEl.textContent = safeTitle;
+  }
+
+  document.title = safeTitle;
+}
+
+function applyThemeFromSettings(settings) {
+  if (!settings || typeof document === "undefined") return;
+
+  const root = document.documentElement;
+  if (!root || !root.style) return;
+
+  const themeName =
+    settings && typeof settings.theme === "string"
+      ? settings.theme.toLowerCase()
+      : "base";
+
+  let palette;
+
+  if (themeName === "office") {
+    palette = {
+      "--md-bg": "#1f2937",
+      "--md-bg-alt": "#111827",
+      "--md-bg-alt-soft": "#374151",
+      "--md-border-subtle": "#4b5563",
+      "--md-text-main": "#e5e7eb",
+      "--md-text-muted": "#9ca3af",
+      "--md-h1": "#2563eb",
+      "--md-h2": "#059669",
+      "--md-h3": "#d97706",
+      "--md-h4": "#7c3aed",
+      "--md-h5": "#db2777",
+      "--md-h6": "#0ea5e9",
+      "--md-aqua": "#22c55e",
+      "--md-blue": "#2563eb",
+      "--md-purple": "#7c3aed",
+      "--md-link": "#22c55e",
+      "--md-link-hover": "#f97316",
+      "--md-code": "#a5b4fc",
+      "--md-menu-bg": "#374151",
+    };
+  } else if (themeName === "high-contrast") {
+    palette = {
+      "--md-bg": "#000000",
+      "--md-bg-alt": "#111111",
+      "--md-bg-alt-soft": "#1f2933",
+      "--md-border-subtle": "#ffffff",
+      "--md-text-main": "#ffffff",
+      "--md-text-muted": "#d1d5db",
+      "--md-h1": "#f97316",
+      "--md-h2": "#22c55e",
+      "--md-h3": "#3b82f6",
+      "--md-h4": "#eab308",
+      "--md-h5": "#ec4899",
+      "--md-h6": "#a855f7",
+      "--md-aqua": "#22c55e",
+      "--md-blue": "#3b82f6",
+      "--md-purple": "#a855f7",
+      "--md-link": "#22c55e",
+      "--md-link-hover": "#facc15",
+      "--md-code": "#a5b4fc",
+      "--md-menu-bg": "#111827",
+    };
+  } else if (themeName === "midnight") {
+    palette = {
+      "--md-bg": "#020617",
+      "--md-bg-alt": "#020617",
+      "--md-bg-alt-soft": "#0f172a",
+      "--md-border-subtle": "#1e293b",
+      "--md-text-main": "#e5e7eb",
+      "--md-text-muted": "#9ca3af",
+      "--md-h1": "#38bdf8",
+      "--md-h2": "#a855f7",
+      "--md-h3": "#f97316",
+      "--md-h4": "#22c55e",
+      "--md-h5": "#e11d48",
+      "--md-h6": "#eab308",
+      "--md-aqua": "#22c55e",
+      "--md-blue": "#38bdf8",
+      "--md-purple": "#a855f7",
+      "--md-link": "#38bdf8",
+      "--md-link-hover": "#facc15",
+      "--md-code": "#a5b4fc",
+      "--md-menu-bg": "#020617",
+    };
+  } else {
+    palette = {
+      "--md-bg": "#1d2021",
+      "--md-bg-alt": "#282828",
+      "--md-bg-alt-soft": "#3c3836",
+      "--md-border-subtle": "#3c3836",
+      "--md-text-main": "#ebdbb2",
+      "--md-text-muted": "#bdae93",
+      "--md-h1": "#cc241d",
+      "--md-h2": "#d79921",
+      "--md-h3": "#98971a",
+      "--md-h4": "#458588",
+      "--md-h5": "#b16286",
+      "--md-h6": "#8ec07c",
+      "--md-aqua": "#8ec07c",
+      "--md-blue": "#458588",
+      "--md-purple": "#b16286",
+      "--md-link": "#8ec07c",
+      "--md-link-hover": "#fe8019",
+      "--md-code": "#83a598",
+      "--md-menu-bg": "#615d5b",
+    };
+  }
+
+  Object.keys(palette).forEach((key) => {
+    root.style.setProperty(key, palette[key]);
+  });
+}
+
+function applySettingsToAppearanceSection(settings) {
+  if (!settings || typeof document === "undefined") return;
+
+  const titleInput = document.getElementById("settings-index-page-title");
+  const themeSelect = document.getElementById("settings-theme");
+  const titleValue = settings.indexPageTitle || "NoteBooks";
+
+  if (titleInput) {
+    titleInput.value = titleValue;
+  }
+
+  if (themeSelect && settings.theme) {
+    themeSelect.value = settings.theme;
+  }
+
+  applyIndexTitleLive(titleValue);
+  applyThemeFromSettings(settings);
+}
+
+function applyAllSettings(settings, options = {}) {
+  const { resetDirty = false } = options;
+  if (!settings) return;
+  suppressSettingsDirtyTracking = true;
+  applyImageSettingsFromSettings(settings);
+  applySettingsToFilesAndImagesSection(settings);
+  applySettingsToEditorSection(settings);
+  applySettingsToAppearanceSection(settings);
+  suppressSettingsDirtyTracking = false;
+  if (resetDirty) {
+    resetSettingsDirtyState();
+  }
+}
+
+function loadSettingsFromLocalCache() {
+  if (typeof window === "undefined" || !window.localStorage) return null;
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_LOCAL_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveSettingsToLocalCache(settings) {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    const json = JSON.stringify(settings || {});
+    window.localStorage.setItem(SETTINGS_LOCAL_STORAGE_KEY, json);
+  } catch {
+  }
+}
+
 function applySettingsToFilesAndImagesSection(settings) {
   if (!settings || typeof document === "undefined") return;
 
@@ -302,9 +491,57 @@ function buildUpdatedSettingsFromFilesAndImagesSection(baseSettings) {
   return next;
 }
 
+function buildUpdatedSettingsFromEditorSection(baseSettings) {
+  if (typeof document === "undefined") return baseSettings || {};
+
+  const next = { ...(baseSettings || {}) };
+
+  const tabLengthEl = document.getElementById("settings-tab-length");
+  if (tabLengthEl) {
+    const raw = tabLengthEl.value.trim();
+    if (raw) {
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isFinite(parsed)) {
+        next.tabLength = parsed;
+      }
+    }
+  }
+
+  return next;
+}
+
+function buildUpdatedSettingsFromAppearanceSection(baseSettings) {
+  if (typeof document === "undefined") return baseSettings || {};
+
+  const next = { ...(baseSettings || {}) };
+
+  const titleEl = document.getElementById("settings-index-page-title");
+  if (titleEl) {
+    const value = titleEl.value.trim();
+    if (value) {
+      next.indexPageTitle = value;
+    }
+  }
+
+  const themeEl = document.getElementById("settings-theme");
+  if (themeEl && themeEl.value) {
+    next.theme = themeEl.value;
+  }
+
+  return next;
+}
+
+function buildUpdatedSettingsFromAllSections(baseSettings) {
+  let next = baseSettings || {};
+  next = buildUpdatedSettingsFromFilesAndImagesSection(next);
+  next = buildUpdatedSettingsFromEditorSection(next);
+  next = buildUpdatedSettingsFromAppearanceSection(next);
+  return next;
+}
+
 async function handleSettingsSave() {
   const current = notebookSettings || {};
-  const payload = buildUpdatedSettingsFromFilesAndImagesSection(current);
+  const payload = buildUpdatedSettingsFromAllSections(current);
 
   try {
     const response = await fetch("/api/settings", {
@@ -320,8 +557,8 @@ async function handleSettingsSave() {
     const data = await response.json();
     const settings = data && typeof data.settings === "object" ? data.settings : {};
     notebookSettings = settings;
-    applyImageSettingsFromSettings(settings);
-    applySettingsToFilesAndImagesSection(settings);
+    saveSettingsToLocalCache(settings);
+    applyAllSettings(settings, { resetDirty: true });
   } catch (error) {
     console.error("/api/settings (save) request failed", error);
     showError("Unable to save settings.");
@@ -360,8 +597,8 @@ async function loadNotebookSettings() {
     const data = await response.json();
     const settings = data && typeof data.settings === "object" ? data.settings : {};
     notebookSettings = settings;
-    applyImageSettingsFromSettings(settings);
-    applySettingsToFilesAndImagesSection(settings);
+    saveSettingsToLocalCache(settings);
+    applyAllSettings(settings, { resetDirty: true });
   } catch (error) {
     console.error("/api/settings request failed", error);
   }
@@ -1813,6 +2050,76 @@ function closeSettingsModal() {
   overlay.classList.add("hidden");
 }
 
+function markSettingsCategoryDirty(categoryId) {
+  if (!categoryId || typeof document === "undefined") return;
+
+  settingsDirty = true;
+
+  const saveBtn = document.getElementById("settings-footer-save-btn");
+  if (saveBtn) {
+    saveBtn.disabled = false;
+  }
+
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+
+  const navItem = overlay.querySelector(
+    `.settings-nav-item[data-settings-category-id="${categoryId}"]`,
+  );
+  if (navItem) {
+    navItem.classList.add("settings-nav-item-dirty");
+  }
+}
+
+function resetSettingsDirtyState() {
+  settingsDirty = false;
+  if (typeof document === "undefined") return;
+
+  const saveBtn = document.getElementById("settings-footer-save-btn");
+  if (saveBtn) {
+    saveBtn.disabled = true;
+  }
+
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+
+  const navItems = overlay.querySelectorAll(".settings-nav-item");
+  navItems.forEach((item) => {
+    item.classList.remove("settings-nav-item-dirty");
+  });
+}
+
+function handleSettingsFieldChanged(target) {
+  if (!target || typeof Element === "undefined" || !(target instanceof Element)) {
+    return;
+  }
+  if (suppressSettingsDirtyTracking) return;
+
+  const categoryEl = target.closest("[data-settings-category]");
+  if (!categoryEl) return;
+
+  const categoryId = categoryEl.dataset.settingsCategory;
+  if (!categoryId) return;
+
+  markSettingsCategoryDirty(categoryId);
+
+  if (target.id === "settings-theme") {
+    const value = target.value || "base";
+    const nextSettings = { ...(notebookSettings || {}), theme: value };
+    applyThemeFromSettings(nextSettings);
+  } else if (target.id === "settings-index-page-title") {
+    const titleValue = target.value || "";
+    applyIndexTitleLive(titleValue);
+  }
+}
+
+function applyCachedSettingsIfAvailable() {
+  const cached = loadSettingsFromLocalCache();
+  if (!cached) return;
+  notebookSettings = cached;
+  applyAllSettings(cached, { resetDirty: true });
+}
+
 function setupSettingsModal() {
   const settingsBtn = document.getElementById("settings-btn");
   const overlay = document.getElementById("settings-overlay");
@@ -1822,6 +2129,8 @@ function setupSettingsModal() {
   const runCleanupBtn = document.getElementById("settings-run-image-cleanup-btn");
 
   if (!settingsBtn || !overlay || !closeBtn || !saveBtn) return;
+
+  resetSettingsDirtyState();
 
   function handleClose() {
     closeSettingsModal();
@@ -1867,6 +2176,16 @@ function setupSettingsModal() {
     });
   });
 
+  const fields = overlay.querySelectorAll("input, select, textarea");
+  fields.forEach((field) => {
+    field.addEventListener("input", () => {
+      handleSettingsFieldChanged(field);
+    });
+    field.addEventListener("change", () => {
+      handleSettingsFieldChanged(field);
+    });
+  });
+
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       const overlayElement = document.getElementById("settings-overlay");
@@ -1903,6 +2222,7 @@ function setupViewerScrollSync() {
 
 window.addEventListener("DOMContentLoaded", () => {
   updateHealthStatus();
+  applyCachedSettingsIfAvailable();
   void loadNotebookSettings();
   loadTree();
   setupTreeSelection();

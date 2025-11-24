@@ -24,8 +24,8 @@ The goal is to preserve the existing layout, button placements, search position,
 - Opening a note automatically expands, focuses, and selects its tree node so the navigation pane stays in sync with the URL-driven view (v0.4.1).
 - Tree renames now use the Fancytree inline editor (v0.4.2) so double-click, Shift+click, clickActive, and F2 all trigger an in-place rename that validates input before calling the existing rename endpoints, with the previous prompt kept as a fallback, and the inline input adopts the dark theme styles for a cohesive appearance.
 - Minimal settings backend in `main.py`:
-  - `NotebookSettings` model (currently `tabLength` only) persisted to `.notebook-settings.json` under the notes root.
-  - `/api/settings` (`GET`/`PUT`) to load and validate settings, wiring `tabLength` into server-side markdown rendering.
+  - `NotebookSettings` model persisted to `.notebook-settings.json` under the notes root, including tab length, theme, index page title, and image paste limits.
+  - `/api/settings` (`GET`/`PUT`) to load and validate settings, wiring `tabLength` into server-side markdown rendering and exposing theme/title to the frontend.
 - Initial v0.2.0 backend/frontend work-in-progress:
   - Secure path helpers (`_validate_relative_path`, `_resolve_relative_path`, `_resolve_destination_path`).
   - Notes tree builder (`build_notes_tree`) and `GET /api/tree` endpoint.
