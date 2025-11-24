@@ -5,6 +5,9 @@ let currentNotePath = null;
 let currentNoteContent = "";
 let currentMode = "view";
 let treeInitialized = false;
+let currentSearchHighlightIds = [];
+let searchDebounceTimerId = null;
+let latestSearchRequestId = 0;
 
 const VALID_MODES = new Set(["view", "edit", "export", "download"]);
 const DEFAULT_MODE = "view";
@@ -712,6 +715,8 @@ async function loadNote(notePath, options = {}) {
 
   viewerEl.textContent = "Loading note…";
 
+  clearSearchHighlights();
+
   try {
     const safePath = toSafePath(notePath);
     const response = await fetch(`/api/notes/${safePath}`);
@@ -750,6 +755,241 @@ async function loadNote(notePath, options = {}) {
     showError("Unable to load the selected note from the server.");
     viewerEl.textContent = "Unable to load note.";
   }
+}
+
+function clearSearchHighlights() {
+  if (!monacoEditor) return;
+
+  currentSearchHighlightIds = monacoEditor.deltaDecorations(
+    currentSearchHighlightIds,
+    [],
+  );
+}
+
+function highlightSearchResultLine(lineNumber) {
+  if (!monacoEditor || typeof monaco === "undefined") return;
+
+  const model = monacoEditor.getModel();
+  if (!model) return;
+
+  const totalLines = model.getLineCount();
+  if (!totalLines) return;
+
+  const clamped = Math.max(1, Math.min(lineNumber, totalLines));
+  const range = new monaco.Range(
+    clamped,
+    1,
+    clamped,
+    model.getLineMaxColumn(clamped),
+  );
+
+  currentSearchHighlightIds = monacoEditor.deltaDecorations(
+    currentSearchHighlightIds,
+    [
+      {
+        range,
+        options: {
+          isWholeLine: true,
+          className: "search-line-highlight",
+        },
+      },
+    ],
+  );
+
+  monacoEditor.revealLineInCenter(clamped);
+}
+
+function clearSearchUi() {
+  const resultsEl = document.getElementById("search-results");
+  if (!resultsEl) return;
+  resultsEl.innerHTML = "";
+  resultsEl.classList.add("hidden");
+}
+
+function updateSearchQueryInUrl(query) {
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+
+  if (query) {
+    params.set("search", query);
+  } else {
+    params.delete("search");
+  }
+
+  window.history.replaceState(null, "", url);
+}
+
+function getInitialSearchQueryFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("search") || "";
+}
+
+function renderSearchResults(results, query) {
+  const container = document.getElementById("search-results");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  if (!query) {
+    container.classList.add("hidden");
+    return;
+  }
+
+  container.classList.remove("hidden");
+
+  const header = document.createElement("div");
+  header.className = "search-results-header";
+
+  const summary = document.createElement("span");
+  const count = Array.isArray(results) ? results.length : 0;
+  summary.textContent = count
+    ? `${count} match${count === 1 ? "" : "es"}`
+    : "No matches";
+
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.className = "small-btn";
+  clearBtn.textContent = "Clear";
+  clearBtn.addEventListener("click", () => {
+    const input = document.getElementById("search-input");
+    if (input) {
+      input.value = "";
+    }
+    clearSearchHighlights();
+    clearSearchUi();
+    updateSearchQueryInUrl("");
+  });
+
+  header.appendChild(summary);
+  header.appendChild(clearBtn);
+  container.appendChild(header);
+
+  if (!count) {
+    const empty = document.createElement("div");
+    empty.className = "search-results-empty";
+    empty.textContent = "No matches found.";
+    container.appendChild(empty);
+    return;
+  }
+
+  results.forEach((result) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "search-result-item";
+
+    const pathEl = document.createElement("div");
+    pathEl.className = "search-result-path";
+    pathEl.textContent = result.path || "";
+
+    const snippetEl = document.createElement("div");
+    snippetEl.className = "search-result-snippet";
+    snippetEl.textContent = result.lineText || "";
+
+    btn.appendChild(pathEl);
+    btn.appendChild(snippetEl);
+
+    btn.addEventListener("click", () => {
+      void handleSearchResultClick(result);
+    });
+
+    container.appendChild(btn);
+  });
+}
+
+async function performSearch(rawQuery) {
+  const query = (rawQuery || "").trim();
+
+  updateSearchQueryInUrl(query);
+
+  if (!query) {
+    clearSearchHighlights();
+    clearSearchUi();
+    return;
+  }
+
+  const requestId = ++latestSearchRequestId;
+
+  try {
+    const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+
+    if (!response.ok) {
+      throw new Error(`Search request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (requestId !== latestSearchRequestId) {
+      return;
+    }
+
+    const results = Array.isArray(data.results) ? data.results : [];
+    renderSearchResults(results, query);
+  } catch (error) {
+    if (requestId !== latestSearchRequestId) {
+      return;
+    }
+
+    console.error("/api/search request failed", error);
+    showError("Unable to perform search.");
+  }
+}
+
+async function handleSearchResultClick(result) {
+  if (!result || !result.path || !result.lineNumber) return;
+
+  const targetPath = result.path;
+  const targetLine = Number(result.lineNumber) || 1;
+
+  if (currentNotePath === targetPath) {
+    setMode("edit", { replaceUrl: false });
+    if (monacoEditor) {
+      highlightSearchResultLine(targetLine);
+    }
+    return;
+  }
+
+  await loadNote(targetPath, {
+    modeOverride: "edit",
+    replaceUrl: false,
+    triggerAction: false,
+  });
+
+  if (monacoEditor) {
+    highlightSearchResultLine(targetLine);
+  }
+}
+
+function setupSearch() {
+  const input = document.getElementById("search-input");
+  if (!input) return;
+
+  const initialQuery = getInitialSearchQueryFromUrl();
+  if (initialQuery) {
+    input.value = initialQuery;
+    void performSearch(initialQuery);
+  }
+
+  input.addEventListener("input", () => {
+    const value = input.value || "";
+
+    if (searchDebounceTimerId !== null) {
+      window.clearTimeout(searchDebounceTimerId);
+    }
+
+    searchDebounceTimerId = window.setTimeout(() => {
+      searchDebounceTimerId = null;
+      void performSearch(value);
+    }, 250);
+  });
+
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      if (searchDebounceTimerId !== null) {
+        window.clearTimeout(searchDebounceTimerId);
+        searchDebounceTimerId = null;
+      }
+      void performSearch(input.value || "");
+    }
+  });
 }
 
 function getBaseFolderPathForNewItem() {
@@ -1244,6 +1484,7 @@ window.addEventListener("DOMContentLoaded", () => {
   setupModeToggle();
   initMonacoEditor();
   setupSettingsModal();
+  setupSearch();
   initializeNavigationFromUrl();
 });
 

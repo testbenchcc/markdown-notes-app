@@ -154,6 +154,7 @@ The goal is to preserve the existing layout, button placements, search position,
   - `GET /api/search?q=...`:
     - Walks all `.md` files under the notes root, excluding dot paths.
     - Returns matching lines (up to a fixed number per file) with line numbers.
+     - The nav-pane search box calls this endpoint; clicking a result opens the note, syncs the tree selection, and highlights the corresponding line in the Monaco editor so the match is easy to spot (v0.5.0).
 
 ### Export / import
 

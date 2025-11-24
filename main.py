@@ -124,6 +124,10 @@ IMAGE_EXTENSIONS = {
 }
 DEFAULT_TAB_LENGTH = 4
 
+SEARCH_MAX_MATCHES_PER_FILE = 20
+SEARCH_MAX_RESULTS = 1000
+SEARCH_MAX_QUERY_LENGTH = 200
+
 
 def _validate_relative_path(path_str: str) -> str:
     raw = path_str.strip()
@@ -548,6 +552,67 @@ def create_note(payload: CreateNoteRequest) -> Dict[str, Any]:
         "path": _relative_to_notes_root(note_file),
         "name": note_file.name,
     }
+
+
+class SearchResultLine(BaseModel):
+    path: str
+    lineNumber: int
+    lineText: str
+
+
+@app.get("/api/search", tags=["search"])
+def search_notes(q: str) -> Dict[str, Any]:
+    query = q.strip()
+    if not query:
+        return {"query": query, "results": []}
+    if len(query) > SEARCH_MAX_QUERY_LENGTH:
+        raise HTTPException(status_code=400, detail="Query too long")
+
+    cfg = get_config()
+    root = cfg.notes_root
+
+    results: List[Dict[str, Any]] = []
+    total_results = 0
+
+    lower_query = query.lower()
+
+    for note_file in root.rglob(f"*{NOTE_FILE_EXTENSION}"):
+        try:
+            rel_path = note_file.relative_to(root).as_posix()
+        except ValueError:
+            continue
+
+        parts = note_file.relative_to(root).parts
+        if any(part.startswith(".") for part in parts):
+            continue
+
+        try:
+            text = note_file.read_text(encoding="utf8")
+        except OSError:
+            continue
+
+        per_file_count = 0
+        for index, line in enumerate(text.splitlines(), start=1):
+            if lower_query in line.lower():
+                results.append(
+                    SearchResultLine(
+                        path=rel_path,
+                        lineNumber=index,
+                        lineText=line,
+                    ).dict()
+                )
+                per_file_count += 1
+                total_results += 1
+
+                if per_file_count >= SEARCH_MAX_MATCHES_PER_FILE:
+                    break
+                if total_results >= SEARCH_MAX_RESULTS:
+                    break
+
+        if total_results >= SEARCH_MAX_RESULTS:
+            break
+
+    return {"query": query, "results": results}
 
 
 if __name__ == "__main__":  # pragma: no cover - manual/dev entrypoint

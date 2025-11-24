@@ -211,14 +211,16 @@ $(function(){
 ## v0.5.0 – Search & Filters Enhancements
 
 - **Backend**
-  - [ ] Review and, if necessary, optimize `/api/search` for typical notebook sizes.
-    - GET URLs so seach can be shared
-  - [ ] Ensure safe handling of search queries and limits on results.
+  - [x] Review and, if necessary, optimize `/api/search` for typical notebook sizes.
+    - GET URLs so seach can be shared (query is stored in `?search=` and restored on load).
+  - [x] Ensure safe handling of search queries and limits on results.
 
  - **Frontend**
-  - [ ] Integrate search results more tightly with the tree and content pane.
+  - [x] Integrate search results more tightly with the tree and content pane.
+    - Search box calls `/api/search` and clicking a result opens the note and syncs tree selection.
   - [ ] Provide filters (e.g., note vs image, path-based narrowing) as reasonable.
-  - [ ] Optionally highlight search matches within notes.
+  - [x] Optionally highlight search matches within notes.
+    - Clicking a search result switches to edit mode and highlights the full line in Monaco so the match is visually located.
 
  ---
 

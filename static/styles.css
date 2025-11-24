@@ -261,6 +261,7 @@ body {
   padding: 0.25rem 0.25rem 0.75rem;
   overflow-y: auto;
   font-size: 0.85rem;
+  background: whitesmoke;
 }
 
 #tree:focus {
@@ -272,7 +273,7 @@ body {
 
 #tree ul.fancytree-container {
   border: none;
-  background: transparent;
+  background: whitesmoke;
 }
 
 #tree span.fancytree-node {
@@ -982,6 +983,14 @@ div.mermaid[data-processed="true"] {
   padding: 1rem;
   border-radius: 4px;
   border: 1px solid var(--md-border-subtle);
+}
+
+.monaco-editor .search-line-highlight {
+  background-color: rgba(255, 241, 118, 0.35);
+}
+
+.monaco-editor .search-line-gutter {
+  border-left: 3px solid #facc15;
 }
 
 /* All icons that should invert */
