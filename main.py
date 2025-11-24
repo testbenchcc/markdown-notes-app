@@ -20,6 +20,7 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 import markdown
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -624,7 +625,8 @@ async def paste_image(note_path: str = Form(...), file: UploadFile = File(...)) 
     image_path.parent.mkdir(parents=True, exist_ok=True)
     image_path.write_bytes(raw)
 
-    markdown_snippet = f"![image](/files/{rel_image_path})"
+    encoded_path = quote(rel_image_path, safe="/")
+    markdown_snippet = f"![image](/files/{encoded_path})"
 
     return PasteImageResponse(path=rel_image_path, markdown=markdown_snippet, size=size)
 

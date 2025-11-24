@@ -93,3 +93,48 @@ def test_paste_image_rejects_invalid_note_path(tmp_path):
     assert resp.status_code == 400
     body = resp.json()
     assert "must not contain" in body.get("detail", "").lower() or "must be relative" in body.get("detail", "").lower()
+
+
+def test_paste_image_in_folder_with_spaces_uses_encoded_url(tmp_path):
+    main = reload_main_with_temp_root(tmp_path)
+    cfg = main.get_config()
+    root = cfg.notes_root
+
+    note_file = root / "Test folder" / "note.md"
+    note_file.parent.mkdir(parents=True, exist_ok=True)
+    note_file.write_text("# Title", encoding="utf8")
+
+    client = TestClient(main.app)
+
+    payload = b"fakepngdata"
+    resp = client.post(
+        "/api/images/paste",
+        data={"note_path": "Test folder/note.md"},
+        files={"file": ("pic.png", payload, "image/png")},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # Path on disk uses the raw relative path with spaces
+    raw_path = data["path"]
+    assert raw_path.startswith("Test folder/Images/")
+
+    stored_image = root / raw_path
+    assert stored_image.is_file()
+    assert stored_image.read_bytes() == payload
+
+    # Markdown snippet must use a URL-encoded path segment so Markdown/HTML
+    # treat it as a single URL, even when folders contain spaces.
+    markdown = data["markdown"]
+    assert markdown.startswith("![image](")
+    assert "Test folder/Images/" not in markdown
+    assert "Test%20folder/Images/" in markdown
+
+    # Extract the URL and confirm that decoding it yields the raw path.
+    url = markdown[len("![image](") : -1]
+    assert url.startswith("/files/")
+    encoded_rel = url.split("/files/", 1)[1]
+
+    from urllib.parse import unquote
+
+    assert unquote(encoded_rel) == raw_path
