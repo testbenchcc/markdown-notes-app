@@ -5,7 +5,9 @@ networks:
 
 services:
   app:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     image: markdown-notes-app:latest
     container_name: markdown-notes-app
     volumes:
