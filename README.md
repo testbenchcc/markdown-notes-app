@@ -259,10 +259,11 @@ The goal is to preserve the existing layout, button placements, search position,
 
 ### Tree and navigation (from `app.js`)
 
-- Tree is currently rendered manually from the `/api/tree` JSON:
-  - Each node becomes DOM elements with classes like `tree-item folder` or `tree-item note` and `data-path` attributes.
-  - Expanded folders are tracked via a `Set` of paths and restored on reload.
-  - Context menu overlay supports actions like new folder/note, rename, delete, expand/collapse, and gitignore management (per roadmap).
+- Tree is rendered using **Fancytree** backed by the `/api/tree` JSON:
+  - API nodes are mapped to Fancytree nodes with folder, note, and image classes for icons and styling.
+  - Expand/collapse state is persisted via the `persist` extension and restored on reload.
+  - Context menu overlay supports actions like new folder/note, rename (via F2 or explicit menu actions), delete, expand/collapse, and gitignore management (per roadmap).
+  - The tree data is refreshed on startup, after create/rename/delete operations, and whenever the window regains focus so external filesystem changes appear automatically.
 
 - Search integration:
   - Search box issues `GET /api/search?q=...`.
@@ -275,24 +276,18 @@ The goal is to preserve the existing layout, button placements, search position,
   - If no note is selected, paste is rejected with a user-facing error.
   - For each image:
     - Enforced against `imageMaxPasteBytes` from settings, with an optional confirm dialog when exceeded.
-    - Uploaded via `/api/images/paste`.
-    - Resulting markdown snippet from the server is inserted at the cursor.
-  - Upload progress is shown in an editor banner using a fixed-width hash/dash bar, which appears during upload, briefly shows the completion state, then hides.
-  - Viewer applies image sizing options from notebook settings (`imageFitToNoteWidth`, `imageMaxWidth`, `imageMaxHeight`) via CSS so images respect per-notebook size preferences.
-
-### Settings UI and persistence
 
 - Settings modal categories:
   - **General**: spellcheck, title, tab width, date/time formats, auto-save interval, export/import buttons.
   - **File handling**: image display mode, max dimensions, default alignment, storage folder, image size limits, cleanup.
-  - **Versioning**: auto-commit/pull, pull interval, notes root/remote URL, GitHub API key status, git history popup.
+  - **Versioning**: auto-commit/pull/push toggles and intervals, notes remote URL and GitHub API key status, manual “Commit & push now” and “Pull now” actions, and an auto-sync status readout. GitHub-backed history views remain planned for a future increment.
   - **Appearance**: theme selection and export theme selection.
   - **Keyboard Shortcuts**: documentation of all editor shortcuts and their behavior.
 
 - State flow:
   - Settings are loaded from `/api/settings` with local defaults, then cached in `localStorage`.
   - Changes in the modal update a draft copy; categories are marked dirty when their settings differ from the last saved state.
-  - Saving posts changes back to `/api/settings`, updates on-disk JSON, and re-applies theme/title/image settings live.
+  - Saving posts changes back to `/api/settings`, updates the `.notebook-settings.json` file under the notes root, and re-applies theme/title/image settings live. After a successful save, pressing **Save** again within a short window will close the Settings modal.
 
 ---
 

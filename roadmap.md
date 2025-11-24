@@ -271,24 +271,24 @@ $(function(){
     - [x] Commit and push notes repo.
     - [x] Pull notes repo safely, with conflict awareness.
     - [x] Manage `.gitignore` entries under notes root.
-  - [ ] Minimize direct GitHub REST usage, reserving it for optional metadata.
+  - [x] Minimize direct GitHub REST usage, reserving it for optional metadata (no direct GitHub REST calls are used yet; future work will use it only for history/metadata).
   - API key is located within .env file along with repo URL: GHUB_API_KEY, NOTES_REPO_REMOTE_URL
   - refer to Frontend checklist to determin any needed endpoints.
-  - Seperate this code into its own local library and call it into the project. 
+  - [x] Separate this code into its own local library and call it into the project. 
 
- - **Frontend**
-  - [ ] Ensure versioning UI (history views, status, gitignore management) uses the new backend flows.
-  - [ ] Provide clear error and success feedback for git operations.
-  - [ ] Add any needed settings to the settings modal Versioning category.
+  - **Frontend**
+  - [x] Ensure versioning UI (status, manual sync actions, gitignore management) uses the new backend flows. (History views remain planned for future GitHub metadata endpoints.)
+  - [x] Provide clear error and success feedback for git operations.
+  - [x] Add any needed settings to the settings modal Versioning category.
 
-  - [ ] Add settings for automatically performing sync actions. All actions must be fully non-interactive and must never wait for user input. Each action can have its own timer:
+  - [x] Add settings for automatically performing sync actions. All actions must be fully non-interactive and must never wait for user input. Each action can have its own timer:
 
-    - [ ] Enable auto commit  
+    - [x] Enable auto commit  
       - Interval: seconds or minutes  
       - Behavior: automatically stage and commit configured paths if there are changes.  
         If commit fails, log the error and skip to the next run.
 
-    - [ ] Enable auto pull  
+    - [x] Enable auto pull  
       - Interval: minutes  
       - Behavior: `git pull --rebase origin <branch>`.  
         If pull succeeds, mark last pull status as OK.  
@@ -299,16 +299,31 @@ $(function(){
           - Log the conflict, but do not require user interaction.  
         Never discard local changes.
 
-    - [ ] Enable auto push  
+    - [x] Enable auto push  
       - Interval: minutes  
       - Behavior: `git push origin <branch>` only if:
           - Last pull status is OK, and  
           - There is no active conflict state recorded.  
         If push fails (non fast forward, permission, network), log the error and skip to the next run.
 
-    - [ ] Require successful auto commit and auto pull before auto push  
+    - [x] Require successful auto commit and auto pull before auto push  
       - Auto push is skipped if the previous auto commit or auto pull failed or produced a conflict.
 
+
+ ---
+
+ ## v0.8.1 - tree bugs
+
+ - [x] When using new folder and notes buttons, nothing is ever created. After pressing ok, the tree clears out and nothing is displayed at all. 
+ - [x] Tree should update when any new files or folders are added, even extenal to the application.
+ - [x] I would like you to remove the double click name editing from the tree. (there are a few click combinations and shortcuts, remove them it they exist)
+
+ ---
+
+ ## v0.8.2 - Settings
+
+- [x] Settings are maintained in a JSON file stored at the root of the `notes` folder.
+- [x] Settings are saved when the Save button is pressed in the modal. Pressing Save a second time within a few seconds closes the modal.
 
  ---
 

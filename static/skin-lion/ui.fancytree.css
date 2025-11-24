@@ -187,48 +187,61 @@ span.fancytree-expander {
 }
 .fancytree-exp-c span.fancytree-expander {
   background-position: 0px -80px;
+  filter: invert(1);
 }
 .fancytree-exp-c span.fancytree-expander:hover {
   background-position: -16px -80px;
+  filter: invert(1);
 }
 .fancytree-exp-cl span.fancytree-expander {
   background-position: 0px -96px;
+  filter: invert(1);
 }
 .fancytree-exp-cl span.fancytree-expander:hover {
   background-position: -16px -96px;
+  filter: invert(1);
 }
 .fancytree-exp-cd span.fancytree-expander {
   background-position: -64px -80px;
+  filter: invert(1);
 }
 .fancytree-exp-cd span.fancytree-expander:hover {
   background-position: -80px -80px;
+  filter: invert(1);
 }
 .fancytree-exp-cdl span.fancytree-expander {
   background-position: -64px -96px;
+  filter: invert(1);
 }
 .fancytree-exp-cdl span.fancytree-expander:hover {
   background-position: -80px -96px;
+  filter: invert(1);
 }
 .fancytree-exp-e span.fancytree-expander,
 .fancytree-exp-ed span.fancytree-expander {
   background-position: -32px -80px;
+  filter: invert(1);
 }
 .fancytree-exp-e span.fancytree-expander:hover,
 .fancytree-exp-ed span.fancytree-expander:hover {
   background-position: -48px -80px;
+  filter: invert(1);
 }
 .fancytree-exp-el span.fancytree-expander,
 .fancytree-exp-edl span.fancytree-expander {
   background-position: -32px -96px;
+  filter: invert(1);
 }
 .fancytree-exp-el span.fancytree-expander:hover,
 .fancytree-exp-edl span.fancytree-expander:hover {
   background-position: -48px -96px;
+  filter: invert(1);
 }
 /* Fade out expanders, when container is not hovered or active */
 .fancytree-fade-expander span.fancytree-expander {
   transition: opacity 1.5s;
   opacity: 0;
+  filter: invert(1);
 }
 .fancytree-fade-expander:hover span.fancytree-expander,
 .fancytree-fade-expander.fancytree-treefocus span.fancytree-expander,
@@ -381,7 +394,7 @@ span.fancytree-node {
   min-height: 16px;
 }
 span.fancytree-title {
-  color: black;
+  color: cornsilk;
   cursor: pointer;
   display: inline-block;
   vertical-align: top;
@@ -585,7 +598,7 @@ table.fancytree-ext-columnview .fancytree-has-children span.fancytree-cv-right:h
 }
 .fancytree-ext-filter-dimm tr.fancytree-submatch span.fancytree-title,
 .fancytree-ext-filter-dimm span.fancytree-node.fancytree-submatch span.fancytree-title {
-  color: black;
+  color: #ffffff;
   font-weight: normal;
 }
 .fancytree-ext-filter-dimm tr.fancytree-match span.fancytree-title,
@@ -604,7 +617,7 @@ table.fancytree-ext-columnview .fancytree-has-children span.fancytree-cv-right:h
 }
 .fancytree-ext-filter-hide tr.fancytree-match span.fancytree-title,
 .fancytree-ext-filter-hide span.fancytree-node.fancytree-match span.fancytree-title {
-  color: black;
+  color: rgb(255, 255, 255);
   font-weight: normal;
 }
 /* Hide expanders if all child nodes are hidden by filter */

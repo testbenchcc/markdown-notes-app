@@ -15,9 +15,12 @@ let notebookSettings = null;
 let settingsDirty = false;
 let suppressSettingsDirtyTracking = false;
 const SETTINGS_LOCAL_STORAGE_KEY = "markdown-notes-app-settings";
+let lastSettingsSaveCompletedAtMs = 0;
+const SETTINGS_DOUBLE_SAVE_CLOSE_WINDOW_MS = 4000;
 
 const VALID_MODES = new Set(["view", "edit", "export", "download"]);
 const DEFAULT_MODE = "view";
+const TREE_AUTO_REFRESH_INTERVAL_MS = 15000;
 let desiredTreeSelectionPath = null;
 const NOTE_MODE_ACTIONS = {
   export: handleNoteExport,
@@ -462,6 +465,103 @@ async function loadAutoSyncStatus() {
   }
 }
 
+async function runManualCommitAndPush() {
+  try {
+    const response = await fetch("/api/versioning/notes/commit-and-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      let detail = `request failed with status ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data && data.detail) {
+          detail = data.detail;
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+      showError(`Commit & push failed: ${detail}`);
+      return;
+    }
+
+    const data = await response.json();
+    const committed = Boolean(data.committed);
+    const pushed = Boolean(data.pushed);
+    const pushInfo = data.push || {};
+    const pushStatus = String(pushInfo.status || "");
+
+    let message;
+
+    if (pushStatus === "error" && pushInfo.detail) {
+      message = `Commit & push: push error - ${pushInfo.detail}`;
+    } else if (!committed && !pushed) {
+      message = "Commit & push: no changes to commit.";
+    } else if (committed && !pushed) {
+      message = "Commit & push: committed local changes; push skipped.";
+    } else if (!committed && pushed) {
+      message = "Commit & push: pushed existing commits.";
+    } else {
+      message = "Commit & push: committed and pushed notes successfully.";
+    }
+
+    showError(message);
+  } catch (error) {
+    console.error("/api/versioning/notes/commit-and-push request failed", error);
+    showError("Commit & push failed due to a network or server error.");
+  }
+
+  void loadAutoSyncStatus();
+}
+
+async function runManualPull() {
+  try {
+    const response = await fetch("/api/versioning/notes/pull", {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      let detail = `request failed with status ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data && data.detail) {
+          detail = data.detail;
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+      showError(`Pull failed: ${detail}`);
+      return;
+    }
+
+    const data = await response.json();
+    const status = String(data.status || "unknown");
+
+    let message;
+    if (status === "ok") {
+      message = "Pull: completed successfully.";
+    } else if (status === "skipped") {
+      const detail = data.detail || "operation skipped.";
+      message = `Pull: skipped - ${detail}`;
+    } else if (status === "conflict") {
+      const branch = data.conflictBranch || "conflict branch";
+      message = `Pull: conflict detected; local changes preserved on ${branch}.`;
+    } else {
+      const errorText = data.error || data.detail;
+      message = errorText ? `Pull failed: ${errorText}` : "Pull failed.";
+    }
+
+    showError(message);
+  } catch (error) {
+    console.error("/api/versioning/notes/pull request failed", error);
+    showError("Pull failed due to a network or server error.");
+  }
+
+  void loadAutoSyncStatus();
+}
+
 function applyAllSettings(settings, options = {}) {
   const { resetDirty = false } = options;
   if (!settings) return;
@@ -744,6 +844,18 @@ function buildUpdatedSettingsFromVersioningSection(baseSettings) {
 }
 
 async function handleSettingsSave() {
+  const now = Date.now();
+
+  if (
+    isSettingsModalOpen() &&
+    !settingsDirty &&
+    lastSettingsSaveCompletedAtMs &&
+    now - lastSettingsSaveCompletedAtMs <= SETTINGS_DOUBLE_SAVE_CLOSE_WINDOW_MS
+  ) {
+    closeSettingsModal();
+    return;
+  }
+
   const current = notebookSettings || {};
   const payload = buildUpdatedSettingsFromAllSections(current);
 
@@ -763,6 +875,7 @@ async function handleSettingsSave() {
     notebookSettings = settings;
     saveSettingsToLocalCache(settings);
     applyAllSettings(settings, { resetDirty: true });
+    lastSettingsSaveCompletedAtMs = Date.now();
   } catch (error) {
     console.error("/api/settings (save) request failed", error);
     showError("Unable to save settings.");
@@ -1266,6 +1379,82 @@ function mapApiNodesToFancytree(nodes) {
   });
 }
 
+function initializeFancytree(treeRootEl, source) {
+  const $tree = window.jQuery(treeRootEl);
+
+  $tree.fancytree({
+    extensions: ["persist", "edit"],
+    source,
+    autoScroll: true,
+    clickFolderMode: 3,
+    focusOnSelect: true,
+    persist: {
+      expandLazy: true,
+      store: "local",
+      types: "expanded",
+    },
+    edit: {
+      triggerStart: [
+        "f2",
+        "mac+enter",
+      ],
+      beforeEdit: (_event, data) => {
+        return canRenameTreeNode(data.node);
+      },
+      edit: (_event, data) => {
+        prepareInlineRenameInput(data.node, data.input);
+      },
+      save: (_event, data) => {
+        return handleInlineRenameSave(data.node, data.input);
+      },
+      close: (_event, data) => {
+        if (!data.save) {
+          return;
+        }
+        const node = data.node;
+        const nodeType = node?.data?.type;
+        const path = node?.data?.path;
+        if (!path || !canRenameType(nodeType)) {
+          return;
+        }
+        const finalName = data.input?.val() ?? "";
+        const destinationPath = buildDestinationPath(path, finalName);
+        if (destinationPath === path) {
+          return;
+        }
+        void renameItem(path, destinationPath, nodeType);
+      },
+    },
+    activate: (event, data) => {
+      const node = data.node;
+      if (!node || !node.data) return;
+
+      const nodeType = node.data.type;
+      const nodePath = node.data.path;
+
+      if (!nodePath) return;
+
+      if (nodeType === "note") {
+        void loadNote(nodePath);
+      } else if (nodeType === "image") {
+        loadImage(nodePath);
+      }
+    },
+    keydown: (event, data) => {
+      if (event.key === "F2") {
+        event.preventDefault();
+        void handleRenameSelectedItem();
+      } else if (event.key === "Delete") {
+        event.preventDefault();
+        void handleDeleteSelectedItem();
+      }
+    },
+  });
+
+  treeInitialized = true;
+  syncTreeSelection();
+}
+
 function setupNewItemButtons() {
   const newFolderBtn = document.getElementById("new-folder-btn");
   if (newFolderBtn) {
@@ -1286,7 +1475,9 @@ async function loadTree() {
   const treeRootEl = document.getElementById("tree");
   if (!treeRootEl) return;
 
-  treeRootEl.textContent = "Loading tree…";
+  if (!treeInitialized) {
+    treeRootEl.textContent = "Loading tree…";
+  }
 
   try {
     const response = await fetch("/api/tree");
@@ -1298,8 +1489,6 @@ async function loadTree() {
     const data = await response.json();
     const nodes = Array.isArray(data.nodes) ? data.nodes : [];
     const source = mapApiNodesToFancytree(nodes);
-
-    treeRootEl.textContent = "";
 
     if (!window.jQuery) {
       console.error("jQuery is not available; Fancytree cannot be initialized.");
@@ -1318,84 +1507,22 @@ async function loadTree() {
     }
 
     if (!treeInitialized) {
-      $tree.fancytree({
-        extensions: ["persist", "edit"],
-        source,
-        autoScroll: true,
-        clickFolderMode: 3,
-        focusOnSelect: true,
-        persist: {
-          expandLazy: true,
-          store: "local",
-          types: "expanded",
-        },
-        edit: {
-          triggerStart: [
-            "clickActive",
-            "dblclick",
-            "f2",
-            "mac+enter",
-            "shift+click",
-          ],
-          beforeEdit: (_event, data) => {
-            return canRenameTreeNode(data.node);
-          },
-          edit: (_event, data) => {
-            prepareInlineRenameInput(data.node, data.input);
-          },
-          save: (_event, data) => {
-            return handleInlineRenameSave(data.node, data.input);
-          },
-          close: (_event, data) => {
-            if (!data.save) {
-              return;
-            }
-            const node = data.node;
-            const nodeType = node?.data?.type;
-            const path = node?.data?.path;
-            if (!path || !canRenameType(nodeType)) {
-              return;
-            }
-            const finalName = data.input?.val() ?? "";
-            const destinationPath = buildDestinationPath(path, finalName);
-            if (destinationPath === path) {
-              return;
-            }
-            void renameItem(path, destinationPath, nodeType);
-          },
-        },
-        activate: (event, data) => {
-          const node = data.node;
-          if (!node || !node.data) return;
-
-          const nodeType = node.data.type;
-          const nodePath = node.data.path;
-
-          if (!nodePath) return;
-
-          if (nodeType === "note") {
-            void loadNote(nodePath);
-          } else if (nodeType === "image") {
-            loadImage(nodePath);
-          }
-        },
-        keydown: (event, data) => {
-          if (event.key === "F2") {
-            event.preventDefault();
-            void handleRenameSelectedItem();
-          } else if (event.key === "Delete") {
-            event.preventDefault();
-            void handleDeleteSelectedItem();
-          }
-        },
-      });
-      treeInitialized = true;
-      syncTreeSelection();
+      treeRootEl.textContent = "";
+      initializeFancytree(treeRootEl, source);
     } else {
       const tree = getFancytreeInstance();
       if (tree) {
-        await tree.reload(source);
-        syncTreeSelection();
+        try {
+          await tree.reload(source);
+          syncTreeSelection();
+        } catch (reloadError) {
+          console.error("Fancytree reload failed; reinitializing tree", reloadError);
+          treeRootEl.textContent = "";
+          initializeFancytree(treeRootEl, source);
+        }
+      } else {
+        treeRootEl.textContent = "";
+        initializeFancytree(treeRootEl, source);
       }
     }
   } catch (error) {
@@ -2311,6 +2438,13 @@ function openSettingsModal() {
   void loadAutoSyncStatus();
 }
 
+function isSettingsModalOpen() {
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return false;
+
+  return !overlay.classList.contains("hidden");
+}
+
 function closeSettingsModal() {
   const overlay = document.getElementById("settings-overlay");
   if (!overlay) return;
@@ -2345,7 +2479,7 @@ function resetSettingsDirtyState() {
 
   const saveBtn = document.getElementById("settings-footer-save-btn");
   if (saveBtn) {
-    saveBtn.disabled = true;
+    saveBtn.disabled = false;
   }
 
   const overlay = document.getElementById("settings-overlay");
@@ -2398,6 +2532,10 @@ function setupSettingsModal() {
   const autoSyncStatusBtn = document.getElementById(
     "settings-refresh-auto-sync-status-btn",
   );
+  const manualCommitPushBtn = document.getElementById(
+    "settings-manual-commit-push-btn",
+  );
+  const manualPullBtn = document.getElementById("settings-manual-pull-btn");
 
   if (!settingsBtn || !overlay || !closeBtn || !saveBtn) return;
 
@@ -2425,9 +2563,21 @@ function setupSettingsModal() {
     });
   }
 
-   if (autoSyncStatusBtn) {
+  if (autoSyncStatusBtn) {
     autoSyncStatusBtn.addEventListener("click", () => {
       void loadAutoSyncStatus();
+    });
+  }
+
+  if (manualCommitPushBtn) {
+    manualCommitPushBtn.addEventListener("click", () => {
+      void runManualCommitAndPush();
+    });
+  }
+
+  if (manualPullBtn) {
+    manualPullBtn.addEventListener("click", () => {
+      void runManualPull();
     });
   }
 
@@ -2511,6 +2661,10 @@ window.addEventListener("DOMContentLoaded", () => {
   setupSearch();
   initializeNavigationFromUrl();
   setupViewerScrollSync();
+});
+
+window.addEventListener("focus", () => {
+  void loadTree();
 });
 
 window.addEventListener("popstate", () => {
