@@ -1,0 +1,17 @@
+networks:
+  comm_net:
+    external: true
+    name: comm_net
+
+services:
+  app:
+    build: .
+    image: markdown-notes-app:latest
+    container_name: markdown-notes-app
+    volumes:
+      - .env:/app/.env:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    networks:
+      - comm_net
