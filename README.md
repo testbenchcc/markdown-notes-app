@@ -19,8 +19,10 @@ The goal is to preserve the existing layout, button placements, search position,
 - Minimal SPA shell under `static/` (`index.html`, `styles.css`, `app.js`) served from the FastAPI app at `/`.
 - Frontend currently uses the legacy layout structure (nav pane, divider, content pane), calls `/health` to display basic status information, and loads note content into the viewer when a note is selected from the tree using `GET /api/notes/{note_path}`.
 - Left-hand notes tree is implemented with **Fancytree**, backed by `/api/tree` (v0.4.0 work-increment).
+- The UI now loads the **skin-lion** Fancytree stylesheet from `/static/skin-lion/` so the navigation pane matches the desired appearance without relying on vendor-hosted assets.
 - Client navigation is now fully **GET-based** (v0.4.1): selecting notes or switching modes updates `?note=...&mode=...` in the URL, browser history works with back/forward, and direct links deep-link the UI state.
 - Opening a note automatically expands, focuses, and selects its tree node so the navigation pane stays in sync with the URL-driven view (v0.4.1).
+- Tree renames now use the Fancytree inline editor (v0.4.2) so double-click, Shift+click, clickActive, and F2 all trigger an in-place rename that validates input before calling the existing rename endpoints, with the previous prompt kept as a fallback, and the inline input adopts the dark theme styles for a cohesive appearance.
 - Minimal settings backend in `main.py`:
   - `NotebookSettings` model (currently `tabLength` only) persisted to `.notebook-settings.json` under the notes root.
   - `/api/settings` (`GET`/`PUT`) to load and validate settings, wiring `tabLength` into server-side markdown rendering.
@@ -238,6 +240,7 @@ The goal is to preserve the existing layout, button placements, search position,
 - **Mode switching and scroll sync**
   - The app tracks `mode = "view" | "edit"` and shows/hides viewer/editor accordingly.
   - Scroll position (as percentage) is synchronized between viewer and editor when switching modes.
+  - When Monaco loads lazily, the editor initializes from the currently loaded note so entering edit mode never shows a blank document.
 
 - **Keyboard shortcuts** (per roadmap + `settings-modal.html`)
   - Editing shortcuts for bold/italics/links/code, lists, headings.

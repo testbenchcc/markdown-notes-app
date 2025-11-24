@@ -1,4 +1,5 @@
 let monacoEditor = null;
+let monacoLoading = false;
 let markdownRenderer = null;
 let currentNotePath = null;
 let currentNoteContent = "";
@@ -202,7 +203,7 @@ function updatePreviewFromEditor() {
 }
 
 function initMonacoEditor() {
-  if (monacoEditor) return;
+  if (monacoEditor || monacoLoading) return;
 
   const editorContainer = document.getElementById("editor");
   if (!editorContainer) return;
@@ -214,7 +215,9 @@ function initMonacoEditor() {
 
   require.config({ paths: { vs: "/vendor/monaco/vs" } });
 
+  monacoLoading = true;
   require(["vs/editor/editor.main"], () => {
+    monacoLoading = false;
     monacoEditor = monaco.editor.create(editorContainer, {
       value: "",
       language: "markdown",
@@ -225,6 +228,13 @@ function initMonacoEditor() {
       wordWrap: "on",
       lineNumbers: "on",
     });
+
+    if (currentNotePath) {
+      monacoEditor.setValue(currentNoteContent || "");
+      if (currentMode === "edit") {
+        updatePreviewFromEditor();
+      }
+    }
 
     monacoEditor.onDidChangeModelContent(() => {
       currentNoteContent = monacoEditor.getValue();
@@ -481,12 +491,19 @@ function toSafePath(relPath) {
 
 function getFancytreeInstance() {
   const treeRootEl = document.getElementById("tree");
-  if (!treeRootEl || !window.jQuery) return null;
+  if (!treeRootEl || !window.jQuery || !treeInitialized) return null;
 
-  const $tree = window.jQuery(treeRootEl);
-  if (typeof $tree.fancytree !== "function") return null;
+  const $ = window.jQuery;
+  if (!$.ui || !$.ui.fancytree || typeof $.ui.fancytree.getTree !== "function") {
+    return null;
+  }
 
-  return $tree.fancytree("getTree");
+  try {
+    return $.ui.fancytree.getTree(treeRootEl);
+  } catch (error) {
+    console.error("Fancytree getTree failed before initialization", error);
+    return null;
+  }
 }
 
 function selectTreeNodeByPath(path) {
@@ -592,16 +609,50 @@ async function loadTree() {
 
     if (!treeInitialized) {
       $tree.fancytree({
-        extensions: ["persist"],
+        extensions: ["persist", "edit"],
         source,
         autoScroll: true,
         clickFolderMode: 3,
-        tabbable: true,
         focusOnSelect: true,
         persist: {
           expandLazy: true,
           store: "local",
           types: "expanded",
+        },
+        edit: {
+          triggerStart: [
+            "clickActive",
+            "dblclick",
+            "f2",
+            "mac+enter",
+            "shift+click",
+          ],
+          beforeEdit: (_event, data) => {
+            return canRenameTreeNode(data.node);
+          },
+          edit: (_event, data) => {
+            prepareInlineRenameInput(data.node, data.input);
+          },
+          save: (_event, data) => {
+            return handleInlineRenameSave(data.node, data.input);
+          },
+          close: (_event, data) => {
+            if (!data.save) {
+              return;
+            }
+            const node = data.node;
+            const nodeType = node?.data?.type;
+            const path = node?.data?.path;
+            if (!path || !canRenameType(nodeType)) {
+              return;
+            }
+            const finalName = data.input?.val() ?? "";
+            const destinationPath = buildDestinationPath(path, finalName);
+            if (destinationPath === path) {
+              return;
+            }
+            void renameItem(path, destinationPath, nodeType);
+          },
         },
         activate: (event, data) => {
           const node = data.node;
@@ -631,7 +682,7 @@ async function loadTree() {
       treeInitialized = true;
       syncTreeSelection();
     } else {
-      const tree = $tree.fancytree("getTree");
+      const tree = getFancytreeInstance();
       if (tree) {
         await tree.reload(source);
         syncTreeSelection();
@@ -789,16 +840,140 @@ function getSelectedTreeItem() {
   return tree.getActiveNode();
 }
 
+function canRenameType(type) {
+  return type === "folder" || type === "note";
+}
+
+function canRenameTreeNode(node) {
+  if (!node || !node.data) return false;
+  return canRenameType(node.data.type);
+}
+
+function sanitizeNameInput(name) {
+  return (name ?? "").trim();
+}
+
+function containsIllegalNameChars(name) {
+  return /[\\/]/.test(name);
+}
+
+function ensureNoteFileName(name) {
+  return name.toLowerCase().endsWith(".md") ? name : `${name}.md`;
+}
+
+function buildDestinationPath(sourcePath, destinationName) {
+  const parts = sourcePath.split("/");
+  if (parts.length === 0) {
+    return destinationName;
+  }
+  parts[parts.length - 1] = destinationName;
+  return parts.join("/");
+}
+
+function prepareInlineRenameInput(node, $input) {
+  if (!$input || typeof $input.val !== "function" || !node) return;
+  const nodeType = node.data?.type;
+  if (nodeType === "note") {
+    const title = node.title || "";
+    if (title.toLowerCase().endsWith(".md")) {
+      $input.val(title.slice(0, -3));
+    }
+  }
+  queueMicrotask(() => {
+    const el = $input.get ? $input.get(0) : null;
+    if (el && typeof el.select === "function") {
+      el.select();
+    }
+  });
+}
+
+function handleInlineRenameSave(node, $input) {
+  if (!$input || typeof $input.val !== "function" || !node) {
+    return false;
+  }
+  if (!canRenameTreeNode(node)) {
+    return false;
+  }
+  const nodeType = node.data?.type;
+  const path = node.data?.path || "";
+  if (!path) {
+    return false;
+  }
+  const rawValue = sanitizeNameInput($input.val());
+  if (!rawValue) {
+    showError("Name cannot be empty.");
+    return false;
+  }
+  if (containsIllegalNameChars(rawValue)) {
+    showError("Names cannot contain slashes.");
+    return false;
+  }
+  const finalName = nodeType === "note" ? ensureNoteFileName(rawValue) : rawValue;
+  $input.val(finalName);
+  return true;
+}
+
+async function renameItem(sourcePath, destinationPath, nodeType) {
+  if (!sourcePath || !destinationPath || sourcePath === destinationPath) {
+    return;
+  }
+
+  const endpoint = nodeType === "folder" ? "/api/folders/rename" : "/api/notes/rename";
+  const body = JSON.stringify({ sourcePath, destinationPath });
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Rename request failed with status ${response.status}`);
+    }
+
+    let newPath = destinationPath;
+    if (nodeType === "note") {
+      const data = await response.json();
+      if (typeof data?.path === "string") {
+        newPath = data.path;
+      }
+    }
+
+    await loadTree();
+
+    if (nodeType === "note" && currentNotePath === sourcePath) {
+      void loadNote(newPath, { replaceUrl: true });
+    }
+  } catch (error) {
+    console.error("Rename request failed", error);
+    showError("Unable to rename item.");
+    await loadTree();
+  }
+}
+
 async function handleRenameSelectedItem() {
   const item = getSelectedTreeItem();
   if (!item) return;
 
+  if (typeof item.editStart === "function") {
+    item.editStart();
+    return;
+  }
+
+  await promptRenameFallback(item);
+}
+
+async function promptRenameFallback(item) {
   const path = item.data?.path || "";
   if (!path) return;
 
+  const nodeType = item.data?.type;
+  if (!canRenameType(nodeType)) return;
+
   const parts = path.split("/");
   const currentName = parts[parts.length - 1] || path;
-  const isNote = item.data?.type === "note";
+  const isNote = nodeType === "note";
 
   const baseName =
     isNote && currentName.toLowerCase().endsWith(".md")
@@ -811,43 +986,14 @@ async function handleRenameSelectedItem() {
   const trimmed = input.trim();
   if (!trimmed) return;
 
-  parts[parts.length - 1] = trimmed;
-  const destPath = parts.join("/");
-
-  try {
-    if (isNote) {
-      const response = await fetch("/api/notes/rename", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourcePath: path, destinationPath: destPath }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Rename note failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      await loadTree();
-      if (data.path) {
-        void loadNote(data.path);
-      }
-    } else if (item.data?.type === "folder") {
-      const response = await fetch("/api/folders/rename", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourcePath: path, destinationPath: destPath }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Rename folder failed with status ${response.status}`);
-      }
-
-      await loadTree();
-    }
-  } catch (error) {
-    console.error("Rename request failed", error);
-    showError("Unable to rename item.");
+  if (containsIllegalNameChars(trimmed)) {
+    showError("Names cannot contain slashes.");
+    return;
   }
+
+  const finalName = isNote ? ensureNoteFileName(trimmed) : trimmed;
+  const destPath = buildDestinationPath(path, finalName);
+  await renameItem(path, destPath, nodeType);
 }
 
 async function handleDeleteSelectedItem() {
