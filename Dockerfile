@@ -15,6 +15,9 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY package.json ./
+RUN npm install
+
 COPY . .
 
 EXPOSE 8000
