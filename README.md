@@ -96,7 +96,7 @@ The goal is to preserve the existing layout, button placements, search position,
 - **Model**
   - `NotebookSettings` tracks editor, image, theme, auto-save, and versioning-related options, including:
     - `editorSpellcheck`, `tabLength`, `autoSaveIntervalSeconds`.
-    - `theme`, `exportTheme`, `indexPageTitle`.
+    - `theme`, `exportTheme`, `indexPageTitle`, `timeZone`.
     - Image display & storage options and size limits.
     - Date/time format strings for shortcuts.
     - Auto-commit/pull notes repo and pull interval.

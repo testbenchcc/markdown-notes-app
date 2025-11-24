@@ -168,6 +168,69 @@ function renderViewerHtml(html) {
   }
 }
 
+function parseUtcIsoToDate(isoString) {
+  if (!isoString || typeof isoString !== "string") return null;
+
+  const trimmed = isoString.trim();
+  if (!trimmed) return null;
+
+  let safe = trimmed;
+  const match = safe.match(/^(.*\d)(\.\d+)(Z?)$/);
+  if (match && match[2].length > 4) {
+    const frac = match[2].slice(0, 4);
+    safe = match[1] + frac + match[3];
+  }
+
+  const timestamp = Date.parse(safe);
+  if (Number.isNaN(timestamp)) return null;
+  return new Date(timestamp);
+}
+
+function formatAutoSyncTimestamp(isoString, timeZone) {
+  if (typeof Intl === "undefined" || typeof Intl.DateTimeFormat !== "function") {
+    return isoString;
+  }
+
+  const date = parseUtcIsoToDate(isoString);
+  if (!date) return isoString;
+
+  const options = {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  };
+
+  let formatter = null;
+  let targetTimeZone = null;
+
+  if (timeZone && typeof timeZone === "string" && timeZone.trim()) {
+    try {
+      targetTimeZone = timeZone.trim();
+      formatter = new Intl.DateTimeFormat(undefined, {
+        ...options,
+        timeZone: targetTimeZone,
+      });
+    } catch {
+      formatter = null;
+      targetTimeZone = null;
+    }
+  }
+
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(undefined, options);
+  }
+
+  const formatted = formatter.format(date);
+  if (targetTimeZone) {
+    return `${formatted} [${targetTimeZone}]`;
+  }
+
+  return formatted;
+}
+
 function applyImageSettingsFromSettings(settings) {
   if (!settings || typeof document === "undefined") return;
 
@@ -185,6 +248,19 @@ function applyImageSettingsFromSettings(settings) {
   const widthValue = fitToNoteWidth ? "100%" : `${maxWidth}px`;
   root.style.setProperty("--viewer-image-max-width", widthValue);
   root.style.setProperty("--viewer-image-max-height", `${maxHeight}px`);
+}
+
+function applySettingsToGeneralSection(settings) {
+  if (!settings || typeof document === "undefined") return;
+
+  const timeZoneEl = document.getElementById("settings-time-zone");
+  if (timeZoneEl) {
+    const value =
+      settings.timeZone && typeof settings.timeZone === "string"
+        ? settings.timeZone
+        : "";
+    timeZoneEl.value = value;
+  }
 }
 
 function applySettingsToEditorSection(settings) {
@@ -399,6 +475,12 @@ function applyAutoSyncStatusToUi(payload) {
     return;
   }
 
+  const settings = payload.settings || {};
+  const timeZone =
+    settings && typeof settings.timeZone === "string" && settings.timeZone.trim()
+      ? settings.timeZone.trim()
+      : null;
+
   const state = payload.state || {};
   const commit = state.commit || {};
   const pull = state.pull || {};
@@ -409,19 +491,25 @@ function applyAutoSyncStatusToUi(payload) {
 
   const commitParts = [`Commit: ${String(commit.lastStatus || "idle")}`];
   if (commit.lastRunCompletedAt) {
-    commitParts.push(`last at ${commit.lastRunCompletedAt}`);
+    commitParts.push(
+      `last at ${formatAutoSyncTimestamp(commit.lastRunCompletedAt, timeZone)}`,
+    );
   }
   lines.push(commitParts.join(" "));
 
   const pullParts = [`Pull: ${String(pull.lastStatus || "idle")}`];
   if (pull.lastRunCompletedAt) {
-    pullParts.push(`last at ${pull.lastRunCompletedAt}`);
+    pullParts.push(
+      `last at ${formatAutoSyncTimestamp(pull.lastRunCompletedAt, timeZone)}`,
+    );
   }
   lines.push(pullParts.join(" "));
 
   const pushParts = [`Push: ${String(push.lastStatus || "idle")}`];
   if (push.lastRunCompletedAt) {
-    pushParts.push(`last at ${push.lastRunCompletedAt}`);
+    pushParts.push(
+      `last at ${formatAutoSyncTimestamp(push.lastRunCompletedAt, timeZone)}`,
+    );
   }
   lines.push(pushParts.join(" "));
 
@@ -429,7 +517,12 @@ function applyAutoSyncStatusToUi(payload) {
     const branch = conflict.conflictBranch || "unknown branch";
     lines.push(`Conflict: active on ${branch}`);
   } else if (conflict && conflict.lastConflictAt) {
-    lines.push(`Conflict: last recorded at ${conflict.lastConflictAt}`);
+    lines.push(
+      `Conflict: last recorded at ${formatAutoSyncTimestamp(
+        conflict.lastConflictAt,
+        timeZone,
+      )}`,
+    );
   }
 
   statusEl.textContent = lines.join("\n");
@@ -566,6 +659,7 @@ function applyAllSettings(settings, options = {}) {
   const { resetDirty = false } = options;
   if (!settings) return;
   suppressSettingsDirtyTracking = true;
+  applySettingsToGeneralSection(settings);
   applyImageSettingsFromSettings(settings);
   applySettingsToFilesAndImagesSection(settings);
   applySettingsToEditorSection(settings);
@@ -762,10 +856,29 @@ function buildUpdatedSettingsFromAppearanceSection(baseSettings) {
 
 function buildUpdatedSettingsFromAllSections(baseSettings) {
   let next = baseSettings || {};
+  next = buildUpdatedSettingsFromGeneralSection(next);
   next = buildUpdatedSettingsFromFilesAndImagesSection(next);
   next = buildUpdatedSettingsFromEditorSection(next);
   next = buildUpdatedSettingsFromAppearanceSection(next);
-   next = buildUpdatedSettingsFromVersioningSection(next);
+  next = buildUpdatedSettingsFromVersioningSection(next);
+  return next;
+}
+
+function buildUpdatedSettingsFromGeneralSection(baseSettings) {
+  if (typeof document === "undefined") return baseSettings || {};
+
+  const next = { ...(baseSettings || {}) };
+
+  const timeZoneEl = document.getElementById("settings-time-zone");
+  if (timeZoneEl) {
+    const raw = timeZoneEl.value.trim();
+    if (!raw) {
+      next.timeZone = null;
+    } else {
+      next.timeZone = raw;
+    }
+  }
+
   return next;
 }
 

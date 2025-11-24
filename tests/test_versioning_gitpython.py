@@ -96,3 +96,18 @@ def test_pull_without_remote_is_skipped(tmp_path):
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "skipped"
+
+
+def test_auto_sync_status_includes_time_zone_from_settings(tmp_path):
+    main = reload_main_with_temp_root(tmp_path)
+
+    client = TestClient(main.app)
+
+    resp = client.put("/api/settings", json={"timeZone": "UTC"})
+    assert resp.status_code == 200
+
+    resp = client.get("/api/versioning/notes/auto-sync-status")
+    assert resp.status_code == 200
+    data = resp.json()
+    settings = data.get("settings") or {}
+    assert settings.get("timeZone") == "UTC"

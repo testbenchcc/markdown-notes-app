@@ -105,6 +105,8 @@ class NotebookSettings(BaseModel):
     autoPushEnabled: bool = False
     autoPushIntervalSeconds: Optional[conint(gt=0)] = None
 
+    timeZone: Optional[str] = None
+
     model_config = ConfigDict(extra="ignore")
 
 
@@ -1061,6 +1063,7 @@ def versioning_notes_auto_sync_status() -> Dict[str, Any]:
             "autoPullIntervalSeconds": settings.autoPullIntervalSeconds,
             "autoPushEnabled": settings.autoPushEnabled,
             "autoPushIntervalSeconds": settings.autoPushIntervalSeconds,
+            "timeZone": settings.timeZone,
         },
         "state": state,
     }

@@ -112,3 +112,26 @@ def test_get_note_uses_settings_tab_length(tmp_path):
         assert captured.get("tab_length") == 7
     finally:
         main._render_markdown_html = original_render  # type: ignore[assignment]
+
+
+def test_settings_includes_and_updates_time_zone(tmp_path):
+    main = reload_main_with_temp_root(tmp_path)
+
+    client = TestClient(main.app)
+
+    resp = client.get("/api/settings")
+    assert resp.status_code == 200
+    data = resp.json()
+    settings = data["settings"]
+    assert "timeZone" in settings
+    assert settings["timeZone"] is None
+
+    resp = client.put("/api/settings", json={"timeZone": "America/Denver"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["settings"]["timeZone"] == "America/Denver"
+
+    resp = client.get("/api/settings")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["settings"]["timeZone"] == "America/Denver"

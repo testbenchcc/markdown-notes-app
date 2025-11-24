@@ -327,6 +327,13 @@ $(function(){
 
  ---
 
+ ## v0.8.3 - Time zone setting
+
+ - [x] Add a time zone setting under general.
+ - [x] Adjust any times used to the set timezone, this includes Auto-sync status return.
+
+ ---
+
  ## v0.9.0 – UX Polish, Shortcuts, and Theming
 
  - **Frontend**
