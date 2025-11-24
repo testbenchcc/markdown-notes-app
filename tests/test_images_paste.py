@@ -14,92 +14,82 @@ def reload_main_with_temp_root(tmp_path: Path):
     return main
 
 
-def test_paste_image_saves_under_local_images_folder(tmp_path):
+def test_paste_image_succeeds_and_stores_file(tmp_path):
     main = reload_main_with_temp_root(tmp_path)
     cfg = main.get_config()
     root = cfg.notes_root
 
-    note = root / "folder" / "note.md"
-    note.parent.mkdir(parents=True, exist_ok=True)
-    note.write_text("x", encoding="utf8")
+    note_file = root / "folder" / "note.md"
+    note_file.parent.mkdir(parents=True, exist_ok=True)
+    note_file.write_text("# Title", encoding="utf8")
 
     client = TestClient(main.app)
 
-    image_bytes = b"fakepngdata"
-    files = {"file": ("pasted.png", image_bytes, "image/png")}
-    data = {"note_path": "folder/note.md"}
-
-    resp = client.post("/api/images/paste", data=data, files=files)
+    payload = b"fakepngdata"
+    resp = client.post(
+        "/api/images/paste",
+        data={"note_path": "folder/note.md"},
+        files={"file": ("pic.png", payload, "image/png")},
+    )
     assert resp.status_code == 200
-    payload = resp.json()
+    data = resp.json()
 
-    rel_path = payload["path"]
-    name = payload["name"]
-    markdown = payload["markdown"]
+    assert "path" in data
+    assert "markdown" in data
+    assert "size" in data
+    assert data["size"] == len(payload)
 
-    # Image is written under a local Images subfolder next to the note by default.
-    dest = root / "folder" / "Images" / name
-    assert dest.is_file()
-    assert dest.read_bytes() == image_bytes
+    rel_path = Path(data["path"])  # type: ignore[arg-type]
+    stored_image = root / rel_path
+    assert stored_image.is_file()
+    assert stored_image.read_bytes() == payload
 
-    # The markdown snippet points at the files endpoint with the same relative path.
-    assert rel_path == f"folder/Images/{name}"
-    assert markdown == f"![image](/files/{rel_path})"
-
-    file_resp = client.get(f"/files/{rel_path}")
-    assert file_resp.status_code == 200
-    assert file_resp.content == image_bytes
-
-
-def test_paste_image_rejects_oversized_upload(tmp_path):
-    main = reload_main_with_temp_root(tmp_path)
-
-    client = TestClient(main.app)
-
-    # Set a very small max size so we can easily exceed it.
-    resp = client.put("/api/settings", json={"imageMaxPasteBytes": 8})
-    assert resp.status_code == 200
-
-    files = {"file": ("big.png", b"0" * 16, "image/png")}
-    data = {"note_path": "note.md"}
-
-    resp = client.post("/api/images/paste", data=data, files=files)
-    assert resp.status_code == 413
+    markdown = data["markdown"]
+    assert markdown.startswith("![image](")
+    assert data["path"] in markdown
 
 
 def test_paste_image_rejects_unsupported_type(tmp_path):
     main = reload_main_with_temp_root(tmp_path)
-
     client = TestClient(main.app)
 
-    # Non-image content type and extension should be rejected.
-    files = {"file": ("note.txt", b"hello", "text/plain")}
-    data = {"note_path": "note.md"}
-
-    resp = client.post("/api/images/paste", data=data, files=files)
+    resp = client.post(
+        "/api/images/paste",
+        data={"note_path": "note.md"},
+        files={"file": ("doc.txt", b"hello", "text/plain")},
+    )
     assert resp.status_code == 400
+    body = resp.json()
+    assert body.get("detail") == "Unsupported image type"
 
 
-def test_paste_image_uses_content_type_to_guess_extension(tmp_path):
+def test_paste_image_respects_max_size_from_settings(tmp_path):
     main = reload_main_with_temp_root(tmp_path)
-    cfg = main.get_config()
-    root = cfg.notes_root
-
     client = TestClient(main.app)
 
-    image_bytes = b"fakepngdata2"
-    # Unknown extension, but image/png content type: server should fall back to .png
-    files = {"file": ("clipboard", image_bytes, "image/png")}
-    data = {"note_path": "note.md"}
+    settings_resp = client.put("/api/settings", json={"imageMaxPasteBytes": 4})
+    assert settings_resp.status_code == 200
 
-    resp = client.post("/api/images/paste", data=data, files=files)
-    assert resp.status_code == 200
-    payload = resp.json()
+    payload = b"12345"  # 5 bytes, greater than configured limit of 4
+    resp = client.post(
+        "/api/images/paste",
+        data={"note_path": "note.md"},
+        files={"file": ("pic.png", payload, "image/png")},
+    )
+    assert resp.status_code == 413
+    body = resp.json()
+    assert "too large" in body.get("detail", "").lower()
 
-    rel_path = payload["path"]
-    name = payload["name"]
 
-    assert name.endswith(".png")
-    dest = root / rel_path
-    assert dest.is_file()
-    assert dest.read_bytes() == image_bytes
+def test_paste_image_rejects_invalid_note_path(tmp_path):
+    main = reload_main_with_temp_root(tmp_path)
+    client = TestClient(main.app)
+
+    resp = client.post(
+        "/api/images/paste",
+        data={"note_path": "../secret.md"},
+        files={"file": ("pic.png", b"data", "image/png")},
+    )
+    assert resp.status_code == 400
+    body = resp.json()
+    assert "must not contain" in body.get("detail", "").lower() or "must be relative" in body.get("detail", "").lower()

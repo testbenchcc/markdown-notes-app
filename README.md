@@ -97,7 +97,7 @@ The goal is to preserve the existing layout, button placements, search position,
   - `NotebookSettings` tracks editor, image, theme, auto-save, and versioning-related options, including:
     - `editorSpellcheck`, `tabLength`, `autoSaveIntervalSeconds`.
     - `theme`, `exportTheme`, `indexPageTitle`.
-    - Image display & storage options and size limits (`imageStorageMode`, `imageStorageSubfolder`, `localImageSubfolderName`, `imageMaxWidthPx`, `imageMaxHeightPx`, `imageMaxPasteBytes`).
+    - Image display & storage options and size limits.
     - Date/time format strings for shortcuts.
     - Auto-commit/pull notes repo and pull interval.
 
@@ -144,8 +144,8 @@ The goal is to preserve the existing layout, button placements, search position,
 - **Paste-upload images**
   - `POST /api/images/paste` with multipart `note_path` + `file`:
     - Validates file type.
-    - Enforces max size based on settings.
-    - Stores the file under a path derived from `imageStorageMode` (`flat`, `matched`, or `local`) and related image storage settings.
+    - Enforces max size based on settings (`imageMaxPasteBytes`, default 10MB).
+    - Stores the file under image storage settings (`imageStorageMode`, `imageStorageSubfolder`, `imageLocalSubfolderName`).
     - Returns markdown snippet like `![image](/files/relative/path)` to be inserted into notes.
 
 ### Search
@@ -267,10 +267,9 @@ The goal is to preserve the existing layout, button placements, search position,
   - Clipboard is scanned for image items.
   - If no note is selected, paste is rejected with a user-facing error.
   - For each image:
-    - Enforced against `imageMaxPasteBytes` from settings; oversized uploads are rejected with a clear error message.
+    - Enforced against `imageMaxPasteBytes` from settings, with an optional confirm dialog when exceeded.
     - Uploaded via `/api/images/paste`.
     - Resulting markdown snippet from the server is inserted at the cursor.
-    - Upload progress is displayed in an editor-panel banner using a hash-based progress bar that appears when the upload starts, updates during transfer, and briefly shows the result before disappearing.
   - Viewer respects image display options from settings (fit-width vs max-size, max width/height, alignment).
 
 ### Settings UI and persistence

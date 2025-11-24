@@ -221,6 +221,16 @@ $(function(){
   - [-] Provide filters (e.g., note vs image, path-based narrowing) as reasonable. (ignore for now)
   - [x] Optionally highlight search matches within notes.
     - Clicking a search result switches to edit mode and highlights the full line in Monaco so the match is visually located.
+
+ ---
+
+ ## v0.6.0 – Images & Paste Workflow Hardening
+
+ - **Backend**
+  - [x] Revisit `/api/images/paste` to ensure:
+    - [x] File type validation and size limits from settings.
+    - [x] Robust error responses for oversized or invalid images.
+  - [x] Confirm image storage structure (subfolder, naming scheme) is stable.
   - [ ] Cleanup routine for unused images (if selected)
 
  - **Frontend**

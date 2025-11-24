@@ -15,12 +15,13 @@ import json
 import mimetypes
 import os
 import shutil
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import markdown
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, conint
@@ -74,12 +75,13 @@ def get_config() -> AppConfig:
 
 class NotebookSettings(BaseModel):
     tabLength: conint(ge=2, le=8) = 4
-    imageStorageMode: str = "local"  # "flat", "matched", or "local"
+    imageStorageMode: str = "local"
     imageStorageSubfolder: str = "Images"
-    localImageSubfolderName: str = "Images"
-    imageMaxWidthPx: conint(ge=1, le=10000) = 768
-    imageMaxHeightPx: conint(ge=1, le=10000) = 768
-    imageMaxPasteBytes: conint(ge=1) = 5 * 1024 * 1024
+    imageLocalSubfolderName: str = "Images"
+    imageFitToNoteWidth: bool = True
+    imageMaxWidth: conint(gt=0) = 768
+    imageMaxHeight: conint(gt=0) = 768
+    imageMaxPasteBytes: Optional[conint(gt=0)] = None
 
     class Config:
         extra = "ignore"
@@ -129,6 +131,8 @@ IMAGE_EXTENSIONS = {
     ".svg",
 }
 DEFAULT_TAB_LENGTH = 4
+
+DEFAULT_MAX_PASTED_IMAGE_BYTES = 10 * 1024 * 1024
 
 SEARCH_MAX_MATCHES_PER_FILE = 20
 SEARCH_MAX_RESULTS = 1000
@@ -269,6 +273,44 @@ def _render_markdown_html(markdown_text: str, tab_length: int = DEFAULT_TAB_LENG
         tab_length=tab_length,
     )
     return html
+
+
+def _normalize_storage_component(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return "Images"
+    return raw.strip("/\\")
+
+
+def _build_image_relative_path(note_path: str, original_filename: str, settings: NotebookSettings) -> str:
+    safe_note_rel = _validate_relative_path(note_path)
+    note_rel_path = Path(safe_note_rel)
+    note_parent = note_rel_path.parent.as_posix()
+
+    ext = Path(original_filename or "image").suffix.lower()
+    if ext not in IMAGE_EXTENSIONS:
+        ext = ".png"
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S-%f")
+    stem = note_rel_path.stem or "image"
+    safe_stem = "".join(ch for ch in stem if ch.isalnum() or ch in ("-", "_")) or "image"
+    filename = f"{safe_stem}-{timestamp}{ext}"
+
+    mode = (settings.imageStorageMode or "local").lower()
+    if mode not in {"local", "flat", "matched"}:
+        mode = "local"
+
+    if mode == "flat":
+        base = _normalize_storage_component(settings.imageStorageSubfolder)
+        rel_dir = base
+    elif mode == "matched":
+        base = _normalize_storage_component(settings.imageStorageSubfolder)
+        rel_dir = f"{base}/{note_parent}" if note_parent else base
+    else:
+        local_folder = _normalize_storage_component(settings.imageLocalSubfolderName)
+        rel_dir = f"{note_parent}/{local_folder}" if note_parent else local_folder
+
+    return f"{rel_dir}/{filename}" if rel_dir else filename
 
 
 class NoteContent(BaseModel):
@@ -414,6 +456,12 @@ def put_note(note_path: str, payload: NoteContent) -> Dict[str, Any]:
     }
 
 
+class PasteImageResponse(BaseModel):
+    path: str
+    markdown: str
+    size: int
+
+
 @app.post("/api/notes/rename", tags=["notes"])
 def rename_note(payload: RenameRequest) -> Dict[str, Any]:
     source_path = payload.sourcePath
@@ -500,6 +548,49 @@ def delete_folder(folder_path: str) -> Dict[str, Any]:
     }
 
 
+@app.post("/api/images/paste", tags=["files"], response_model=PasteImageResponse)
+async def paste_image(note_path: str = Form(...), file: UploadFile = File(...)) -> PasteImageResponse:
+    settings = _load_settings()
+
+    try:
+        _validate_relative_path(note_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    content_type = (file.content_type or "").lower()
+    filename = file.filename or "pasted-image"
+    suffix = Path(filename).suffix.lower()
+
+    if suffix not in IMAGE_EXTENSIONS and not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Unsupported image type")
+
+    raw = await file.read()
+    size = len(raw)
+    if size == 0:
+        raise HTTPException(status_code=400, detail="Empty image upload")
+
+    max_bytes = settings.imageMaxPasteBytes or DEFAULT_MAX_PASTED_IMAGE_BYTES
+    if size > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image is too large ({size} bytes); maximum allowed is {max_bytes} bytes",
+        )
+
+    rel_image_path = _build_image_relative_path(note_path, filename, settings)
+
+    try:
+        image_path = _resolve_relative_path(rel_image_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(raw)
+
+    markdown_snippet = f"![image](/files/{rel_image_path})"
+
+    return PasteImageResponse(path=rel_image_path, markdown=markdown_snippet, size=size)
+
+
 @app.get("/files/{file_rel_path:path}", tags=["files"])
 def get_file(file_rel_path: str) -> FileResponse:
     try:
@@ -516,104 +607,6 @@ def get_file(file_rel_path: str) -> FileResponse:
 
     content_type, _ = mimetypes.guess_type(str(file_path))
     return FileResponse(file_path, media_type=content_type or "application/octet-stream")
-
-
-@app.post("/api/images/paste", tags=["images"])
-async def paste_image(
-    note_path: str = Form(...),
-    file: UploadFile = File(...),
-) -> Dict[str, Any]:
-
-    try:
-        safe_note_rel = _validate_relative_path(note_path)
-    except ValueError as exc:  # pragma: no cover - validation branch
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    settings = _load_settings()
-    cfg = get_config()
-
-    max_bytes = getattr(settings, "imageMaxPasteBytes", 0) or 0
-    if max_bytes and max_bytes > 0:
-        raw_bytes = await file.read(max_bytes + 1)
-        if len(raw_bytes) > max_bytes:
-            raise HTTPException(status_code=413, detail="Pasted image is too large")
-    else:
-        raw_bytes = await file.read()
-
-    if not raw_bytes:
-        raise HTTPException(status_code=400, detail="Empty image upload")
-
-    original_filename = file.filename or "pasted-image"
-    suffix = Path(original_filename).suffix.lower()
-    content_type = (file.content_type or "").lower()
-
-    if suffix not in IMAGE_EXTENSIONS:
-        if content_type.startswith("image/"):
-            guessed_ext_map = {
-                "image/png": ".png",
-                "image/jpeg": ".jpg",
-                "image/jpg": ".jpg",
-                "image/gif": ".gif",
-                "image/webp": ".webp",
-                "image/bmp": ".bmp",
-                "image/svg+xml": ".svg",
-            }
-            guessed = guessed_ext_map.get(content_type)
-            if guessed:
-                suffix = guessed
-
-    if suffix not in IMAGE_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Unsupported image type")
-
-    note_rel_path = Path(safe_note_rel)
-    parent_rel = note_rel_path.parent.as_posix()
-
-    storage_mode = getattr(settings, "imageStorageMode", "local") or "local"
-    storage_subfolder = getattr(settings, "imageStorageSubfolder", "Images").strip("/")
-
-    if storage_mode == "flat":
-        dest_dir_rel = storage_subfolder or "Images"
-    elif storage_mode == "matched":
-        if parent_rel:
-            dest_dir_rel = f"{storage_subfolder}/{parent_rel}" if storage_subfolder else parent_rel
-        else:
-            dest_dir_rel = storage_subfolder or "Images"
-    else:  # "local" and any unknown value fall back to local behavior
-        local_name = getattr(settings, "localImageSubfolderName", "Images").strip("/") or "Images"
-        dest_dir_rel = f"{parent_rel}/{local_name}" if parent_rel else local_name
-
-    dest_dir_rel = dest_dir_rel.strip("/")
-
-    if dest_dir_rel:
-        try:
-            dest_dir = _resolve_relative_path(dest_dir_rel)
-        except ValueError as exc:  # pragma: no cover - defensive branch
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-    else:
-        dest_dir = cfg.notes_root
-
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
-    base_stem = Path(original_filename).stem or "pasted-image"
-    safe_stem = base_stem.replace(" ", "-") or "pasted-image"
-    candidate = f"{safe_stem}{suffix}"
-    dest_path = dest_dir / candidate
-    counter = 1
-    while dest_path.exists():
-        candidate = f"{safe_stem}-{counter}{suffix}"
-        dest_path = dest_dir / candidate
-        counter += 1
-
-    dest_path.write_bytes(raw_bytes)
-
-    rel_path = _relative_to_notes_root(dest_path)
-    markdown_snippet = f"![image](/files/{rel_path})"
-
-    return {
-        "path": rel_path,
-        "name": dest_path.name,
-        "markdown": markdown_snippet,
-    }
 
 
 @app.post("/api/folders", tags=["notes"], status_code=201)
