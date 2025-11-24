@@ -181,6 +181,174 @@ function applyImageSettingsFromSettings(settings) {
   root.style.setProperty("--viewer-image-max-height", `${maxHeight}px`);
 }
 
+function applySettingsToFilesAndImagesSection(settings) {
+  if (!settings || typeof document === "undefined") return;
+
+  const storageModeEl = document.getElementById("settings-image-storage-mode");
+  if (storageModeEl) {
+    storageModeEl.value = settings.imageStorageMode || "local";
+  }
+
+  const storageSubfolderEl = document.getElementById("settings-image-storage-subfolder");
+  if (storageSubfolderEl) {
+    storageSubfolderEl.value = settings.imageStorageSubfolder || "Images";
+  }
+
+  const localSubfolderEl = document.getElementById("settings-image-local-subfolder-name");
+  if (localSubfolderEl) {
+    localSubfolderEl.value = settings.imageLocalSubfolderName || "Images";
+  }
+
+  const displayModeEl = document.getElementById("settings-image-display-mode");
+  if (displayModeEl) {
+    const fitToNoteWidth = Boolean(settings.imageFitToNoteWidth);
+    displayModeEl.value = fitToNoteWidth ? "fit-width" : "max-dimensions";
+  }
+
+  const maxWidthEl = document.getElementById("settings-image-max-width");
+  if (maxWidthEl) {
+    const maxWidth = Number.isFinite(settings.imageMaxWidth)
+      ? settings.imageMaxWidth
+      : 768;
+    maxWidthEl.value = String(maxWidth);
+  }
+
+  const maxHeightEl = document.getElementById("settings-image-max-height");
+  if (maxHeightEl) {
+    const maxHeight = Number.isFinite(settings.imageMaxHeight)
+      ? settings.imageMaxHeight
+      : 768;
+    maxHeightEl.value = String(maxHeight);
+  }
+
+  const maxPasteMbEl = document.getElementById("settings-image-max-paste-mb");
+  if (maxPasteMbEl) {
+    const maxBytes = settings.imageMaxPasteBytes;
+    if (Number.isFinite(maxBytes) && maxBytes > 0) {
+      const mb = maxBytes / (1024 * 1024);
+      maxPasteMbEl.value = String(Math.round(mb * 10) / 10);
+    } else {
+      maxPasteMbEl.value = "";
+    }
+  }
+}
+
+function buildUpdatedSettingsFromFilesAndImagesSection(baseSettings) {
+  if (typeof document === "undefined") return baseSettings || {};
+
+  const next = { ...(baseSettings || {}) };
+
+  const storageModeEl = document.getElementById("settings-image-storage-mode");
+  if (storageModeEl && storageModeEl.value) {
+    next.imageStorageMode = storageModeEl.value;
+  }
+
+  const storageSubfolderEl = document.getElementById("settings-image-storage-subfolder");
+  if (storageSubfolderEl) {
+    const value = storageSubfolderEl.value.trim();
+    if (value) {
+      next.imageStorageSubfolder = value;
+    }
+  }
+
+  const localSubfolderEl = document.getElementById("settings-image-local-subfolder-name");
+  if (localSubfolderEl) {
+    const value = localSubfolderEl.value.trim();
+    if (value) {
+      next.imageLocalSubfolderName = value;
+    }
+  }
+
+  const displayModeEl = document.getElementById("settings-image-display-mode");
+  if (displayModeEl && displayModeEl.value) {
+    const mode = displayModeEl.value;
+    if (mode === "fit-width") {
+      next.imageFitToNoteWidth = true;
+    } else if (mode === "max-dimensions") {
+      next.imageFitToNoteWidth = false;
+    }
+  }
+
+  const maxWidthEl = document.getElementById("settings-image-max-width");
+  if (maxWidthEl) {
+    const parsed = Number.parseInt(maxWidthEl.value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      next.imageMaxWidth = parsed;
+    }
+  }
+
+  const maxHeightEl = document.getElementById("settings-image-max-height");
+  if (maxHeightEl) {
+    const parsed = Number.parseInt(maxHeightEl.value, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      next.imageMaxHeight = parsed;
+    }
+  }
+
+  const maxPasteMbEl = document.getElementById("settings-image-max-paste-mb");
+  if (maxPasteMbEl) {
+    const raw = maxPasteMbEl.value.trim();
+    if (!raw) {
+      next.imageMaxPasteBytes = null;
+    } else {
+      const mb = Number.parseFloat(raw);
+      if (Number.isFinite(mb) && mb > 0) {
+        const bytes = Math.round(mb * 1024 * 1024);
+        next.imageMaxPasteBytes = bytes;
+      }
+    }
+  }
+
+  return next;
+}
+
+async function handleSettingsSave() {
+  const current = notebookSettings || {};
+  const payload = buildUpdatedSettingsFromFilesAndImagesSection(current);
+
+  try {
+    const response = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Settings save failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const settings = data && typeof data.settings === "object" ? data.settings : {};
+    notebookSettings = settings;
+    applyImageSettingsFromSettings(settings);
+    applySettingsToFilesAndImagesSection(settings);
+  } catch (error) {
+    console.error("/api/settings (save) request failed", error);
+    showError("Unable to save settings.");
+  }
+}
+
+async function handleRunImageCleanup() {
+  try {
+    const response = await fetch("/api/images/cleanup", {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Image cleanup request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const total = typeof data.totalImages === "number" ? data.totalImages : 0;
+    const unused = typeof data.unusedImages === "number" ? data.unusedImages : 0;
+    const message = `Image cleanup dry run: ${unused} unused of ${total} total images.`;
+    showError(message);
+  } catch (error) {
+    console.error("/api/images/cleanup request failed", error);
+    showError("Unable to run image cleanup.");
+  }
+}
+
 async function loadNotebookSettings() {
   try {
     const response = await fetch("/api/settings");
@@ -193,6 +361,7 @@ async function loadNotebookSettings() {
     const settings = data && typeof data.settings === "object" ? data.settings : {};
     notebookSettings = settings;
     applyImageSettingsFromSettings(settings);
+    applySettingsToFilesAndImagesSection(settings);
   } catch (error) {
     console.error("/api/settings request failed", error);
   }
@@ -1649,8 +1818,10 @@ function setupSettingsModal() {
   const overlay = document.getElementById("settings-overlay");
   const closeBtn = document.getElementById("settings-close-btn");
   const footerCloseBtn = document.getElementById("settings-footer-close-btn");
+  const saveBtn = document.getElementById("settings-footer-save-btn");
+  const runCleanupBtn = document.getElementById("settings-run-image-cleanup-btn");
 
-  if (!settingsBtn || !overlay || !closeBtn) return;
+  if (!settingsBtn || !overlay || !closeBtn || !saveBtn) return;
 
   function handleClose() {
     closeSettingsModal();
@@ -1663,6 +1834,16 @@ function setupSettingsModal() {
   closeBtn.addEventListener("click", () => {
     handleClose();
   });
+
+  saveBtn.addEventListener("click", () => {
+    void handleSettingsSave();
+  });
+
+  if (runCleanupBtn) {
+    runCleanupBtn.addEventListener("click", () => {
+      void handleRunImageCleanup();
+    });
+  }
 
   if (footerCloseBtn) {
     footerCloseBtn.addEventListener("click", () => {

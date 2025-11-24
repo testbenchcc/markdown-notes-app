@@ -241,12 +241,12 @@ $(function(){
     - The width of the progress bar should expand to fit, leave a little padding on the sides.
     - apear when the download starts, display during upload, and when finished, quickly display the response, then go away. 
   - [x] Confirm viewer behavior for image sizing (fit-width vs max-size, max width/height) matches settings. (Alignment options still TBD.)
-  - [ ] Three storeage options for images
-    - [ ] flat: dump everything in one folder
-    - [ ] matched: put everything in a matched structure inside the Image storage subfolder
-    - [ ] local: save them in a subfolder within the same folder as the note. (include setting for folder name) (default option)
-  - [ ] Additional settings for settings modal.
-    - [ ] File handling, Image display mode, Fit to note width, Max image width (px) (default of 768), Max image height (px) (default of 768), Image storage subfolder (default of /Images) (only used if local not selected), Max pasted image size (MB), Images maintenance, Run image cleanup
+  - [x] Three storeage options for images
+    - [x] flat: dump everything in one folder
+    - [x] matched: put everything in a matched structure inside the Image storage subfolder
+    - [x] local: save them in a subfolder within the same folder as the note. (include setting for folder name) (default option)
+  - [x] Additional settings for settings modal.
+    - [x] File handling, Image display mode, Fit to note width, Max image width (px) (default of 768), Max image height (px) (default of 768), Image storage subfolder (default of /Images) (only used if local not selected), Max pasted image size (MB), Images maintenance, Run image cleanup
 
  ---
 

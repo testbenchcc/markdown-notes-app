@@ -262,9 +262,123 @@
               data-settings-category="files"
             >
               <div class="settings-category-title">Files &amp; Images</div>
-              <p class="settings-field-description">
-                File and image handling options will be added here.
-              </p>
+              <div class="settings-field">
+                <div class="settings-field-label">Image storage mode</div>
+                <p class="settings-field-description">
+                  Choose how pasted images are organized on disk.
+                </p>
+                <select
+                  id="settings-image-storage-mode"
+                  class="settings-select"
+                >
+                  <option value="local">Local (per-note subfolder)</option>
+                  <option value="matched">Matched (mirror note folders)</option>
+                  <option value="flat">Flat (single shared folder)</option>
+                </select>
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Image storage subfolder</div>
+                <p class="settings-field-description">
+                  Used when storage mode is <code>flat</code> or
+                  <code>matched</code>. Relative to the notes root.
+                </p>
+                <input
+                  id="settings-image-storage-subfolder"
+                  type="text"
+                  class="search-input"
+                />
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">
+                  Local images subfolder name
+                </div>
+                <p class="settings-field-description">
+                  Used when storage mode is <code>local</code>. Created next to
+                  each note.
+                </p>
+                <input
+                  id="settings-image-local-subfolder-name"
+                  type="text"
+                  class="search-input"
+                />
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Image display mode</div>
+                <p class="settings-field-description">
+                  Control how images are sized in the viewer.
+                </p>
+                <select
+                  id="settings-image-display-mode"
+                  class="settings-select"
+                >
+                  <option value="fit-width">Fit to note width</option>
+                  <option value="max-dimensions">
+                    Use maximum width/height only
+                  </option>
+                </select>
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Max image width (px)</div>
+                <p class="settings-field-description">
+                  Maximum width for images when not fitted to the full note
+                  width.
+                </p>
+                <input
+                  id="settings-image-max-width"
+                  type="number"
+                  min="1"
+                  class="search-input"
+                />
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Max image height (px)</div>
+                <p class="settings-field-description">
+                  Maximum height for images in the viewer.
+                </p>
+                <input
+                  id="settings-image-max-height"
+                  type="number"
+                  min="1"
+                  class="search-input"
+                />
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">
+                  Max pasted image size (MB)
+                </div>
+                <p class="settings-field-description">
+                  Pasted images larger than this limit are rejected. Leave blank
+                  to use the default.
+                </p>
+                <input
+                  id="settings-image-max-paste-mb"
+                  type="number"
+                  min="1"
+                  step="0.1"
+                  class="search-input"
+                />
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Images maintenance</div>
+                <p class="settings-field-description">
+                  Scan for images that are no longer referenced by any notes
+                  and optionally delete them.
+                </p>
+                <button
+                  type="button"
+                  class="settings-btn"
+                  id="settings-run-image-cleanup-btn"
+                >
+                  Run image cleanup
+                </button>
+              </div>
             </section>
             <section
               class="settings-category hidden"
@@ -278,6 +392,13 @@
           </div>
         </div>
         <div class="settings-footer">
+          <button
+            type="button"
+            class="settings-btn settings-btn-primary"
+            id="settings-footer-save-btn"
+          >
+            Save
+          </button>
           <button
             type="button"
             class="settings-btn"
