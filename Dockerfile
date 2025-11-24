@@ -9,8 +9,8 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && apt-get install -y git \
-    && apt-get install nano \
-    && apt-get install npm \
+    && apt-get install -y nano \
+    && apt-get install -y npm \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
