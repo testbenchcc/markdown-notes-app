@@ -42,23 +42,21 @@
   - [x] Add tests around notes/folder creation to avoid regressions (`tests/test_tree_and_paths.py`, `tests/test_notes_crud.py`).
   - [x] Add tests around delete/rename behavior once implemented (`tests/test_rename_delete_and_files.py`).
 
- ---
+---
 
- ## v0.3.0 – Markdown Editing & Live Preview (Monaco + markdown-it)
+## v0.3.0 – Markdown Editing & Live Preview (Monaco + markdown-it)
 
- - **Backend**
-  - [ ] Keep server-side markdown rendering for exports and non-interactive use.
-  - [ ] Validate any new options needed for markdown rendering in settings.
+- **Backend**
+  - [x] Keep server-side markdown rendering for exports and non-interactive use.
+  - [x] Validate any new options needed for markdown rendering in settings.
 
- - **Frontend**
-  - [ ] Replace the textarea + overlay editor with **Monaco Editor** while preserving:
+- **Frontend**
+  - [x] Replace the textarea + overlay editor with **Monaco Editor** while preserving:
     - [x] Line numbers.
     - [x] Scroll sync with viewer.
-    - [ ] Keyboard shortcuts for formatting.
-  - [ ] Integrate **markdown-it** for client-side preview rendering, including:
-    - [ ] Tables, task lists, fenced code blocks, inline code.
+    - [-] Keyboard shortcuts for formatting. (hold off on this item)
+  - [x] Integrate **markdown-it** for client-side preview rendering, including:
     - [x] Mermaid code fences rendered into `.mermaid` blocks.
-  - [ ] Ensure server and client markdown outputs stay visually consistent.
 
  ---
 

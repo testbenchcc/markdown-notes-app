@@ -11,6 +11,7 @@ versioning APIs described in README.md and roadmap.md.
 """
 from __future__ import annotations
 
+import json
 import mimetypes
 import os
 import shutil
@@ -22,7 +23,7 @@ import markdown
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, conint
 
 
 APP_ROOT = Path(__file__).resolve().parent
@@ -69,6 +70,46 @@ def get_config() -> AppConfig:
     """
 
     return AppConfig()
+
+
+class NotebookSettings(BaseModel):
+    tabLength: conint(ge=2, le=8) = 4
+
+    class Config:
+        extra = "ignore"
+
+
+_DEFAULT_SETTINGS = NotebookSettings()
+
+
+def _load_settings() -> NotebookSettings:
+    cfg = get_config()
+    path = cfg.settings_path
+
+    if not path.is_file():
+        return _DEFAULT_SETTINGS
+
+    try:
+        raw = path.read_text(encoding="utf8")
+    except OSError:  # pragma: no cover - defensive fallback
+        return _DEFAULT_SETTINGS
+
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return _DEFAULT_SETTINGS
+
+    try:
+        return NotebookSettings.parse_obj(data)
+    except Exception:  # pragma: no cover - defensive fallback
+        return _DEFAULT_SETTINGS
+
+
+def _save_settings(settings: NotebookSettings) -> None:
+    cfg = get_config()
+    path = cfg.settings_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(settings.json(indent=2, sort_keys=True), encoding="utf8")
 
 
 NOTE_FILE_EXTENSION = ".md"
@@ -215,6 +256,7 @@ def _render_markdown_html(markdown_text: str, tab_length: int = DEFAULT_TAB_LENG
             }
         },
         output_format="html5",
+        tab_length=tab_length,
     )
     return html
 
@@ -299,6 +341,19 @@ def _relative_to_notes_root(path: Path) -> str:
     return path.relative_to(cfg.notes_root).as_posix()
 
 
+@app.get("/api/settings", tags=["settings"])
+def get_settings() -> Dict[str, Any]:
+    settings = _load_settings()
+    return {"settings": settings.dict()}
+
+
+@app.put("/api/settings", tags=["settings"])
+def update_settings(payload: NotebookSettings) -> Dict[str, Any]:
+    settings = NotebookSettings.parse_obj({**_DEFAULT_SETTINGS.dict(), **payload.dict()})
+    _save_settings(settings)
+    return {"settings": settings.dict()}
+
+
 @app.get("/api/notes/{note_path:path}", tags=["notes"])
 def get_note(note_path: str) -> Dict[str, Any]:
     try:
@@ -310,7 +365,8 @@ def get_note(note_path: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="Note not found")
 
     content = note_file.read_text(encoding="utf8")
-    html = _render_markdown_html(content)
+    settings = _load_settings()
+    html = _render_markdown_html(content, tab_length=settings.tabLength)
 
     return {
         "path": _relative_to_notes_root(note_file),
