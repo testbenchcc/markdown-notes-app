@@ -11,6 +11,7 @@ let latestSearchRequestId = 0;
 let isSyncingScrollFromEditor = false;
 let isSyncingScrollFromViewer = false;
 let uploadBannerHideTimerId = null;
+let notebookSettings = null;
 
 const VALID_MODES = new Set(["view", "edit", "export", "download"]);
 const DEFAULT_MODE = "view";
@@ -158,6 +159,42 @@ function renderViewerHtml(html) {
     } catch (error) {
       console.error("Mermaid rendering failed", error);
     }
+  }
+}
+
+function applyImageSettingsFromSettings(settings) {
+  if (!settings || typeof document === "undefined") return;
+
+  const root = document.documentElement;
+  if (!root || !root.style) return;
+
+  const fitToNoteWidth = Boolean(settings.imageFitToNoteWidth);
+  const maxWidth = Number.isFinite(settings.imageMaxWidth)
+    ? settings.imageMaxWidth
+    : 768;
+  const maxHeight = Number.isFinite(settings.imageMaxHeight)
+    ? settings.imageMaxHeight
+    : 768;
+
+  const widthValue = fitToNoteWidth ? "100%" : `${maxWidth}px`;
+  root.style.setProperty("--viewer-image-max-width", widthValue);
+  root.style.setProperty("--viewer-image-max-height", `${maxHeight}px`);
+}
+
+async function loadNotebookSettings() {
+  try {
+    const response = await fetch("/api/settings");
+
+    if (!response.ok) {
+      throw new Error(`Settings request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const settings = data && typeof data.settings === "object" ? data.settings : {};
+    notebookSettings = settings;
+    applyImageSettingsFromSettings(settings);
+  } catch (error) {
+    console.error("/api/settings request failed", error);
   }
 }
 
@@ -1685,6 +1722,7 @@ function setupViewerScrollSync() {
 
 window.addEventListener("DOMContentLoaded", () => {
   updateHealthStatus();
+  void loadNotebookSettings();
   loadTree();
   setupTreeSelection();
   setupNewItemButtons();

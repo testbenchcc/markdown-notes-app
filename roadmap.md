@@ -221,6 +221,10 @@ $(function(){
   - [-] Provide filters (e.g., note vs image, path-based narrowing) as reasonable. (ignore for now)
   - [x] Optionally highlight search matches within notes.
     - Clicking a search result switches to edit mode and highlights the full line in Monaco so the match is visually located.
+
+
+## v0.6.0 – Images & Paste Workflow Hardening
+
  - **Backend**
   - [x] Revisit `/api/images/paste` to ensure:
     - [x] File type validation and size limits from settings.
@@ -236,7 +240,7 @@ $(function(){
     - Use a banner in the editor panel. Do not shift the panel downd overlay the banner so contents do not shift.
     - The width of the progress bar should expand to fit, leave a little padding on the sides.
     - apear when the download starts, display during upload, and when finished, quickly display the response, then go away. 
-  - [ ] Confirm viewer behavior for images (fit-width, max-size, alignment) matches settings.
+  - [x] Confirm viewer behavior for image sizing (fit-width vs max-size, max width/height) matches settings. (Alignment options still TBD.)
   - [ ] Three storeage options for images
     - [ ] flat: dump everything in one folder
     - [ ] matched: put everything in a matched structure inside the Image storage subfolder

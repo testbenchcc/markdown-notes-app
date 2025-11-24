@@ -29,6 +29,8 @@ body {
   --md-link-hover: #fe8019;
   --md-code: #83a598;
   --md-menu-bg: #615d5b;
+  --viewer-image-max-width: 100%;
+  --viewer-image-max-height: 768px;
 }
 
 body {
@@ -700,7 +702,8 @@ body.resizing {
 }
 
 .content-view img {
-  max-width: 100%;
+  max-width: var(--viewer-image-max-width);
+  max-height: var(--viewer-image-max-height);
   height: auto;
 }
 

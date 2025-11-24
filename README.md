@@ -275,7 +275,7 @@ The goal is to preserve the existing layout, button placements, search position,
     - Enforced against `imageMaxPasteBytes` from settings, with an optional confirm dialog when exceeded.
     - Uploaded via `/api/images/paste`.
     - Resulting markdown snippet from the server is inserted at the cursor.
-  - Viewer respects image display options from settings (fit-width vs max-size, max width/height, alignment).
+  - Viewer applies image sizing options from notebook settings (`imageFitToNoteWidth`, `imageMaxWidth`, `imageMaxHeight`) via CSS so images respect per-notebook size preferences.
 
 ### Settings UI and persistence
 
