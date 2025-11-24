@@ -88,16 +88,13 @@ def _get_origin(repo: Repo):
     return next((r for r in repo.remotes if r.name == "origin"), None)
 
 
-def commit_and_push_notes(
+def _commit_notes(
     *,
     notes_root: Path,
     remote_url: Optional[str] = None,
     commit_message: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Stage all changes under ``notes_root``, commit if needed, and push.
-
-    Returns a JSON-serializable dict describing commit and push results.
-    """
+) -> tuple[Repo, CommitResult]:
+    """Stage all changes under ``notes_root`` and create a commit if needed."""
 
     repo = _ensure_repo(notes_root, remote_url)
 
@@ -111,8 +108,6 @@ def commit_and_push_notes(
         pass
 
     dirty = repo.is_dirty(index=True, working_tree=True, untracked_files=True)
-
-    commit_info: Optional[CommitResult] = None
 
     if dirty:
         message = commit_message or f"Auto-commit notes at {datetime.utcnow().isoformat()}Z"
@@ -128,6 +123,12 @@ def commit_and_push_notes(
             committed=False,
             summary="No changes to commit",
         )
+
+    return repo, commit_info
+
+
+def _push_notes(repo: Repo) -> tuple[bool, Dict[str, Any]]:
+    """Push the active branch to the ``origin`` remote if configured."""
 
     origin = _get_origin(repo)
     push_status: Dict[str, Any] = {
@@ -162,9 +163,70 @@ def commit_and_push_notes(
                 "detail": str(exc),
             }
 
+    return pushed, push_status
+
+
+def commit_notes_only(
+    *,
+    notes_root: Path,
+    remote_url: Optional[str] = None,
+    commit_message: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Stage all changes under ``notes_root`` and commit if needed (no push)."""
+
+    repo, commit_info = _commit_notes(
+        notes_root=notes_root,
+        remote_url=remote_url,
+        commit_message=commit_message,
+    )
+
+    # repo is currently unused but kept for symmetry with _commit_notes.
+    _ = repo
+
     return {
-        "committed": bool(commit_info and commit_info.committed),
-        "commit": commit_info.__dict__ if commit_info else None,
+        "committed": bool(commit_info.committed),
+        "commit": commit_info.__dict__,
+    }
+
+
+def push_notes(
+    *,
+    notes_root: Path,
+    remote_url: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Push the active branch for the notes repo to its ``origin`` remote."""
+
+    repo = _ensure_repo(notes_root, remote_url)
+    pushed, push_status = _push_notes(repo)
+
+    return {
+        "pushed": pushed,
+        "push": push_status,
+    }
+
+
+def commit_and_push_notes(
+    *,
+    notes_root: Path,
+    remote_url: Optional[str] = None,
+    commit_message: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Stage all changes under ``notes_root``, commit if needed, and push.
+
+    Returns a JSON-serializable dict describing commit and push results.
+    """
+
+    repo, commit_info = _commit_notes(
+        notes_root=notes_root,
+        remote_url=remote_url,
+        commit_message=commit_message,
+    )
+
+    pushed, push_status = _push_notes(repo)
+
+    return {
+        "committed": bool(commit_info.committed),
+        "commit": commit_info.__dict__,
         "pushed": pushed,
         "push": push_status,
     }

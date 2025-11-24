@@ -334,6 +334,134 @@ function applySettingsToAppearanceSection(settings) {
   applyThemeFromSettings(settings);
 }
 
+function applySettingsToVersioningSection(settings) {
+  if (!settings || typeof document === "undefined") return;
+
+  const autoCommitEnabledEl = document.getElementById("settings-auto-commit-enabled");
+  if (autoCommitEnabledEl) {
+    autoCommitEnabledEl.checked = Boolean(settings.autoCommitEnabled);
+  }
+
+  const autoCommitIntervalEl = document.getElementById("settings-auto-commit-interval");
+  if (autoCommitIntervalEl) {
+    const seconds = settings.autoCommitIntervalSeconds;
+    if (Number.isFinite(seconds) && seconds > 0) {
+      autoCommitIntervalEl.value = String(seconds);
+    } else {
+      autoCommitIntervalEl.value = "";
+    }
+  }
+
+  const autoPullEnabledEl = document.getElementById("settings-auto-pull-enabled");
+  if (autoPullEnabledEl) {
+    autoPullEnabledEl.checked = Boolean(settings.autoPullEnabled);
+  }
+
+  const autoPullIntervalEl = document.getElementById("settings-auto-pull-interval-minutes");
+  if (autoPullIntervalEl) {
+    const seconds = settings.autoPullIntervalSeconds;
+    if (Number.isFinite(seconds) && seconds > 0) {
+      const minutes = Math.round(seconds / 60);
+      autoPullIntervalEl.value = String(minutes);
+    } else {
+      autoPullIntervalEl.value = "";
+    }
+  }
+
+  const autoPushEnabledEl = document.getElementById("settings-auto-push-enabled");
+  if (autoPushEnabledEl) {
+    autoPushEnabledEl.checked = Boolean(settings.autoPushEnabled);
+  }
+
+  const autoPushIntervalEl = document.getElementById("settings-auto-push-interval-minutes");
+  if (autoPushIntervalEl) {
+    const seconds = settings.autoPushIntervalSeconds;
+    if (Number.isFinite(seconds) && seconds > 0) {
+      const minutes = Math.round(seconds / 60);
+      autoPushIntervalEl.value = String(minutes);
+    } else {
+      autoPushIntervalEl.value = "";
+    }
+  }
+}
+
+function applyAutoSyncStatusToUi(payload) {
+  if (typeof document === "undefined") return;
+
+  const statusEl = document.getElementById("settings-auto-sync-status-text");
+  if (!statusEl) return;
+
+  if (!payload || !payload.state) {
+    statusEl.textContent = "Auto-sync status is unavailable.";
+    return;
+  }
+
+  const state = payload.state || {};
+  const commit = state.commit || {};
+  const pull = state.pull || {};
+  const push = state.push || {};
+  const conflict = state.conflict || {};
+
+  const lines = [];
+
+  const commitParts = [`Commit: ${String(commit.lastStatus || "idle")}`];
+  if (commit.lastRunCompletedAt) {
+    commitParts.push(`last at ${commit.lastRunCompletedAt}`);
+  }
+  lines.push(commitParts.join(" "));
+
+  const pullParts = [`Pull: ${String(pull.lastStatus || "idle")}`];
+  if (pull.lastRunCompletedAt) {
+    pullParts.push(`last at ${pull.lastRunCompletedAt}`);
+  }
+  lines.push(pullParts.join(" "));
+
+  const pushParts = [`Push: ${String(push.lastStatus || "idle")}`];
+  if (push.lastRunCompletedAt) {
+    pushParts.push(`last at ${push.lastRunCompletedAt}`);
+  }
+  lines.push(pushParts.join(" "));
+
+  if (conflict && conflict.active) {
+    const branch = conflict.conflictBranch || "unknown branch";
+    lines.push(`Conflict: active on ${branch}`);
+  } else if (conflict && conflict.lastConflictAt) {
+    lines.push(`Conflict: last recorded at ${conflict.lastConflictAt}`);
+  }
+
+  statusEl.textContent = lines.join("\n");
+}
+
+async function loadAutoSyncStatus() {
+  if (typeof document === "undefined") return;
+
+  const statusEl = document.getElementById("settings-auto-sync-status-text");
+  if (statusEl) {
+    statusEl.textContent = "Loading auto-sync status…";
+  }
+
+  try {
+    const response = await fetch("/api/versioning/notes/auto-sync-status");
+
+    if (!response.ok) {
+      throw new Error(
+        `Auto-sync status request failed with status ${response.status}`,
+      );
+    }
+
+    const data = await response.json();
+    applyAutoSyncStatusToUi(data);
+  } catch (error) {
+    console.error(
+      "/api/versioning/notes/auto-sync-status request failed",
+      error,
+    );
+    if (statusEl) {
+      statusEl.textContent = "Unable to load auto-sync status.";
+    }
+  }
+}
+
 function applyAllSettings(settings, options = {}) {
   const { resetDirty = false } = options;
   if (!settings) return;
@@ -342,6 +470,7 @@ function applyAllSettings(settings, options = {}) {
   applySettingsToFilesAndImagesSection(settings);
   applySettingsToEditorSection(settings);
   applySettingsToAppearanceSection(settings);
+  applySettingsToVersioningSection(settings);
   suppressSettingsDirtyTracking = false;
   if (resetDirty) {
     resetSettingsDirtyState();
@@ -536,6 +665,81 @@ function buildUpdatedSettingsFromAllSections(baseSettings) {
   next = buildUpdatedSettingsFromFilesAndImagesSection(next);
   next = buildUpdatedSettingsFromEditorSection(next);
   next = buildUpdatedSettingsFromAppearanceSection(next);
+   next = buildUpdatedSettingsFromVersioningSection(next);
+  return next;
+}
+
+function buildUpdatedSettingsFromVersioningSection(baseSettings) {
+  if (typeof document === "undefined") return baseSettings || {};
+
+  const next = { ...(baseSettings || {}) };
+
+  const autoCommitEnabledEl = document.getElementById(
+    "settings-auto-commit-enabled",
+  );
+  if (autoCommitEnabledEl) {
+    next.autoCommitEnabled = Boolean(autoCommitEnabledEl.checked);
+  }
+
+  const autoCommitIntervalEl = document.getElementById(
+    "settings-auto-commit-interval",
+  );
+  if (autoCommitIntervalEl) {
+    const raw = autoCommitIntervalEl.value.trim();
+    if (!raw) {
+      next.autoCommitIntervalSeconds = null;
+    } else {
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        next.autoCommitIntervalSeconds = parsed;
+      }
+    }
+  }
+
+  const autoPullEnabledEl = document.getElementById(
+    "settings-auto-pull-enabled",
+  );
+  if (autoPullEnabledEl) {
+    next.autoPullEnabled = Boolean(autoPullEnabledEl.checked);
+  }
+
+  const autoPullIntervalEl = document.getElementById(
+    "settings-auto-pull-interval-minutes",
+  );
+  if (autoPullIntervalEl) {
+    const raw = autoPullIntervalEl.value.trim();
+    if (!raw) {
+      next.autoPullIntervalSeconds = null;
+    } else {
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        next.autoPullIntervalSeconds = parsed * 60;
+      }
+    }
+  }
+
+  const autoPushEnabledEl = document.getElementById(
+    "settings-auto-push-enabled",
+  );
+  if (autoPushEnabledEl) {
+    next.autoPushEnabled = Boolean(autoPushEnabledEl.checked);
+  }
+
+  const autoPushIntervalEl = document.getElementById(
+    "settings-auto-push-interval-minutes",
+  );
+  if (autoPushIntervalEl) {
+    const raw = autoPushIntervalEl.value.trim();
+    if (!raw) {
+      next.autoPushIntervalSeconds = null;
+    } else {
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        next.autoPushIntervalSeconds = parsed * 60;
+      }
+    }
+  }
+
   return next;
 }
 
@@ -2103,6 +2307,8 @@ function openSettingsModal() {
   if (firstNavItem instanceof HTMLElement) {
     firstNavItem.focus();
   }
+
+  void loadAutoSyncStatus();
 }
 
 function closeSettingsModal() {
@@ -2189,6 +2395,9 @@ function setupSettingsModal() {
   const footerCloseBtn = document.getElementById("settings-footer-close-btn");
   const saveBtn = document.getElementById("settings-footer-save-btn");
   const runCleanupBtn = document.getElementById("settings-run-image-cleanup-btn");
+  const autoSyncStatusBtn = document.getElementById(
+    "settings-refresh-auto-sync-status-btn",
+  );
 
   if (!settingsBtn || !overlay || !closeBtn || !saveBtn) return;
 
@@ -2213,6 +2422,12 @@ function setupSettingsModal() {
   if (runCleanupBtn) {
     runCleanupBtn.addEventListener("click", () => {
       void handleRunImageCleanup();
+    });
+  }
+
+   if (autoSyncStatusBtn) {
+    autoSyncStatusBtn.addEventListener("click", () => {
+      void loadAutoSyncStatus();
     });
   }
 

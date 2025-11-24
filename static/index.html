@@ -415,9 +415,104 @@
               data-settings-category="versioning"
             >
               <div class="settings-category-title">Versioning</div>
-              <p class="settings-field-description">
-                Git and versioning options will be exposed here.
-              </p>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Automatic commit</div>
+                <p class="settings-field-description">
+                  Periodically stage and commit changes in the notes repository
+                  without user interaction.
+                </p>
+                <label>
+                  <input
+                    id="settings-auto-commit-enabled"
+                    type="checkbox"
+                  />
+                  Enable auto commit
+                </label>
+                <div class="settings-field-description">
+                  Interval (seconds):
+                  <input
+                    id="settings-auto-commit-interval"
+                    type="number"
+                    min="10"
+                    class="search-input"
+                  />
+                </div>
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Automatic pull</div>
+                <p class="settings-field-description">
+                  Periodically pull from the remote notes repository with
+                  rebase, creating conflict branches instead of discarding
+                  local changes.
+                </p>
+                <label>
+                  <input
+                    id="settings-auto-pull-enabled"
+                    type="checkbox"
+                  />
+                  Enable auto pull
+                </label>
+                <div class="settings-field-description">
+                  Interval (minutes):
+                  <input
+                    id="settings-auto-pull-interval-minutes"
+                    type="number"
+                    min="1"
+                    class="search-input"
+                  />
+                </div>
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Automatic push</div>
+                <p class="settings-field-description">
+                  Periodically push the notes repository to the configured
+                  remote when the last auto pull and auto commit succeeded and
+                  no conflict is active.
+                </p>
+                <label>
+                  <input
+                    id="settings-auto-push-enabled"
+                    type="checkbox"
+                  />
+                  Enable auto push
+                </label>
+                <div class="settings-field-description">
+                  Interval (minutes):
+                  <input
+                    id="settings-auto-push-interval-minutes"
+                    type="number"
+                    min="1"
+                    class="search-input"
+                  />
+                </div>
+                <p class="settings-field-description">
+                  Auto push is skipped if the previous auto pull or auto
+                  commit failed or produced a conflict.
+                </p>
+              </div>
+
+              <div class="settings-field">
+                <div class="settings-field-label">Auto-sync status</div>
+                <p class="settings-field-description">
+                  Snapshot of the most recent automatic commit, pull, and push
+                  runs.
+                </p>
+                <button
+                  type="button"
+                  class="settings-btn"
+                  id="settings-refresh-auto-sync-status-btn"
+                >
+                  Refresh status
+                </button>
+                <pre
+                  id="settings-auto-sync-status-text"
+                  class="settings-field-description"
+                  aria-live="polite"
+                ></pre>
+              </div>
             </section>
           </div>
         </div>

@@ -16,6 +16,8 @@ import mimetypes
 import os
 import re
 import shutil
+import threading
+import time
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -31,7 +33,9 @@ from pydantic import BaseModel, ConfigDict, conint
 from git_versioning import (
     add_gitignore_pattern,
     commit_and_push_notes,
+    commit_notes_only,
     pull_notes_with_rebase,
+    push_notes,
     remove_gitignore_pattern,
 )
 
@@ -94,6 +98,13 @@ class NotebookSettings(BaseModel):
     imageMaxHeight: conint(gt=0) = 768
     imageMaxPasteBytes: Optional[conint(gt=0)] = None
 
+    autoCommitEnabled: bool = False
+    autoCommitIntervalSeconds: Optional[conint(gt=0)] = None
+    autoPullEnabled: bool = False
+    autoPullIntervalSeconds: Optional[conint(gt=0)] = None
+    autoPushEnabled: bool = False
+    autoPushIntervalSeconds: Optional[conint(gt=0)] = None
+
     model_config = ConfigDict(extra="ignore")
 
 
@@ -154,6 +165,252 @@ IMAGE_HTML_TAG_PATTERN = re.compile(
 SEARCH_MAX_MATCHES_PER_FILE = 20
 SEARCH_MAX_RESULTS = 1000
 SEARCH_MAX_QUERY_LENGTH = 200
+
+
+_AUTO_SYNC_STATE: Dict[str, Dict[str, Any]] = {
+    "commit": {
+        "lastRunStartedAt": None,
+        "lastRunCompletedAt": None,
+        "lastStatus": "idle",
+        "lastError": None,
+        "lastResult": None,
+    },
+    "pull": {
+        "lastRunStartedAt": None,
+        "lastRunCompletedAt": None,
+        "lastStatus": "idle",
+        "lastError": None,
+        "lastResult": None,
+    },
+    "push": {
+        "lastRunStartedAt": None,
+        "lastRunCompletedAt": None,
+        "lastStatus": "idle",
+        "lastError": None,
+        "lastResult": None,
+    },
+    "conflict": {
+        "active": False,
+        "lastConflictAt": None,
+        "conflictBranch": None,
+        "lastError": None,
+    },
+}
+
+_AUTO_SYNC_LOCK = threading.Lock()
+_AUTO_SYNC_THREAD_STARTED = False
+
+DEFAULT_AUTO_COMMIT_INTERVAL_SECONDS = 300
+DEFAULT_AUTO_PULL_INTERVAL_SECONDS = 900
+DEFAULT_AUTO_PUSH_INTERVAL_SECONDS = 900
+
+
+def _auto_sync_now_iso() -> str:
+    return datetime.utcnow().isoformat() + "Z"
+
+
+def _run_auto_commit(notes_root: Path, remote_url: Optional[str]) -> None:
+    started_at = _auto_sync_now_iso()
+
+    with _AUTO_SYNC_LOCK:
+        entry = _AUTO_SYNC_STATE["commit"]
+        entry["lastRunStartedAt"] = started_at
+        entry["lastStatus"] = "running"
+        entry["lastError"] = None
+
+    result: Dict[str, Any] | None = None
+    status = "error"
+    error: Optional[str] = None
+
+    try:
+        result = commit_notes_only(notes_root=notes_root, remote_url=remote_url)
+        committed = bool(result.get("committed"))
+        status = "ok" if committed else "skipped"
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        error = str(exc)
+        status = "error"
+
+    finished_at = _auto_sync_now_iso()
+
+    with _AUTO_SYNC_LOCK:
+        entry = _AUTO_SYNC_STATE["commit"]
+        entry["lastRunCompletedAt"] = finished_at
+        entry["lastStatus"] = status
+        entry["lastResult"] = result
+        entry["lastError"] = error
+
+
+def _run_auto_pull(notes_root: Path, remote_url: Optional[str]) -> None:
+    started_at = _auto_sync_now_iso()
+
+    with _AUTO_SYNC_LOCK:
+        entry = _AUTO_SYNC_STATE["pull"]
+        entry["lastRunStartedAt"] = started_at
+        entry["lastStatus"] = "running"
+        entry["lastError"] = None
+
+    result: Dict[str, Any] | None = None
+    status = "error"
+    error: Optional[str] = None
+    conflict_update: Dict[str, Any] | None = None
+
+    try:
+        result = pull_notes_with_rebase(notes_root=notes_root, remote_url=remote_url)
+        status_value = str(result.get("status") or "unknown")
+        status = status_value
+        error = result.get("error")
+
+        if status_value == "conflict":
+            conflict_update = {
+                "active": True,
+                "lastConflictAt": started_at,
+                "conflictBranch": result.get("conflictBranch"),
+                "lastError": error,
+            }
+        elif status_value in {"ok", "skipped"}:
+            conflict_update = {
+                "active": False,
+                "lastConflictAt": None,
+                "conflictBranch": None,
+                "lastError": None,
+            }
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        error = str(exc)
+        status = "error"
+
+    finished_at = _auto_sync_now_iso()
+
+    with _AUTO_SYNC_LOCK:
+        entry = _AUTO_SYNC_STATE["pull"]
+        entry["lastRunCompletedAt"] = finished_at
+        entry["lastStatus"] = status
+        entry["lastResult"] = result
+        entry["lastError"] = error
+
+        if conflict_update is not None:
+            conflict_entry = _AUTO_SYNC_STATE["conflict"]
+            conflict_entry["active"] = conflict_update["active"]
+            conflict_entry["lastConflictAt"] = conflict_update["lastConflictAt"]
+            conflict_entry["conflictBranch"] = conflict_update["conflictBranch"]
+            conflict_entry["lastError"] = conflict_update["lastError"]
+
+
+def _run_auto_push(notes_root: Path, remote_url: Optional[str]) -> None:
+    started_at = _auto_sync_now_iso()
+
+    with _AUTO_SYNC_LOCK:
+        entry = _AUTO_SYNC_STATE["push"]
+        entry["lastRunStartedAt"] = started_at
+        entry["lastStatus"] = "running"
+        entry["lastError"] = None
+
+    result: Dict[str, Any] | None = None
+    status = "error"
+    error: Optional[str] = None
+
+    try:
+        result = push_notes(notes_root=notes_root, remote_url=remote_url)
+        pushed = bool(result.get("pushed"))
+        push_status = result.get("push") or {}
+        inner_status = str(push_status.get("status") or "")
+
+        if inner_status == "error":
+            status = "error"
+            detail = push_status.get("detail")
+            error = str(detail) if detail is not None else None
+        else:
+            status = "ok" if pushed else "skipped"
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        error = str(exc)
+        status = "error"
+
+    finished_at = _auto_sync_now_iso()
+
+    with _AUTO_SYNC_LOCK:
+        entry = _AUTO_SYNC_STATE["push"]
+        entry["lastRunCompletedAt"] = finished_at
+        entry["lastStatus"] = status
+        entry["lastResult"] = result
+        entry["lastError"] = error
+
+
+def _auto_sync_loop() -> None:
+    last_commit_run = 0.0
+    last_pull_run = 0.0
+    last_push_run = 0.0
+
+    while True:
+        try:
+            settings = _load_settings()
+        except Exception:
+            time.sleep(5.0)
+            continue
+
+        cfg = get_config()
+        notes_root = cfg.notes_root
+        remote_url = os.getenv("NOTES_REPO_REMOTE_URL") or None
+        now = time.time()
+
+        if settings.autoCommitEnabled:
+            commit_interval = (
+                settings.autoCommitIntervalSeconds
+                or DEFAULT_AUTO_COMMIT_INTERVAL_SECONDS
+            )
+            if now - last_commit_run >= commit_interval:
+                _run_auto_commit(notes_root, remote_url)
+                last_commit_run = now
+
+        if settings.autoPullEnabled:
+            pull_interval = (
+                settings.autoPullIntervalSeconds
+                or DEFAULT_AUTO_PULL_INTERVAL_SECONDS
+            )
+            if now - last_pull_run >= pull_interval:
+                _run_auto_pull(notes_root, remote_url)
+                last_pull_run = now
+
+        if settings.autoPushEnabled:
+            push_interval = (
+                settings.autoPushIntervalSeconds
+                or DEFAULT_AUTO_PUSH_INTERVAL_SECONDS
+            )
+            if now - last_push_run >= push_interval:
+                with _AUTO_SYNC_LOCK:
+                    conflict_active = bool(_AUTO_SYNC_STATE["conflict"]["active"])
+                    last_pull_status = str(_AUTO_SYNC_STATE["pull"]["lastStatus"])
+                    last_commit_status = str(_AUTO_SYNC_STATE["commit"]["lastStatus"])
+
+                should_push = True
+                skip_reason: Optional[str] = None
+
+                if conflict_active:
+                    should_push = False
+                    skip_reason = "conflict-active"
+                elif last_pull_status not in {"ok", "skipped"}:
+                    should_push = False
+                    skip_reason = "pull-not-ok"
+                elif last_commit_status not in {"ok", "skipped"}:
+                    should_push = False
+                    skip_reason = "commit-not-ok"
+
+                if should_push:
+                    _run_auto_push(notes_root, remote_url)
+                else:
+                    skipped_at = _auto_sync_now_iso()
+                    with _AUTO_SYNC_LOCK:
+                        entry = _AUTO_SYNC_STATE["push"]
+                        entry["lastRunStartedAt"] = skipped_at
+                        entry["lastRunCompletedAt"] = skipped_at
+                        entry["lastStatus"] = "skipped"
+                        entry["lastError"] = None
+                        entry["lastResult"] = {
+                            "pushed": False,
+                            "reason": skip_reason or "preconditions-not-met",
+                        }
+
+                last_push_run = now
+
+        time.sleep(1.0)
 
 
 def _validate_relative_path(path_str: str) -> str:
@@ -382,6 +639,23 @@ class GitignorePatternRequest(BaseModel):
 
 
 app = FastAPI(title="Markdown Notes App", version="0.1.0")
+
+
+@app.on_event("startup")
+def _start_auto_sync_background() -> None:  # pragma: no cover - integration behavior
+    global _AUTO_SYNC_THREAD_STARTED
+
+    with _AUTO_SYNC_LOCK:
+        if _AUTO_SYNC_THREAD_STARTED:
+            return
+
+        thread = threading.Thread(
+            target=_auto_sync_loop,
+            name="notes-auto-sync-worker",
+            daemon=True,
+        )
+        thread.start()
+        _AUTO_SYNC_THREAD_STARTED = True
 
 
 STATIC_DIR = APP_ROOT / "static"
@@ -770,6 +1044,26 @@ def versioning_notes_commit_and_push(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return result
+
+
+@app.get("/api/versioning/notes/auto-sync-status", tags=["versioning"])
+def versioning_notes_auto_sync_status() -> Dict[str, Any]:
+    settings = _load_settings()
+
+    with _AUTO_SYNC_LOCK:
+        state = json.loads(json.dumps(_AUTO_SYNC_STATE))
+
+    return {
+        "settings": {
+            "autoCommitEnabled": settings.autoCommitEnabled,
+            "autoCommitIntervalSeconds": settings.autoCommitIntervalSeconds,
+            "autoPullEnabled": settings.autoPullEnabled,
+            "autoPullIntervalSeconds": settings.autoPullIntervalSeconds,
+            "autoPushEnabled": settings.autoPushEnabled,
+            "autoPushIntervalSeconds": settings.autoPushIntervalSeconds,
+        },
+        "state": state,
+    }
 
 
 @app.post("/api/versioning/notes/pull", tags=["versioning"])
