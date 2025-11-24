@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import re
 import shutil
 from datetime import datetime
 from functools import lru_cache
@@ -133,6 +134,12 @@ IMAGE_EXTENSIONS = {
 DEFAULT_TAB_LENGTH = 4
 
 DEFAULT_MAX_PASTED_IMAGE_BYTES = 10 * 1024 * 1024
+
+IMAGE_MARKDOWN_LINK_PATTERN = re.compile(r"\]\(\s*/files/([^)\s'\"#]+)")
+IMAGE_HTML_TAG_PATTERN = re.compile(
+    r"<img[^>]+src=['\"]\s*/files/([^'\">\s]+)",
+    re.IGNORECASE,
+)
 
 SEARCH_MAX_MATCHES_PER_FILE = 20
 SEARCH_MAX_RESULTS = 1000
@@ -313,6 +320,28 @@ def _build_image_relative_path(note_path: str, original_filename: str, settings:
     return f"{rel_dir}/{filename}" if rel_dir else filename
 
 
+def _collect_referenced_image_paths(root: Path) -> set[str]:
+    referenced: set[str] = set()
+
+    for note_file in root.rglob(f"*{NOTE_FILE_EXTENSION}"):
+        try:
+            text = note_file.read_text(encoding="utf8")
+        except OSError:
+            continue
+
+        for match in IMAGE_MARKDOWN_LINK_PATTERN.finditer(text):
+            rel_path = match.group(1).strip()
+            if rel_path:
+                referenced.add(rel_path)
+
+        for match in IMAGE_HTML_TAG_PATTERN.finditer(text):
+            rel_path = match.group(1).strip()
+            if rel_path:
+                referenced.add(rel_path)
+
+    return referenced
+
+
 class NoteContent(BaseModel):
     content: str
 
@@ -462,6 +491,15 @@ class PasteImageResponse(BaseModel):
     size: int
 
 
+class ImageCleanupSummary(BaseModel):
+    dryRun: bool
+    totalImages: int
+    referencedImages: int
+    unusedImages: int
+    removedPaths: List[str]
+    candidatePaths: List[str]
+
+
 @app.post("/api/notes/rename", tags=["notes"])
 def rename_note(payload: RenameRequest) -> Dict[str, Any]:
     source_path = payload.sourcePath
@@ -607,6 +645,47 @@ def get_file(file_rel_path: str) -> FileResponse:
 
     content_type, _ = mimetypes.guess_type(str(file_path))
     return FileResponse(file_path, media_type=content_type or "application/octet-stream")
+
+
+@app.post("/api/images/cleanup", tags=["files"])
+def cleanup_images(dryRun: bool = True) -> ImageCleanupSummary:
+    cfg = get_config()
+    root = cfg.notes_root
+
+    referenced = _collect_referenced_image_paths(root)
+
+    all_images: List[Path] = []
+    for image_file in root.rglob("*"):
+        if image_file.is_file() and image_file.suffix.lower() in IMAGE_EXTENSIONS:
+            all_images.append(image_file)
+
+    unused_files: List[Path] = []
+    candidate_paths: List[str] = []
+    removed_paths: List[str] = []
+
+    for image_file in all_images:
+        rel_path = _relative_to_notes_root(image_file)
+        if rel_path not in referenced:
+            unused_files.append(image_file)
+            candidate_paths.append(rel_path)
+
+    if not dryRun:
+        for image_file in unused_files:
+            rel_path = _relative_to_notes_root(image_file)
+            try:
+                image_file.unlink()
+                removed_paths.append(rel_path)
+            except OSError:
+                continue
+
+    return ImageCleanupSummary(
+        dryRun=dryRun,
+        totalImages=len(all_images),
+        referencedImages=len(all_images) - len(candidate_paths),
+        unusedImages=len(candidate_paths),
+        removedPaths=removed_paths,
+        candidatePaths=candidate_paths,
+    )
 
 
 @app.post("/api/folders", tags=["notes"], status_code=201)

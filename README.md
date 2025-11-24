@@ -148,6 +148,11 @@ The goal is to preserve the existing layout, button placements, search position,
     - Stores the file under image storage settings (`imageStorageMode`, `imageStorageSubfolder`, `imageLocalSubfolderName`).
     - Returns markdown snippet like `![image](/files/relative/path)` to be inserted into notes.
 
+- **Image cleanup (unused images)**
+  - `POST /api/images/cleanup?dryRun=true|false` scans the notes root for image files and detects which are not referenced from any markdown notes via `/files/...` links:
+    - In **dry-run** mode (default), returns a summary of total/referenced/unused images and candidate paths without deleting files.
+    - When `dryRun=false`, deletes the unused image files and returns which paths were removed.
+
 ### Search
 
 - **Text search across notes**
