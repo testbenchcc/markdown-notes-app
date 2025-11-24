@@ -3,6 +3,7 @@ let markdownRenderer = null;
 let currentNotePath = null;
 let currentNoteContent = "";
 let currentMode = "view";
+let treeInitialized = false;
 
 function ensureMarkdownRenderer() {
   if (markdownRenderer || typeof window === "undefined") return markdownRenderer;
@@ -280,41 +281,37 @@ function toSafePath(relPath) {
     .join("/");
 }
 
-function createTreeItem(node) {
-  const item = document.createElement("div");
-  item.classList.add("tree-item", node.type);
-  item.dataset.path = node.path;
+function getFancytreeInstance() {
+  const treeRootEl = document.getElementById("tree");
+  if (!treeRootEl || !window.jQuery) return null;
 
-  const icon = document.createElement("span");
-  icon.classList.add("tree-icon");
-  item.appendChild(icon);
+  const $tree = window.jQuery(treeRootEl);
+  if (typeof $tree.fancytree !== "function") return null;
 
-  const label = document.createElement("span");
-  label.classList.add("label");
-  label.textContent = node.name;
-  item.appendChild(label);
-
-  return item;
+  return $tree.fancytree("getTree");
 }
 
-function renderTreeNodes(nodes, container) {
-  nodes.forEach((node) => {
-    if (node.type === "folder") {
-      const folderItem = createTreeItem(node);
-      folderItem.classList.add("expanded");
+function mapApiNodesToFancytree(nodes) {
+  return nodes.map((node) => {
+    const isFolder = node.type === "folder";
+    const children = Array.isArray(node.children) ? node.children : [];
 
-      const childrenContainer = document.createElement("div");
-      childrenContainer.classList.add("tree-children");
-
-      const children = Array.isArray(node.children) ? node.children : [];
-      renderTreeNodes(children, childrenContainer);
-
-      container.appendChild(folderItem);
-      container.appendChild(childrenContainer);
-    } else {
-      const leafItem = createTreeItem(node);
-      container.appendChild(leafItem);
-    }
+    return {
+      title: node.name,
+      key: node.path,
+      folder: isFolder,
+      extraClasses:
+        node.type === "folder"
+          ? "tree-node-folder"
+          : node.type === "image"
+          ? "tree-node-image"
+          : "tree-node-note",
+      data: {
+        type: node.type,
+        path: node.path,
+      },
+      children: isFolder ? mapApiNodesToFancytree(children) : undefined,
+    };
   });
 }
 
@@ -333,7 +330,6 @@ function setupNewItemButtons() {
     });
   }
 }
-
 async function loadTree() {
   const treeRootEl = document.getElementById("tree");
   if (!treeRootEl) return;
@@ -349,11 +345,69 @@ async function loadTree() {
 
     const data = await response.json();
     const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    const source = mapApiNodesToFancytree(nodes);
 
     treeRootEl.textContent = "";
-    const fragment = document.createDocumentFragment();
-    renderTreeNodes(nodes, fragment);
-    treeRootEl.appendChild(fragment);
+
+    if (!window.jQuery) {
+      console.error("jQuery is not available; Fancytree cannot be initialized.");
+      treeRootEl.textContent = "Unable to load notes tree.";
+      showError("Unable to load notes tree from the server.");
+      return;
+    }
+
+    const $tree = window.jQuery(treeRootEl);
+
+    if (typeof $tree.fancytree !== "function") {
+      console.error("Fancytree plugin is not available on the jQuery instance.");
+      treeRootEl.textContent = "Unable to load notes tree.";
+      showError("Unable to load notes tree from the server.");
+      return;
+    }
+
+    if (!treeInitialized) {
+      $tree.fancytree({
+        extensions: ["persist"],
+        source,
+        autoScroll: true,
+        clickFolderMode: 3,
+        tabbable: true,
+        focusOnSelect: true,
+        persist: {
+          expandLazy: true,
+          store: "local",
+          types: "expanded",
+        },
+        activate: (event, data) => {
+          const node = data.node;
+          if (!node || !node.data) return;
+
+          const nodeType = node.data.type;
+          const nodePath = node.data.path;
+
+          if (!nodePath) return;
+
+          if (nodeType === "note") {
+            loadNote(nodePath);
+          } else if (nodeType === "image") {
+            loadImage(nodePath);
+          }
+        },
+        keydown: (event, data) => {
+          if (event.key === "F2") {
+            event.preventDefault();
+            void handleRenameSelectedItem();
+          } else if (event.key === "Delete") {
+            event.preventDefault();
+            void handleDeleteSelectedItem();
+          }
+        },
+      });
+      treeInitialized = true;
+    } else {
+      const tree = $tree.fancytree("getTree");
+      tree.reload(source);
+    }
   } catch (error) {
     console.error("/api/tree request failed", error);
     treeRootEl.textContent = "Unable to load notes tree.";
@@ -401,16 +455,16 @@ async function loadNote(notePath) {
 }
 
 function getBaseFolderPathForNewItem() {
-  const treeRootEl = document.getElementById("tree");
-  if (!treeRootEl) return "";
+  const tree = getFancytreeInstance();
+  if (!tree) return "";
 
-  const selected = treeRootEl.querySelector(".tree-item.selected");
-  if (!selected) return "";
+  const node = tree.getActiveNode();
+  if (!node || !node.data) return "";
 
-  const path = selected.dataset.path || "";
+  const path = node.data.path || "";
   if (!path) return "";
 
-  if (selected.classList.contains("folder")) {
+  if (node.data.type === "folder") {
     return path;
   }
 
@@ -483,21 +537,21 @@ async function handleNewNoteClick() {
 }
 
 function getSelectedTreeItem() {
-  const treeRootEl = document.getElementById("tree");
-  if (!treeRootEl) return null;
-  return treeRootEl.querySelector(".tree-item.selected");
+  const tree = getFancytreeInstance();
+  if (!tree) return null;
+  return tree.getActiveNode();
 }
 
 async function handleRenameSelectedItem() {
   const item = getSelectedTreeItem();
   if (!item) return;
 
-  const path = item.dataset.path || "";
+  const path = item.data?.path || "";
   if (!path) return;
 
   const parts = path.split("/");
   const currentName = parts[parts.length - 1] || path;
-  const isNote = item.classList.contains("note");
+  const isNote = item.data?.type === "note";
 
   const baseName =
     isNote && currentName.toLowerCase().endsWith(".md")
@@ -530,7 +584,7 @@ async function handleRenameSelectedItem() {
       if (data.path) {
         loadNote(data.path);
       }
-    } else if (item.classList.contains("folder")) {
+    } else if (item.data?.type === "folder") {
       const response = await fetch("/api/folders/rename", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -553,7 +607,7 @@ async function handleDeleteSelectedItem() {
   const item = getSelectedTreeItem();
   if (!item) return;
 
-  const path = item.dataset.path || "";
+  const path = item.data?.path || "";
   if (!path) return;
 
   const confirmed = window.confirm(
@@ -561,8 +615,8 @@ async function handleDeleteSelectedItem() {
   );
   if (!confirmed) return;
 
-  const isNote = item.classList.contains("note");
-  const isFolder = item.classList.contains("folder");
+  const isNote = item.data?.type === "note";
+  const isFolder = item.data?.type === "folder";
 
   try {
     if (isNote) {
@@ -596,39 +650,102 @@ function setupTreeSelection() {
   const treeRootEl = document.getElementById("tree");
   if (!treeRootEl) return;
 
-  treeRootEl.addEventListener("click", (event) => {
+  treeRootEl.addEventListener("contextmenu", (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
-    const item = target.closest(".tree-item");
-    if (!item || !treeRootEl.contains(item)) return;
+    const nodeElem = target.closest("span.fancytree-node");
+    if (!nodeElem) return;
 
-    const previouslySelected = treeRootEl.querySelector(".tree-item.selected");
-    if (previouslySelected) {
-      previouslySelected.classList.remove("selected");
-    }
+    event.preventDefault();
 
-    item.classList.add("selected");
+    const tree = getFancytreeInstance();
+    if (!tree || !window.jQuery) return;
 
-    const path = item.dataset.path;
-    if (!path) return;
+    const node = window.jQuery(nodeElem).data("ftNode");
+    if (!node) return;
 
-    if (item.classList.contains("note")) {
-      loadNote(path);
-    } else if (item.classList.contains("image")) {
-      loadImage(path);
-    }
+    node.setActive();
+    openTreeContextMenu(event, node);
   });
+}
 
-  treeRootEl.addEventListener("keydown", (event) => {
-    if (event.key === "F2") {
-      event.preventDefault();
-      void handleRenameSelectedItem();
-    } else if (event.key === "Delete") {
-      event.preventDefault();
-      void handleDeleteSelectedItem();
+let activeContextMenu = null;
+
+function closeTreeContextMenu() {
+  if (activeContextMenu && activeContextMenu.parentNode) {
+    activeContextMenu.parentNode.removeChild(activeContextMenu);
+  }
+  activeContextMenu = null;
+}
+
+function openTreeContextMenu(event, node) {
+  closeTreeContextMenu();
+
+  const menu = document.createElement("div");
+  menu.className = "context-menu";
+
+  function addItem(label, handler, disabled) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "context-menu-item";
+    btn.textContent = label;
+    if (disabled) {
+      btn.disabled = true;
+    } else {
+      btn.addEventListener("click", () => {
+        closeTreeContextMenu();
+        handler();
+      });
     }
-  });
+    menu.appendChild(btn);
+  }
+
+  const isFolder = node.data?.type === "folder";
+  const isNote = node.data?.type === "note";
+
+  addItem("New folder", () => {
+    void handleNewFolderClick();
+  }, !isFolder);
+
+  addItem("New note", () => {
+    void handleNewNoteClick();
+  }, !isFolder);
+
+  const sep = document.createElement("div");
+  sep.className = "context-menu-separator";
+  menu.appendChild(sep);
+
+  addItem("Rename", () => {
+    void handleRenameSelectedItem();
+  }, !(isFolder || isNote));
+
+  addItem("Delete", () => {
+    void handleDeleteSelectedItem();
+  }, !(isFolder || isNote));
+
+  const sep2 = document.createElement("div");
+  sep2.className = "context-menu-separator";
+  menu.appendChild(sep2);
+
+  addItem("Manage .gitignore (not yet implemented)", () => {
+    showError("Gitignore management is not implemented yet.");
+  }, false);
+
+  document.body.appendChild(menu);
+  activeContextMenu = menu;
+
+  const { clientX, clientY } = event;
+  menu.style.left = `${clientX}px`;
+  menu.style.top = `${clientY}px`;
+
+  window.addEventListener(
+    "click",
+    () => {
+      closeTreeContextMenu();
+    },
+    { once: true },
+  );
 }
 
 function setActiveSettingsCategory(categoryId) {

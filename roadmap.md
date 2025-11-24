@@ -1,6 +1,6 @@
  # Roadmap
 
- This roadmap describes how the Markdown Notes App evolves from initial restructuring work to a stable **v1.0.0** release.
+ This roadmap describes how the Markdown Notes App evolves from initial restructuring work to a stable **v1.0.0*- release.
 
  The focus is on:
 
@@ -51,30 +51,45 @@
   - [x] Validate any new options needed for markdown rendering in settings.
 
 - **Frontend**
-  - [x] Replace the textarea + overlay editor with **Monaco Editor** while preserving:
+  - [x] Replace the textarea + overlay editor with **Monaco Editor*- while preserving:
     - [x] Line numbers.
     - [x] Scroll sync with viewer.
     - [-] Keyboard shortcuts for formatting. (hold off on this item)
-  - [x] Integrate **markdown-it** for client-side preview rendering, including:
+  - [x] Integrate **markdown-it*- for client-side preview rendering, including:
     - [x] Mermaid code fences rendered into `.mermaid` blocks.
 
- ---
+---
 
- ## v0.4.0 – Tree and Navigation Rework (Fancytree)
+## v0.4.0 – Tree and Navigation Rework (Fancytree)
 
- - **Frontend**
-  - [ ] Replace ad-hoc tree rendering with **Fancytree**.
-  - [ ] Map `/api/tree` JSON to Fancytree node structures.
-  - [ ] Preserve UX behaviors:
-    - [ ] Icons for folders, notes, and images.
-    - [ ] Expand/collapse state remembered across reloads.
-    - [ ] Keyboard navigation (up/down, expand/collapse).
-    - [ ] Context menu actions (new folder/note, rename, delete, gitignore management).
+- **Frontend**
+  - [x] Replace ad-hoc tree rendering with **Fancytree**.
+  - [x] Map `/api/tree` JSON to Fancytree node structures.
+  - [x] Preserve UX behaviors:
+    - [x] Icons for folders, notes, and images.
+    - [x] Expand/collapse state remembered across reloads.
+    - [x] Keyboard navigation (up/down, expand/collapse).
+    - [-] Context menu actions (new folder/note, rename, delete; gitignore management deferred).
 
- - **Backend**
-  - [ ] Keep `/api/tree` response stable enough for both old and new trees during transition if needed.
+- **Backend**
+  - [x] Keep `/api/tree` response stable enough for both old and new trees during transition if needed.
 
- ---
+---
+
+## v0.4.1 - Switch all navigation routes to GET
+
+- [ ] Update the interface so **all navigation inside the app actually uses GET URLs**, not just external links. When I click notes or use editor controls, the browser URL must update to reflect the current note and mode.
+  - [www.site.com/?note=/markdown.md&mode=edit](http://www.site.com/?note=/markdown.md&mode=edit)
+  - [www.site.com/?note=/markdown.md&mode=view](http://www.site.com/?note=/markdown.md&mode=view)
+  - [www.site.com/?note=/markdown.md&mode=export](http://www.site.com/?note=/markdown.md&mode=export)
+  - [www.site.com/?note=/markdown.md&mode=download](http://www.site.com/?note=/markdown.md&mode=download)
+- [ ] When a note is opened, ensure its tree item is expanded, visible, and selected.
+ the URL should look like:
+   - [www.site.com/?note=/markdown.md&mode=edit](http://www.site.com/?note=/markdown.md&mode=edit)
+   - [www.site.com/?note=/markdown.md&mode=view](http://www.site.com/?note=/markdown.md&mode=view)
+   - [www.site.com/?note=/markdown.md&mode=export](http://www.site.com/?note=/markdown.md&mode=export)
+   - [www.site.com/?note=/markdown.md&mode=download](http://www.site.com/?note=/markdown.md&mode=download)
+ - [ ] When a note is opened, ensure its tree item is expanded, visible, and selected.
 
  ## v0.5.0 – Search & Filters Enhancements
 
@@ -121,7 +136,7 @@
  ## v0.8.0 – GitPython-based Versioning
 
  - **Backend**
-  - [ ] Integrate **GitPython** for local notes and app repositories.
+  - [ ] Integrate **GitPython*- for local notes and app repositories.
   - [ ] Implement operations:
     - [ ] Commit and push notes repo.
     - [ ] Pull notes repo safely, with conflict awareness.
