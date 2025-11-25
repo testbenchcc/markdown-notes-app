@@ -392,6 +392,9 @@ The high-level implementation roadmap for the rework is tracked in [`roadmap.md`
 - **v0.9.2 – UX States & Logging**
   - Improve empty states, error banners, loading indicators, and logging around UX flows.
 
+- **v0.9.3 – Folder Download & Gitignore Toggles**
+  - Implement folder download and folder-level gitignore toggle behavior behind the context menu placeholders.
+
 - **v1.0.0 – Stable Release**
   - Finalize UX, testing, and deployment configuration and tag `v1.0.0`.
 

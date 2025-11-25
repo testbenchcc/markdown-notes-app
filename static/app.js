@@ -2350,7 +2350,6 @@ async function handleDeleteSelectedItem() {
     showError("Unable to delete item.");
   }
 }
-
 function setupTreeSelection() {
   const treeRootEl = document.getElementById("tree");
   if (!treeRootEl) return;
@@ -2359,18 +2358,26 @@ function setupTreeSelection() {
     const target = event.target;
     if (!(target instanceof Element)) return;
 
-    const nodeElem = target.closest("span.fancytree-node");
-    if (!nodeElem) return;
-
     event.preventDefault();
 
     const tree = getFancytreeInstance();
-    if (!tree || !window.jQuery) return;
+    if (!tree || !window.jQuery || !window.jQuery.ui || !window.jQuery.ui.fancytree) {
+      return;
+    }
 
-    const node = window.jQuery(nodeElem).data("ftNode");
-    if (!node) return;
+    const nodeElem = target.closest(".fancytree-node");
+    let node = null;
+    if (nodeElem) {
+      try {
+        node = window.jQuery.ui.fancytree.getNode(nodeElem) || null;
+      } catch {
+        node = null;
+      }
+      if (node) {
+        node.setActive();
+      }
+    }
 
-    node.setActive();
     openTreeContextMenu(event, node);
   });
 }
@@ -2435,6 +2442,82 @@ async function handleManageGitignore() {
   }
 }
 
+function expandAllTreeNodes() {
+  const tree = getFancytreeInstance();
+  if (!tree) return;
+  const root = tree.getRootNode();
+  if (!root) return;
+  root.visit((n) => {
+    if (n.children && n.children.length) {
+      n.setExpanded(true);
+    }
+  });
+}
+
+function collapseAllTreeNodes() {
+  const tree = getFancytreeInstance();
+  if (!tree) return;
+  const root = tree.getRootNode();
+  if (!root) return;
+  root.visit((n) => {
+    if (n !== root) {
+      n.setExpanded(false);
+    }
+  });
+}
+
+function expandAllSubfolders(node) {
+  if (!node) return;
+  node.setExpanded(true);
+  node.visit((child) => {
+    if (child !== node && child.folder) {
+      child.setExpanded(true);
+    }
+  });
+}
+
+function collapseAllSubfolders(node) {
+  if (!node) return;
+  node.visit((child) => {
+    if (child !== node && child.folder) {
+      child.setExpanded(false);
+    }
+  });
+}
+
+function handleFolderDownloadPlaceholder() {
+  showError("Folder download is not implemented yet.");
+}
+
+function handleFolderGitignoreTogglePlaceholder() {
+  showError(
+    "Per-folder .gitignore toggle is not implemented yet. Use 'Manage .gitignore for notes…' instead.",
+  );
+}
+
+function downloadFileForNode(node) {
+  if (!node || !node.data || !node.data.path) return;
+  const type = node.data.type;
+  const path = node.data.path;
+  if (type === "note") {
+    void loadNote(path, {
+      modeOverride: "download",
+      triggerAction: true,
+    });
+  } else if (type === "image") {
+    const safePath = toSafePath(path);
+    const link = document.createElement("a");
+    link.href = `/files/${safePath}`;
+    const parts = path.split("/");
+    link.download = parts[parts.length - 1] || "image";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } else {
+    showError("Download is only supported for notes and images.");
+  }
+}
+
 function closeTreeContextMenu() {
   if (activeContextMenu && activeContextMenu.parentNode) {
     activeContextMenu.parentNode.removeChild(activeContextMenu);
@@ -2464,32 +2547,103 @@ function openTreeContextMenu(event, node) {
     menu.appendChild(btn);
   }
 
-  const isFolder = node.data?.type === "folder";
-  const isNote = node.data?.type === "note";
+  const tree = getFancytreeInstance();
+  const hasTree = Boolean(tree);
+  const isFolder = node?.data?.type === "folder";
+  const isNote = node?.data?.type === "note";
+  const isImage = node?.data?.type === "image";
+  const hasNode = Boolean(node);
 
-  addItem("New folder", () => {
-    void handleNewFolderClick();
-  }, !isFolder);
+  // Available for all items and within the tree area
+  addItem("Expand all", () => {
+    expandAllTreeNodes();
+  }, !hasTree);
 
-  addItem("New note", () => {
-    void handleNewNoteClick();
-  }, !isFolder);
+  addItem("Collapse all", () => {
+    collapseAllTreeNodes();
+  }, !hasTree);
 
-  const sep = document.createElement("div");
-  sep.className = "context-menu-separator";
-  menu.appendChild(sep);
+  const globalSep = document.createElement("div");
+  globalSep.className = "context-menu-separator";
+  menu.appendChild(globalSep);
 
-  addItem("Rename", () => {
-    void handleRenameSelectedItem();
-  }, !(isFolder || isNote));
+  if (hasNode && isFolder) {
+    addItem("Expand all subfolders", () => {
+      expandAllSubfolders(node);
+    }, false);
 
-  addItem("Delete", () => {
-    void handleDeleteSelectedItem();
-  }, !(isFolder || isNote));
+    addItem("Collapse all subfolders", () => {
+      collapseAllSubfolders(node);
+    }, false);
 
-  const sep2 = document.createElement("div");
-  sep2.className = "context-menu-separator";
-  menu.appendChild(sep2);
+    addItem("New folder", () => {
+      void handleNewFolderClick();
+    }, false);
+
+    addItem("New note", () => {
+      void handleNewNoteClick();
+    }, false);
+
+    addItem("Add to .gitignore (toggle)", () => {
+      handleFolderGitignoreTogglePlaceholder();
+    }, false);
+
+    addItem("Download folder", () => {
+      handleFolderDownloadPlaceholder();
+    }, false);
+
+    const folderSep = document.createElement("div");
+    folderSep.className = "context-menu-separator";
+    menu.appendChild(folderSep);
+  }
+
+  if (hasNode && (isNote || isImage)) {
+    addItem(
+      "Open in edit mode",
+      () => {
+        if (!node || !isNote || !node.data?.path) return;
+        void loadNote(node.data.path, {
+          modeOverride: "edit",
+          triggerAction: false,
+        });
+      },
+      !isNote,
+    );
+
+    addItem(
+      "Export MD as HTML",
+      () => {
+        if (!node || !isNote || !node.data?.path) return;
+        void loadNote(node.data.path, {
+          modeOverride: "export",
+          triggerAction: true,
+        });
+      },
+      !isNote,
+    );
+
+    addItem("Download file", () => {
+      downloadFileForNode(node);
+    }, false);
+
+    const fileSep = document.createElement("div");
+    fileSep.className = "context-menu-separator";
+    menu.appendChild(fileSep);
+  }
+
+  if (hasNode) {
+    addItem("Rename", () => {
+      void handleRenameSelectedItem();
+    }, !(isFolder || isNote));
+
+    addItem("Delete", () => {
+      void handleDeleteSelectedItem();
+    }, !(isFolder || isNote));
+
+    const sepNode = document.createElement("div");
+    sepNode.className = "context-menu-separator";
+    menu.appendChild(sepNode);
+  }
 
   addItem(
     "Manage .gitignore for notes…",

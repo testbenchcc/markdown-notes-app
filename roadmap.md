@@ -372,6 +372,18 @@ $(function(){
 
 ---
 
+## v0.9.3 – Folder Download & Gitignore Toggles
+
+- **Backend**
+  - [ ] Add an endpoint to download a folder (and its contents) as a zip archive, using a path under the notes root.
+  - [ ] Extend notes versioning gitignore APIs to support folder-based toggle patterns for a specific subtree (e.g., add/remove patterns for a folder path).
+
+- **Frontend**
+  - [ ] Replace the "Download folder" context menu placeholder with a real download flow that calls the new folder export endpoint.
+  - [ ] Replace the "Add to .gitignore [toggle]" folder context menu placeholder with a real toggle that calls the new folder-based gitignore APIs and reflects toggle state in the UI.
+
+---
+
 ## v1.0.0 – Stable Release
 
 - **Definition of Done**
