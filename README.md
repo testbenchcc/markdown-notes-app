@@ -55,7 +55,7 @@ The goal is to preserve the existing layout, button placements, search position,
   - Single-page UI served from `static/index.html`.
   - Main behavior, including the Monaco-based markdown editor and markdown-it live preview, is implemented in `static/app.js`.
   - Settings modal markup is defined inline in `static/index.html` (see `.settings-overlay` / `.settings-modal`) and wired up via `static/app.js`.
-  - Multiple CSS themes (`styles.css`, `styles-office.css`, `styles-high-contrast.css`, `styles-midnight.css`) selectable via settings.
+  - Multiple visual themes (base, office, high-contrast, midnight) are implemented via CSS custom properties driven by `applyThemeFromSettings` in `static/app.js`, and are selectable via the Appearance section of the Settings modal.
 
 - **Deployment/runtime**
   - Typical dev workflow: `uvicorn main:app --reload` in a virtual environment.

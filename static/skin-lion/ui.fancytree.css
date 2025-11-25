@@ -6,7 +6,7 @@
  */
 /*
  Lion colors:
-	gray highlight bar: #D4D4D4
+	gray highlight bar: #D22366D
 	blue highlight-bar and -border #3875D7
 
 */
@@ -731,7 +731,7 @@ span.fancytree-focused span.fancytree-title {
 }
 span.fancytree-selected span.fancytree-title,
 span.fancytree-active span.fancytree-title {
-  background-color: #D4D4D4;
+  background-color: #324066;
 }
 span.fancytree-selected span.fancytree-title {
   font-style: italic;

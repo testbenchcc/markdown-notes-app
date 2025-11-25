@@ -329,7 +329,7 @@ body {
   position: fixed;
   min-width: 160px;
   padding: 0.25rem 0;
-  background: var(--md-bg-alt);
+  background: var(--md-menu-bg);
   border: 1px solid var(--md-border-subtle);
   border-radius: 4px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
@@ -389,16 +389,14 @@ body {
 
 .tree-item.note .tree-icon {
   background-image: url("/static/icons/file-single.png");
-  filter: invert(1);
 }
 
 .tree-item.image .tree-icon {
   background-image: url("/static/icons/file-single.png");
-  filter: invert(1);
 }
 
 .tree-item.folder .label {
-  color: var(--md-grey);
+  color: var(--md-text-muted);
 }
 
 .tree-item.note .label {
@@ -503,9 +501,10 @@ body.resizing {
   right: 0.75rem;
   top: 0.5rem;
   padding: 0.35rem 0.75rem;
-  background: rgba(0, 0, 0, 0.9);
+  background: var(--md-bg-alt-soft);
   border-radius: 4px;
   border: 1px solid var(--md-border-subtle);
+  color: var(--md-text-main);
   font-size: 0.8rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   text-align: center;
@@ -1000,7 +999,8 @@ body.resizing {
 }
 
 div.mermaid[data-processed="true"] {
-  background-color: #faf7f3;
+  background-color: var(--md-bg-alt-soft);
+  color: var(--md-text-main);
   padding: 1rem;
   border-radius: 4px;
   border: 1px solid var(--md-border-subtle);

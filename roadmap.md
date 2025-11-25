@@ -335,7 +335,7 @@ $(function(){
 ## v0.9.0 – Tree Context Menu & Navigation Polish
 
 - **Frontend**
-  - [ ] Add context menu to Fancytree. Application example: @example files\fancy-context-menu.html
+  - [x] Add context menu to Fancytree. Application example: @example files\fancy-context-menu.html
       - Available for all items, and within the menu area
           - Expand All
           - Collapse All
@@ -358,7 +358,7 @@ $(function(){
 ## v0.9.1 – Theme Polish
 
 - **Frontend**
-  - [ ] Polish themes (base, office, high contrast, midnight) and ensure they work with new components.
+  - [x] Polish themes (base, office, high contrast, midnight) and ensure they work with new components.
 
 ---
 
