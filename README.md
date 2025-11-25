@@ -383,8 +383,14 @@ The high-level implementation roadmap for the rework is tracked in [`roadmap.md`
 - **v0.8.0 – GitPython-based Versioning**
   - Adopt GitPython for local notes/app repos and align the versioning UI.
 
-- **v0.9.0 – UX Polish, Shortcuts, and Theming**
-  - Polish keyboard shortcuts, theming, empty states, and visual details.
+- **v0.9.0 – Tree Context Menu & Navigation Polish**
+  - Add Fancytree context menu actions and audit GET-based navigation behavior.
+
+- **v0.9.1 – Theme Polish**
+  - Refine base/office/high-contrast/midnight themes and align them with new components.
+
+- **v0.9.2 – UX States & Logging**
+  - Improve empty states, error banners, loading indicators, and logging around UX flows.
 
 - **v1.0.0 – Stable Release**
   - Finalize UX, testing, and deployment configuration and tag `v1.0.0`.

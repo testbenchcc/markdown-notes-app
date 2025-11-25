@@ -325,38 +325,62 @@ $(function(){
 - [x] Settings are maintained in a JSON file stored at the root of the `notes` folder.
 - [x] Settings are saved when the Save button is pressed in the modal. Pressing Save a second time within a few seconds closes the modal.
 
- ---
-
  ## v0.8.3 - Time zone setting
 
  - [x] Add a time zone setting under general.
- - [x] Adjust any times used to the set timezone, this includes Auto-sync status return.
+  - [x] Adjust any times used to the set timezone, this includes Auto-sync status return.
 
- ---
+---
 
- ## v0.9.0 – UX Polish, Shortcuts, and Theming
+## v0.9.0 – Tree Context Menu & Navigation Polish
 
- - **Frontend**
-  - [ ] Audit keyboard shortcuts and ensure they work correctly with Monaco.
+- **Frontend**
+  - [ ] Add context menu to Fancytree. Application example: @example files\fancy-context-menu.html
+      - Available for all items, and within the menu area
+          - Expand All
+          - Collapse All
+      - Available on folders
+          - Expand all subfolders
+          - Collapse all subfolders
+          - Add to .gitignore [toggle]
+          - Download folder
+          - Rename
+          - Delete
+      - Available on files
+          - Open in edit mode (text based files only)
+          - Export MD as HTML (future)
+          - Download file
+          - Rename
+          - Delete
+
+---
+
+## v0.9.1 – Theme Polish
+
+- **Frontend**
   - [ ] Polish themes (base, office, high contrast, midnight) and ensure they work with new components.
-  - [ ] Improve empty states, error banners, and loading indicators.
-  - [ ] Ensure responsive behavior is acceptable for common window sizes.
 
- - **Backend**
+---
+
+## v0.9.2 – UX States & Logging
+
+- **Frontend**
+  - [ ] Improve empty states, error banners, and loading indicators.
+
+- **Backend**
   - [ ] Add or refine logging to support debugging production issues.
 
- ---
+---
 
- ## v1.0.0 – Stable Release
+## v1.0.0 – Stable Release
 
- - **Definition of Done**
+- **Definition of Done**
   - [ ] All major feature areas preserved: notes tree, markdown editing, images, search, themes, versioning, export/import.
   - [ ] Monaco + markdown-it + Fancytree + GitPython are the primary implementation stack.
   - [ ] Core workflows have automated test coverage (backend + critical frontend paths).
 
- - **Release tasks**
+- **Release tasks**
   - [ ] Final UX pass for layout, labels, and navigation.
   - [ ] Prepare deployment configuration (Docker, Compose, or equivalent).
   - [ ] Tag `v1.0.0` in git with release notes summarizing the roadmap.
   - [ ] Update `README.md` with final feature list and pointers to this roadmap.
-
