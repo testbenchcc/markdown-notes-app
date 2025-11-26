@@ -169,9 +169,9 @@ The goal is to preserve the existing layout, button placements, search position,
 ### Export / import
 
 - **Export single note as HTML**
-  - `GET /api/export-note/{note_path}` with optional `theme`:
+  - `GET /api/export-note/{note_path}`:
     - Renders markdown to HTML using the same pipeline as the main viewer.
-    - Embeds CSS from base + theme variant.
+    - Inlines the main application stylesheet (`static/styles.css`) so the export is self-contained.
     - Inlines `mermaid.min.js` and runs it on `.mermaid` blocks.
     - Responds with a download of `note-name.html`.
 
@@ -403,6 +403,15 @@ The high-level implementation roadmap for the rework is tracked in [`roadmap.md`
 
 - **v0.9.3 – Folder Download & Gitignore Toggles**
   - Implement folder download and folder-level gitignore toggle behavior behind the context menu placeholders.
+
+- **v0.9.4 – Export & Import Completion**
+  - Implement single-note HTML export and notebook export/import flows with appropriate UX and safety checks.
+
+- **v0.9.5 – Automated Test Coverage**
+  - Expand backend and frontend/smoke tests for versioning, images, search, and core workflows.
+
+- **v0.9.6 – Release Prep & Ops**
+  - Perform final UX/content pass, validate Docker/Compose, document env configuration, and prepare release notes.
 
 - **v1.0.0 – Stable Release**
   - Finalize UX, testing, and deployment configuration and tag `v1.0.0`.

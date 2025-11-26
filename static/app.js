@@ -112,7 +112,7 @@ function ensureMarkdownRenderer() {
   markdownRenderer = window.markdownit({
     html: true,
     linkify: true,
-    breaks: false,
+    breaks: true
   });
 
   return markdownRenderer;

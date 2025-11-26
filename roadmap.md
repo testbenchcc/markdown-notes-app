@@ -357,12 +357,11 @@ $(function(){
 
 ## v0.9.1 – Theme Polish
 
-- **Frontend**
   - [x] Polish themes (base, office, high contrast, midnight) and ensure they work with new components.
 
 ---
 
-## v0.9.2 – UX States & Logging
+ ## v0.9.2 – UX States & Logging
 
 - **Frontend**
   - [x] Improve empty states, error banners, and loading indicators.
@@ -372,7 +371,7 @@ $(function(){
 
 ---
 
-## v0.9.3 – Folder Download & Gitignore Toggles
+ ## v0.9.3 – Folder Download & Gitignore Toggles
 
 - **Backend**
   - [x] Add an endpoint to download a folder (and its contents) as a zip archive, using a path under the notes root.
@@ -381,6 +380,52 @@ $(function(){
 - **Frontend**
   - [x] Replace the "Download folder" context menu placeholder with a real download flow that calls the new folder export endpoint.
   - [x] Replace the "Add to .gitignore [toggle]" folder context menu placeholder with a real toggle that calls the new folder-based gitignore APIs and reflects toggle state in the UI.
+
+---
+
+## v0.9.4 – Export & Import Completion
+
+- **Backend**
+  - [x] Implement `GET /api/export-note/{note_path}` for single-note HTML export using the existing markdown renderer, theme support, and Mermaid handling.
+  - [ ] Implement `GET /api/export` for notebook archive export (notes plus selected app files) with safe path handling and predictable contents.
+  - [ ] Implement `POST /api/import` for notebook archive import with timestamp-aware conflict handling and clear error responses.
+  - [ ] Add backend tests for export/import endpoints, including invalid paths, large notebooks, and mismatched timestamps.
+
+- **Frontend**
+  - [x] Ensure the toolbar "Export note" button and tree context menu "Export MD as HTML" use `GET /api/export-note/{note_path}` and download correctly.
+  - [ ] Add notebook Export/Import actions to the Settings modal, wired to the new `/api/export` and `/api/import` endpoints.
+  - [ ] Provide clear UX for long-running exports/imports (busy states, error messages, and success confirmations).
+
+---
+
+## v0.9.5 – Automated Test Coverage
+
+- **Backend**
+  - [ ] Extend pytest coverage to versioning endpoints (`/api/versioning/notes/commit-and-push`, `/pull`, and gitignore add/remove/folder-toggle endpoints).
+  - [ ] Add tests for image paste and image cleanup flows, including `dryRun=false` deletes and safety checks.
+  - [ ] Add regression tests for `/api/tree`, note/folder CRUD, and search limits (query length, per-file and global result caps).
+
+- **Frontend / QA**
+  - [ ] Establish a repeatable smoke test checklist (or automated tests where feasible) that covers:
+    - [ ] URL-driven navigation (`?note=`, `?mode=`, and `?search=`).
+    - [ ] Editing and saving notes with Monaco, including scroll sync with the viewer.
+    - [ ] Image paste workflow, including progress banner and oversized-image errors.
+    - [ ] Tree context menu operations: new folder/note, rename, delete, download, and .gitignore toggle.
+  - [ ] Document how to run the full test suite (pytest plus any frontend/smoke tests) in the README.
+
+---
+
+## v0.9.6 – Release Prep & Ops
+
+- **UX & Documentation**
+  - [ ] Run a final UX/content pass for layout, labels, empty states, banners, and error messages to ensure consistency.
+  - [ ] Update `README.md` with final feature list, roadmap cross-links, and screenshots or animated gifs where helpful.
+  - [ ] Add a short "Troubleshooting" section for common issues (git authentication, image paste size limits, export/import errors).
+
+- **Deployment & Release Mechanics**
+  - [ ] Validate `Dockerfile` and `docker-compose.yml` against the current FastAPI entrypoint, static assets, and vendor bundles.
+  - [ ] Document required environment variables in an `.env` template (notes root, Git remotes, GitHub API key, etc.).
+  - [ ] Draft v1.0.0 release notes based on this roadmap and confirm the tagging process for `v1.0.0`.
 
 ---
 

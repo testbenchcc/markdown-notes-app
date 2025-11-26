@@ -23,13 +23,14 @@ import time
 import zipfile
 from datetime import datetime
 from functools import lru_cache
+from html import escape as html_escape
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote, unquote
 
 import markdown
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, conint
 
@@ -579,6 +580,38 @@ def _render_markdown_html(markdown_text: str, tab_length: int = DEFAULT_TAB_LENG
     return html
 
 
+@lru_cache(maxsize=1)
+def _load_export_styles_css() -> str:
+    """Return the CSS used for HTML exports.
+
+    For now this simply inlines the main application stylesheet. If the file
+    is missing, exports still succeed but without custom styles.
+    """
+
+    css_path = APP_ROOT / "static" / "styles.css"
+    try:
+        return css_path.read_text(encoding="utf8")
+    except OSError:  # pragma: no cover - defensive fallback
+        logger.warning("Export CSS file not found at %s", css_path)
+        return ""
+
+
+@lru_cache(maxsize=1)
+def _load_export_mermaid_js() -> str:
+    """Return the Mermaid JS bundle for HTML exports.
+
+    Exports remain functional even if this asset is missing; Mermaid blocks
+    will simply render as plain code.
+    """
+
+    js_path = APP_ROOT / "static" / "mermaid.min.js"
+    try:
+        return js_path.read_text(encoding="utf8")
+    except OSError:  # pragma: no cover - defensive fallback
+        logger.warning("Mermaid JS file not found at %s", js_path)
+        return ""
+
+
 def _normalize_storage_component(value: str) -> str:
     raw = (value or "").strip()
     if not raw:
@@ -810,6 +843,72 @@ def put_note(note_path: str, payload: NoteContent) -> Dict[str, Any]:
         "path": _relative_to_notes_root(note_file),
         "name": note_file.name,
     }
+
+
+@app.get("/api/export-note/{note_path:path}", tags=["export"])
+def export_note(note_path: str) -> Response:
+    """Export a single markdown note as an HTML download.
+
+    The HTML uses the same markdown rendering pipeline as the main viewer,
+    with mermaid code fences converted to <div class="mermaid"> blocks and
+    the main stylesheet and Mermaid script inlined for portability.
+    """
+
+    try:
+        note_file = _resolve_relative_path(note_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not note_file.is_file() or note_file.suffix.lower() != NOTE_FILE_EXTENSION:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    content = note_file.read_text(encoding="utf8")
+    settings = _load_settings()
+    body_html = _render_markdown_html(content, tab_length=settings.tabLength)
+
+    title = note_file.stem or note_file.name
+    safe_title = html_escape(title)
+    styles = _load_export_styles_css()
+    mermaid_js = _load_export_mermaid_js()
+
+    html_doc = """<!doctype html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\" />
+  <title>{title}</title>
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <style>
+{styles}
+  </style>
+</head>
+<body>
+  <div class=\"content-view\">
+{body}
+  </div>
+  <script>
+{mermaid_js}
+  </script>
+  <script>
+  try {{
+    if (window.mermaid && typeof window.mermaid.init === "function") {{
+      window.mermaid.init(undefined, document.querySelectorAll(".mermaid"));
+    }}
+  }} catch (e) {{
+    console.error("Mermaid initialization failed in exported HTML", e);
+  }}
+  </script>
+</body>
+</html>
+""".format(
+        title=safe_title,
+        styles=styles,
+        body=body_html,
+        mermaid_js=mermaid_js,
+    )
+
+    download_name = f"{note_file.stem or note_file.name}.html"
+    headers = {"Content-Disposition": f"attachment; filename=\"{download_name}\""}
+    return Response(content=html_doc, media_type="text/html; charset=utf-8", headers=headers)
 
 
 class PasteImageResponse(BaseModel):
