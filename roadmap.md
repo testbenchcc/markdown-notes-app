@@ -1,6 +1,6 @@
  # Roadmap
 
- This roadmap describes how the Markdown Notes App evolves from initial restructuring work to a stable **v1.0.0*- release.
+ This roadmap describes how the Markdown Notes App evolves from initial restructuring work to a stable **v2.0.0*- release.
 
  The focus is on:
 
@@ -425,11 +425,11 @@ $(function(){
 - **Deployment & Release Mechanics**
   - [x] Validate `Dockerfile` and `docker-compose.yml` against the current FastAPI entrypoint, static assets, and vendor bundles.
   - [x] Document required environment variables in an `.env` template (notes root, Git remotes, GitHub API key, etc.).
-  - [x] Draft v1.0.0 release notes based on this roadmap and confirm the tagging process for `v1.0.0`.
+  - [x] Draft v2.0.0 release notes based on this roadmap and confirm the tagging process for `v2.0.0`.
 
 ---
 
-## v1.0.0 – Stable Release
+## v2.0.0 – Stable Release
 
 - **Definition of Done**
   - [x] All major feature areas preserved: notes tree, markdown editing, images, search, themes, versioning, export/import.
@@ -439,5 +439,5 @@ $(function(){
 - **Release tasks**
   - [x] Final UX pass for layout, labels, and navigation.
   - [x] Prepare deployment configuration (Docker, Compose, or equivalent).
-  - [ ] Tag `v1.0.0` in git with release notes summarizing the roadmap.
+  - [ ] Tag `v2.0.0` in git with release notes summarizing the roadmap.
   - [x] Update `README.md` with final feature list and pointers to this roadmap.

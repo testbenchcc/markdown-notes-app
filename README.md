@@ -11,11 +11,11 @@ This document summarizes the current implementation of the Markdown Notes App to
 
 The goal is to preserve the existing layout, button placements, search position, and overall UX while modernizing the internals.
 
-## Current Implementation Status (v1.0.0 stable release)
+## Current Implementation Status (v2.0.0 stable release)
 
 - FastAPI application skeleton in `main.py` with `GET /health`.
 - Notes root resolved from `NOTES_ROOT` env var or defaulting to `notes/` under the app root (directory is created on startup).
-- `requirements.txt` defines the backend dependencies (FastAPI + Uvicorn and related libraries); the rest of this document summarizes the implemented architecture as of v1.0.0.
+- `requirements.txt` defines the backend dependencies (FastAPI + Uvicorn and related libraries); the rest of this document summarizes the implemented architecture as of v2.0.0.
 - Minimal SPA shell under `static/` (`index.html`, `styles.css`, `app.js`) served from the FastAPI app at `/`.
 - Frontend currently uses the legacy layout structure (nav pane, divider, content pane), calls `/health` to display basic status information, and loads note content into the viewer when a note is selected from the tree using `GET /api/notes/{note_path}`.
 - Left-hand notes tree is implemented with **Fancytree**, backed by `/api/tree` (v0.4.0 work-increment).
@@ -369,7 +369,7 @@ This report is an inventory and baseline. Follow-up reports in `rework-report/` 
 
 ## Roadmap Overview
 
-The high-level implementation roadmap for the rework is tracked in [`roadmap.md`](./roadmap.md). It defines small, versioned increments from **v0.1.0** through **v1.0.0**:
+The high-level implementation roadmap for the rework is tracked in [`roadmap.md`](./roadmap.md). It defines small, versioned increments from **v0.1.0** through **v2.0.0**:
 
 - **v0.1.0 – Project Bootstrap**
   - Confirm FastAPI app structure, configuration, and health checks.
@@ -417,8 +417,8 @@ The high-level implementation roadmap for the rework is tracked in [`roadmap.md`
 - **v0.9.6 – Release Prep & Ops**
   - Perform final UX/content pass, validate Docker/Compose, document env configuration, and prepare release notes.
 
-- **v1.0.0 – Stable Release**
-  - Finalize UX, testing, and deployment configuration and tag `v1.0.0`.
+- **v2.0.0 – Stable Release**
+  - Finalize UX, testing, and deployment configuration and tag `v2.0.0`.
 
 ## Configuration and environment
 
@@ -451,9 +451,9 @@ To run with Compose:
 - Ensure `.env` exists next to `docker-compose.yml` (for example by copying `.env.example`).
 - Start the stack from the repository root using your preferred `docker compose` invocation.
 
-### Release notes and tagging for v1.0.0
+### Release notes and tagging for v2.0.0
 
-When preparing the `v1.0.0` release, the release notes should summarize the major feature areas delivered across the roadmap:
+When preparing the `v2.0.0` release, the release notes should summarize the major feature areas delivered across the roadmap:
 
 - File-based notes tree and CRUD with Fancytree navigation.
 - Monaco-based markdown editing with markdown-it preview and Mermaid support.
@@ -464,11 +464,11 @@ When preparing the `v1.0.0` release, the release notes should summarize the majo
 - Export single notes as HTML and export the full notebook as a zip.
 - Containerized deployment via Docker and Docker Compose.
 
-A typical tagging process for `v1.0.0` is:
+A typical tagging process for `v2.0.0` is:
 
 - Run the full backend test suite and the frontend/smoke checklist described below.
 - Confirm Docker/Compose startup, basic navigation, editing, image paste, search, export, and notes versioning all behave as expected.
-- Create a git tag `v1.0.0` on the release commit and push tags to the remote.
+- Create a git tag `v2.0.0` on the release commit and push tags to the remote.
 - Publish the release notes (for example in your hosting platform) referencing this README and `roadmap.md` as the detailed feature inventory.
 
 ## Troubleshooting
