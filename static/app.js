@@ -3,6 +3,7 @@ let monacoLoading = false;
 let markdownRenderer = null;
 let currentNotePath = null;
 let currentNoteContent = "";
+let currentFileType = "markdown";
 let currentMode = "view";
 let treeInitialized = false;
 let currentSearchHighlightIds = [];
@@ -158,6 +159,7 @@ function renderViewerHtml(html) {
   const viewerEl = document.getElementById("viewer");
   if (!viewerEl) return;
 
+  viewerEl.classList.remove("text-file-view", "csv-table-view");
   viewerEl.innerHTML = html;
 
   if (window.mermaid && typeof window.mermaid.init === "function") {
@@ -167,6 +169,114 @@ function renderViewerHtml(html) {
       console.error("Mermaid rendering failed", error);
     }
   }
+}
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+let currentCsvTable = null;
+
+function renderTextFileView(content) {
+  const viewerEl = document.getElementById("viewer");
+  if (!viewerEl) return;
+
+  viewerEl.classList.add("text-file-view");
+  viewerEl.classList.remove("csv-table-view");
+  viewerEl.innerHTML = `<pre>${escapeHtml(content || "")}</pre>`;
+}
+
+function renderCsvView(content) {
+  const viewerEl = document.getElementById("viewer");
+  if (!viewerEl) return;
+
+  viewerEl.classList.remove("text-file-view");
+  viewerEl.classList.add("csv-table-view");
+  viewerEl.innerHTML = "";
+
+  if (currentCsvTable && typeof currentCsvTable.destroy === "function") {
+    currentCsvTable.destroy();
+    currentCsvTable = null;
+  }
+
+  if (!window.Tabulator) {
+    const fallback = document.createElement("pre");
+    fallback.textContent = content || "";
+    viewerEl.appendChild(fallback);
+    return;
+  }
+
+  const raw = content || "";
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0);
+
+  if (!lines.length) {
+    const empty = document.createElement("div");
+    empty.textContent = "CSV file is empty.";
+    viewerEl.appendChild(empty);
+    return;
+  }
+
+  const headerCells = lines[0].split(",");
+  const hasHeader = headerCells.every((cell) => cell.trim() !== "");
+
+  const headers = hasHeader
+    ? headerCells.map((h) => h.trim() || "Column")
+    : headerCells.map((_, idx) => `Column ${idx + 1}`);
+
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  const columns = headers.map((title, index) => ({
+    title,
+    field: `col${index}`,
+  }));
+
+  const data = dataLines.map((line) => {
+    const cells = line.split(",");
+    const row = {};
+    headers.forEach((_, index) => {
+      row[`col${index}`] = (cells[index] ?? "").trim();
+    });
+    return row;
+  });
+
+  currentCsvTable = new window.Tabulator(viewerEl, {
+    data,
+    columns,
+    layout: "fitDataStretch",
+    height: "100%",
+  });
+}
+
+function getLanguageForPath(path, fileType) {
+  if (fileType === "markdown") return "markdown";
+
+  const lower = (path || "").toLowerCase();
+
+  if (lower.endsWith(".py")) return "python";
+  if (lower.endsWith(".js")) return "javascript";
+  if (lower.endsWith(".ts")) return "typescript";
+  if (lower.endsWith(".json")) return "json";
+  if (lower.endsWith(".css")) return "css";
+  if (lower.endsWith(".html") || lower.endsWith(".htm")) return "html";
+  if (lower.endsWith(".csv")) return "plaintext";
+
+  return "plaintext";
+}
+
+function setMonacoLanguageForCurrentFile() {
+  if (!monacoEditor || typeof monaco === "undefined") return;
+  const model = monacoEditor.getModel();
+  if (!model) return;
+
+  const lang = getLanguageForPath(currentNotePath || "", currentFileType);
+  monaco.editor.setModelLanguage(model, lang);
 }
 
 function parseUtcIsoToDate(isoString) {
@@ -1053,6 +1163,7 @@ function clearCurrentNoteDisplay() {
 
   if (viewerEl) {
     viewerEl.textContent = "Select a note from the tree to get started.";
+    viewerEl.classList.remove("hidden");
   }
 
   if (noteNameEl) {
@@ -1081,14 +1192,22 @@ function clearCurrentNoteDisplay() {
 
 function updatePreviewFromEditor() {
   if (!monacoEditor) return;
-
-  const md = ensureMarkdownRenderer();
-  if (!md) return;
-
   const value = monacoEditor.getValue();
-  const processed = preprocessMermaidFences(value);
-  const html = md.render(processed);
-  renderViewerHtml(html);
+
+  if (currentFileType === "markdown") {
+    const md = ensureMarkdownRenderer();
+    if (!md) return;
+
+    const processed = preprocessMermaidFences(value);
+    const html = md.render(processed);
+    renderViewerHtml(html);
+  } else if (currentFileType === "csv") {
+    // CSV remains view-only: just refresh the table view if needed.
+    renderCsvView(value);
+  } else {
+    // Generic text files: keep the viewer in sync using the text-file view.
+    renderTextFileView(value);
+  }
 }
 
 function initMonacoEditor() {
@@ -1117,6 +1236,8 @@ function initMonacoEditor() {
       wordWrap: "on",
       lineNumbers: "on",
     });
+
+    setMonacoLanguageForCurrentFile();
 
     if (currentNotePath) {
       monacoEditor.setValue(currentNoteContent || "");
@@ -1178,7 +1299,9 @@ async function saveCurrentNote() {
 function setMode(mode, options = {}) {
   const { skipUrlUpdate = false, replaceUrl = false, triggerAction = false } = options;
   const normalizedMode = normalizeMode(mode);
-  currentMode = normalizedMode;
+  const canEditInMonaco = currentFileType === "markdown" || currentFileType === "text";
+  const effectiveMode = !canEditInMonaco && normalizedMode === "edit" ? "view" : normalizedMode;
+  currentMode = effectiveMode;
 
   const viewerEl = document.getElementById("viewer");
   const editorWrapperEl = document.getElementById("editor-wrapper");
@@ -1200,35 +1323,51 @@ function setMode(mode, options = {}) {
     return;
   }
 
-  modeToggleBtn.disabled = false;
-  exportBtn.disabled = false;
+  const shouldShowEditor =
+    (currentFileType === "markdown" && effectiveMode === "edit") ||
+    currentFileType === "text";
+
+  modeToggleBtn.disabled = !canEditInMonaco;
   downloadBtn.disabled = false;
+  exportBtn.disabled = currentFileType !== "markdown";
 
-  if (normalizedMode === "edit") {
+  if (shouldShowEditor) {
     editorWrapperEl.classList.remove("hidden");
-    modeToggleBtn.setAttribute("aria-label", "View");
-    modeToggleBtn.setAttribute("title", "View");
-    initMonacoEditor();
-
-    if (monacoEditor) {
-      monacoEditor.setValue(currentNoteContent || "");
-      updatePreviewFromEditor();
-    }
   } else {
     editorWrapperEl.classList.add("hidden");
+  }
+
+  if (effectiveMode === "edit") {
+    modeToggleBtn.setAttribute("aria-label", "View");
+    modeToggleBtn.setAttribute("title", "View");
+  } else {
     modeToggleBtn.setAttribute("aria-label", "Edit");
     modeToggleBtn.setAttribute("title", "Edit");
   }
 
+  if (shouldShowEditor) {
+    initMonacoEditor();
+
+    if (monacoEditor) {
+      setMonacoLanguageForCurrentFile();
+      // Markdown is editable only in edit mode. Text-based files use Monaco in
+      // both view and edit modes: read-only in view, editable in edit.
+      const readOnly = currentFileType === "text" && effectiveMode !== "edit";
+      monacoEditor.updateOptions({ readOnly });
+      monacoEditor.setValue(currentNoteContent || "");
+      updatePreviewFromEditor();
+    }
+  }
+
   if (!skipUrlUpdate && currentNotePath) {
-    updateUrlState(currentNotePath, normalizedMode, { replace: replaceUrl });
+    updateUrlState(currentNotePath, effectiveMode, { replace: replaceUrl });
   }
 
   exportBtn.onclick = () => setMode("export", { triggerAction: true });
   downloadBtn.onclick = () => setMode("download", { triggerAction: true });
 
-  if (triggerAction && (normalizedMode === "export" || normalizedMode === "download")) {
-    void triggerNoteAction(normalizedMode);
+  if (triggerAction && (effectiveMode === "export" || effectiveMode === "download")) {
+    void triggerNoteAction(effectiveMode);
   }
 }
 
@@ -1269,7 +1408,14 @@ async function handleNoteDownload() {
     const content = data.content ?? "";
     const filename = data.name ?? currentNotePath.split("/").pop() ?? "note.md";
 
-    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    let mime = "text/plain;charset=utf-8";
+    if (currentFileType === "markdown") {
+      mime = "text/markdown;charset=utf-8";
+    } else if (currentFileType === "csv") {
+      mime = "text/csv;charset=utf-8";
+    }
+
+    const blob = new Blob([content], { type: mime });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
@@ -1709,13 +1855,32 @@ async function loadNote(notePath, options = {}) {
     noteNameEl.textContent = data.name ?? "";
     notePathEl.textContent = currentNotePath;
 
-    renderViewerHtml(data.html ?? "");
+    const fileType = typeof data.fileType === "string" ? data.fileType : "markdown";
+    currentFileType = fileType;
+
+    if (fileType === "markdown") {
+      viewerEl.classList.remove("hidden");
+      renderViewerHtml(data.html ?? "");
+    } else if (fileType === "csv") {
+      viewerEl.classList.remove("hidden");
+      renderCsvView(currentNoteContent);
+    } else {
+      // Generic text files: hide the viewer and rely solely on the Monaco
+      // editor for displaying and editing contents.
+      viewerEl.classList.add("hidden");
+      renderTextFileView("");
+    }
 
     if (typeof modeOverride === "string") {
       currentMode = normalizeMode(modeOverride);
     }
 
-    if (monacoEditor && currentMode === "edit") {
+    if (
+      monacoEditor &&
+      currentMode === "edit" &&
+      (currentFileType === "markdown" || currentFileType === "text")
+    ) {
+      setMonacoLanguageForCurrentFile();
       monacoEditor.setValue(currentNoteContent);
       updatePreviewFromEditor();
     }
@@ -2200,7 +2365,16 @@ function containsIllegalNameChars(name) {
 }
 
 function ensureNoteFileName(name) {
-  return name.toLowerCase().endsWith(".md") ? name : `${name}.md`;
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) return trimmed;
+
+  // If the user provided an explicit extension, respect it.
+  if (trimmed.includes(".")) {
+    return trimmed;
+  }
+
+  // No extension provided: default to .md for markdown notes.
+  return `${trimmed}.md`;
 }
 
 function buildDestinationPath(sourcePath, destinationName) {

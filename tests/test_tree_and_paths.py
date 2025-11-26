@@ -84,7 +84,7 @@ def test_build_notes_tree_and_api_tree(tmp_path):
     child_types = {(n["type"], n["name"]) for n in folder1["children"]}
     assert ("note", "note1.md") in child_types
     assert ("image", "image1.png") in child_types
-    assert all(name != "ignore.txt" for _, name in child_types)
+    assert ("note", "ignore.txt") in child_types
 
     client = TestClient(main.app)
     resp = client.get("/api/tree")

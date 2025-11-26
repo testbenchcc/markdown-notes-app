@@ -159,6 +159,25 @@ IMAGE_EXTENSIONS = {
     ".bmp",
     ".svg",
 }
+TEXT_FILE_EXTENSIONS = {
+    ".txt",
+    ".csv",
+    ".json",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".py",
+    ".php",
+    ".bat",
+    ".ps1",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".log",
+    ".html",
+    ".css",
+}
 DEFAULT_TAB_LENGTH = 4
 
 DEFAULT_MAX_PASTED_IMAGE_BYTES = 10 * 1024 * 1024
@@ -493,6 +512,25 @@ def _resolve_destination_path(source_relative: str, destination_relative: str) -
     return source, destination
 
 
+def _looks_like_text_file(path: Path) -> bool:
+    mime_type, _ = mimetypes.guess_type(path.name)
+    if mime_type and mime_type.startswith("text/"):
+        return True
+    return False
+
+
+def _classify_note_kind(note_file: Path) -> str:
+    suffix = note_file.suffix.lower()
+
+    if suffix == NOTE_FILE_EXTENSION:
+        return "markdown"
+    if suffix == ".csv":
+        return "csv"
+    if suffix in TEXT_FILE_EXTENSIONS or _looks_like_text_file(note_file):
+        return "text"
+    return "binary"
+
+
 def _build_tree_for_directory(directory: Path, root: Path) -> List[Dict[str, Any]]:
     entries: List[Dict[str, Any]] = []
 
@@ -515,6 +553,8 @@ def _build_tree_for_directory(directory: Path, root: Path) -> List[Dict[str, Any
                 node_type = "note"
             elif suffix in IMAGE_EXTENSIONS:
                 node_type = "image"
+            elif suffix in TEXT_FILE_EXTENSIONS or _looks_like_text_file(child):
+                node_type = "note"
             else:
                 continue
 
@@ -728,6 +768,7 @@ MARKDOWN_IT_STATIC_DIR = APP_ROOT / "node_modules" / "markdown-it" / "dist"
 JQUERY_STATIC_DIR = APP_ROOT / "node_modules" / "jquery" / "dist"
 JQUERY_UI_STATIC_DIR = APP_ROOT / "node_modules" / "jquery-ui" / "dist"
 FANCYTREE_STATIC_DIR = APP_ROOT / "node_modules" / "jquery.fancytree" / "dist"
+TABULATOR_STATIC_DIR = APP_ROOT / "node_modules" / "tabulator-tables" / "dist"
 
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -750,6 +791,9 @@ if JQUERY_UI_STATIC_DIR.is_dir():
 
 if FANCYTREE_STATIC_DIR.is_dir():
     app.mount("/vendor/fancytree", StaticFiles(directory=FANCYTREE_STATIC_DIR), name="fancytree")
+
+if TABULATOR_STATIC_DIR.is_dir():
+    app.mount("/vendor/tabulator", StaticFiles(directory=TABULATOR_STATIC_DIR), name="tabulator")
 
 
 @app.get("/", response_class=FileResponse, tags=["ui"])
@@ -817,15 +861,26 @@ def get_note(note_path: str) -> Dict[str, Any]:
     if not note_file.is_file():
         raise HTTPException(status_code=404, detail="Note not found")
 
-    content = note_file.read_text(encoding="utf8")
-    settings = _load_settings()
-    html = _render_markdown_html(content, tab_length=settings.tabLength)
+    kind = _classify_note_kind(note_file)
+    if kind == "binary":
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    try:
+        content = note_file.read_text(encoding="utf8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Note is not valid UTF-8 text") from exc
+
+    html = ""
+    if kind == "markdown":
+        settings = _load_settings()
+        html = _render_markdown_html(content, tab_length=settings.tabLength)
 
     return {
         "path": _relative_to_notes_root(note_file),
         "name": note_file.name,
         "content": content,
         "html": html,
+        "fileType": kind,
     }
 
 
@@ -990,7 +1045,9 @@ def rename_note(payload: RenameRequest) -> Dict[str, Any]:
     source_path = payload.sourcePath
     destination_path = payload.destinationPath
 
-    if not destination_path.endswith(NOTE_FILE_EXTENSION):
+    # Only auto-append .md when no extension is provided at all.
+    dest_suffix = Path(destination_path).suffix
+    if not dest_suffix:
         destination_path = f"{destination_path}{NOTE_FILE_EXTENSION}"
 
     try:
@@ -1218,7 +1275,8 @@ def create_folder(payload: CreateFolderRequest) -> Dict[str, Any]:
 @app.post("/api/notes", tags=["notes"], status_code=201)
 def create_note(payload: CreateNoteRequest) -> Dict[str, Any]:
     note_path = payload.path
-    if not note_path.endswith(NOTE_FILE_EXTENSION):
+    # Only auto-append .md when no extension is provided at all.
+    if not Path(note_path).suffix:
         note_path = f"{note_path}{NOTE_FILE_EXTENSION}"
 
     try:

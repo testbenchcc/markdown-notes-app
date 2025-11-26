@@ -7,11 +7,12 @@ This document summarizes the current implementation of the Markdown Notes App to
 - Uses Monaco Editor for editing.
 - Uses markdown-it for markdown rendering.
 - Uses Fancytree for the file/navigation pane.
+- Uses Tabulator for CSV table rendering in the viewer.
 - Uses GitPython for local git-based versioning of notes and app repositories.
 
 The goal is to preserve the existing layout, button placements, search position, and overall UX while modernizing the internals.
 
-## Current Implementation Status (v2.0.1 bug-fix release)
+## Current Implementation Status (v2.0.2 text-file support)
 
 - FastAPI application skeleton in `main.py` with `GET /health`.
 - Notes root resolved from `NOTES_ROOT` env var or defaulting to `notes/` under the app root (directory is created on startup).
@@ -24,6 +25,7 @@ The goal is to preserve the existing layout, button placements, search position,
 - Opening a note automatically expands, focuses, and selects its tree node so the navigation pane stays in sync with the URL-driven view (v0.4.1).
 - Tree renames now use the Fancytree inline editor (v0.4.2) so double-click, Shift+click, clickActive, and F2 all trigger an in-place rename that validates input before calling the existing rename endpoints, with the previous prompt kept as a fallback, and the inline input adopts the dark theme styles for a cohesive appearance.
 - v2.0.1 bug-fix patch: fixes the default mode after creating a new note (new notes now open in edit mode) and keeps the `mode` query parameter in sync when navigating via the Fancytree after export/download; see `roadmap.md` v2.0.1.
+- v2.0.2 feature patch: expands the notes tree and `/api/notes` to support additional text-based files (for example `.txt`, `.csv`, `.py`, `.js`, `.json`, `.bat`, `.ps1`, and other common text files). Markdown notes remain the only editable type; non-markdown text and CSV files are shown read-only in the viewer, with CSV rendered as a Tabulator table; see `roadmap.md` v2.0.2.
 - Minimal settings backend in `main.py`:
   - `NotebookSettings` model persisted to `.notebook-settings.json` under the notes root, including tab length, theme, index page title, and image paste limits.
   - `/api/settings` (`GET`/`PUT`) to load and validate settings, wiring `tabLength` into server-side markdown rendering and exposing theme/title to the frontend.
@@ -112,14 +114,21 @@ The goal is to preserve the existing layout, button placements, search position,
   - `GET /api/tree` exposes the notes hierarchy produced by `build_notes_tree()`:
     - Folders: `{ type: "folder", name, path, children: [...] }`.
     - Files: `{ type: "note" | "image", name, path }`.
-    - Hides dotfiles and includes only `.md` files and whitelisted image types.
+    - Hides dotfiles and includes:
+      - Markdown notes (`.md`).
+      - Additional text-based files (for example `.txt`, `.csv`, `.py`, `.js`, `.json`, `.bat`, `.ps1`, `.ini`, `.cfg`, `.conf`, `.log`, `.html`, `.css`, and other files detected as `text/*` by `mimetypes`).
+      - Whitelisted image types.
 
 - **Read single note**
   - `GET /api/notes/{note_path}`:
     - Validates path.
-    - Reads raw markdown.
-    - Renders HTML using `_render_markdown_html()` and settings-based `tabLength`.
-    - Returns `{ path, name, content, html }`.
+    - Reads UTF‑8 text content from the target file.
+    - Classifies the file as `markdown`, `text`, or `csv` via `fileType`:
+      - `markdown` – `.md` notes are rendered to HTML using `_render_markdown_html()` and settings-based `tabLength`.
+      - `text` – other text-based files are returned as raw text and displayed read-only in a code-like viewer (no markdown rendering).
+      - `csv` – CSV files are returned as raw text and rendered as tables in the frontend using Tabulator when in view mode.
+      - Non-text/binary files are rejected with `404` and do not appear in the tree.
+    - Returns `{ path, name, content, html, fileType }` (where `html` is populated only for markdown notes).
 
 - **Save single note**
   - `PUT /api/notes/{note_path}` with body `{ content }`:
@@ -229,8 +238,8 @@ The goal is to preserve the existing layout, button placements, search position,
     - Mode toggle (view/edit) using an edit icon.
     - Export note button.
   - Body:
-    - Markdown viewer (`#viewer`) on the left.
-    - Editor wrapper (`#editor-wrapper`) containing a line-number gutter and a `<div id="editor">` that hosts the Monaco editor on the right.
+    - Markdown/text viewer (`#viewer`) on the left. For markdown notes this shows rendered HTML; for other text-based files it shows a monospace, read-only code-style view; CSV files are rendered as Tabulator tables.
+    - Editor wrapper (`#editor-wrapper`) containing a line-number gutter and a `<div id="editor">` that hosts the Monaco editor on the right; editing is available only for markdown notes.
 
 - **Global**
   - Error banner at the top of the app for user-facing messages.
@@ -323,6 +332,8 @@ The roadmap and implementation indicate the following major feature areas that m
   - Syntax highlighting in both viewer and editor for fenced code blocks.
   - Line numbers in the editor.
   - Rich keyboard shortcuts for formatting and structural editing.
+  - Non-markdown text-based files (for example `.txt`, `.py`, `.js`, `.json`, `.bat`, `.ps1`, etc.) are loaded via `/api/notes` and editable in the Monaco editor using an appropriate language mode (for example Python, JavaScript, JSON, or plaintext). For these files, the Monaco editor is the primary way to view and edit content; the markdown-style viewer is not used.
+  - CSV notes are rendered as tables in the viewer using Tabulator when selected; they share the same tree and download flows as markdown notes but remain view-only.
 
 - **Images and assets**
   - Pasting images directly into the editor with automatic file naming and storage.

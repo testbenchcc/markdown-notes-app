@@ -447,4 +447,11 @@ $(function(){
 
 - [x] After creating a new note, mode used is view, we should be using edit.
 - [x] The GET url needs to update when using the fancy tree navigation. For example, clicking export button on a note will change he url to export mode, but after it saves  and we return the the normal screen, if I select another note, only the ?note= portin of the the url changes. The mode has not changed from ?mode=export
-- [ ] When in edit mode, mermaid charts change to indicate a syntax error. When edit mode is closed and the page refreshed, the chart is displayed again.
+- [-] When in edit mode, mermaid charts change to indicate a syntax error. When edit mode is closed and the page refreshed, the chart is displayed again. (skip for now)
+
+## v2.0.2 - Expand to support text based files
+
+- [x] Allow seeing text based files in the fancytree. (txt, csv, php, py, js, json, bat, ps1, and any other common text based files
+- [x] For non-CSV text-based files, use Monaco as both the viewing and editing surface (with language-aware syntax highlighting). The separate markdown viewer is reserved for markdown notes and CSV tables.
+- [x] Use `Tabulator` JS library to render CSV file tabular data when in view mode. CSV remains view-only; edit mode behavior for markdown and other text-based files is unchanged.
+
