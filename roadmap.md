@@ -401,17 +401,17 @@ $(function(){
 ## v0.9.5 – Automated Test Coverage
 
 - **Backend**
-  - [ ] Extend pytest coverage to versioning endpoints (`/api/versioning/notes/commit-and-push`, `/pull`, and gitignore add/remove/folder-toggle endpoints).
-  - [ ] Add tests for image paste and image cleanup flows, including `dryRun=false` deletes and safety checks.
-  - [ ] Add regression tests for `/api/tree`, note/folder CRUD, and search limits (query length, per-file and global result caps).
+  - [x] Extend pytest coverage to versioning endpoints (`/api/versioning/notes/commit-and-push`, `/pull`, and gitignore add/remove/folder-toggle endpoints).
+  - [x] Add tests for image paste and image cleanup flows, including `dryRun=false` deletes and safety checks.
+  - [x] Add regression tests for `/api/tree`, note/folder CRUD, and search limits (query length, per-file and global result caps).
 
 - **Frontend / QA**
-  - [ ] Establish a repeatable smoke test checklist (or automated tests where feasible) that covers:
-    - [ ] URL-driven navigation (`?note=`, `?mode=`, and `?search=`).
-    - [ ] Editing and saving notes with Monaco, including scroll sync with the viewer.
-    - [ ] Image paste workflow, including progress banner and oversized-image errors.
-    - [ ] Tree context menu operations: new folder/note, rename, delete, download, and .gitignore toggle.
-  - [ ] Document how to run the full test suite (pytest plus any frontend/smoke tests) in the README.
+  - [x] Establish a repeatable smoke test checklist (or automated tests where feasible) that covers:
+    - [x] URL-driven navigation (`?note=`, `?mode=`, and `?search=`).
+    - [x] Editing and saving notes with Monaco, including scroll sync with the viewer.
+    - [x] Image paste workflow, including progress banner and oversized-image errors.
+    - [x] Tree context menu operations: new folder/note, rename, delete, download, and .gitignore toggle.
+  - [x] Document how to run the full test suite (pytest plus any frontend/smoke tests) in the README.
 
 ---
 

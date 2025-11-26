@@ -420,4 +420,21 @@ The high-level implementation roadmap for the rework is tracked in [`roadmap.md`
 - **v1.0.0 – Stable Release**
   - Finalize UX, testing, and deployment configuration and tag `v1.0.0`.
 
+## Testing and automated coverage
+
+- **Backend tests (pytest)**
+  - Activate the project virtual environment (for example, `.venv`) and from the repository root run:
+    - `python -m pytest`
+  - Tests live under `tests/` and cover notes tree/paths, CRUD, rename/delete, images (paste/cleanup), export, settings, search limits, and GitPython-based versioning.
+
+- **Frontend / smoke tests (v0.9.5)**
+  - URL-driven navigation:
+    - Launch the app (for example, `uvicorn main:app --reload`) and verify that `?note=`, `?mode=`, and `?search=` in the URL correctly restore the selected note, editor/viewer mode, and search query.
+  - Editing and saving with Monaco:
+    - Open a note, switch between view/edit, confirm scroll sync between editor and viewer, and verify that saving persists changes on reload.
+  - Image paste workflow:
+    - Paste an image into an existing note, confirm that the upload progress banner appears and disappears as expected, and verify that oversized pastes produce a clear error while leaving existing content intact.
+  - Tree context menu operations:
+    - From the tree context menu, exercise new folder/note creation, rename, delete, folder download, and `.gitignore` toggle for a folder, confirming both backend effects and UI updates.
+
 Use `roadmap.md` as the source of truth for the detailed checklists for each version.
