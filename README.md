@@ -420,6 +420,93 @@ The high-level implementation roadmap for the rework is tracked in [`roadmap.md`
 - **v1.0.0 – Stable Release**
   - Finalize UX, testing, and deployment configuration and tag `v1.0.0`.
 
+## Configuration and environment
+
+### Environment variables
+
+The backend reads configuration from standard environment variables. For local development and Docker/Compose, the recommended workflow is:
+
+- Copy `.env.example` in the repository root to `.env`.
+- Fill in values that make sense for your environment (paths, Git remotes, and any optional GitHub API token).
+
+Key variables used by the app include:
+
+- `NOTES_ROOT` – base directory for all markdown notes. If omitted, defaults to a `notes/` folder under the app root.
+- `HOST`, `PORT`, `UVICORN_RELOAD` – FastAPI/Uvicorn host, port, and reload flag used when running `python main.py`.
+- `NOTES_REPO_REMOTE_URL` – remote URL for the notes repository used by GitPython-based auto-commit/pull/push and manual sync.
+- `APP_REPO_REMOTE_URL` – remote URL for the application repository (planned for future GitHub-backed history views).
+- `GITHUB_API_KEY` – optional GitHub fine-grained token for future metadata endpoints; not required for basic Git-based syncing.
+
+The `.env` file is ignored by git so that secrets and machine-specific paths are not committed.
+
+### Docker and Docker Compose
+
+Containerized usage is supported via the root `Dockerfile` and `docker-compose.yml`:
+
+- The Dockerfile builds a Python 3.11 image, installs backend dependencies plus the required frontend vendor packages (Monaco, markdown-it, Fancytree, jQuery, Mermaid), copies the app code, and runs `uvicorn main:app --host 0.0.0.0 --port 8000`.
+- `docker-compose.yml` builds this image and exposes the app on port 8000, loading configuration from a `.env` file via the `env_file: [.env]` directive so that `NOTES_ROOT`, `NOTES_REPO_REMOTE_URL`, `APP_REPO_REMOTE_URL`, and `GITHUB_API_KEY` are available inside the container.
+
+To run with Compose:
+
+- Ensure `.env` exists next to `docker-compose.yml` (for example by copying `.env.example`).
+- Start the stack from the repository root using your preferred `docker compose` invocation.
+
+### Release notes and tagging for v1.0.0
+
+When preparing the `v1.0.0` release, the release notes should summarize the major feature areas delivered across the roadmap:
+
+- File-based notes tree and CRUD with Fancytree navigation.
+- Monaco-based markdown editing with markdown-it preview and Mermaid support.
+- Image paste, storage modes, and image cleanup.
+- Search across notes.
+- Settings, themes, and keyboard shortcuts documentation.
+- GitPython-based notes versioning with auto-sync.
+- Export single notes as HTML and export the full notebook as a zip.
+- Containerized deployment via Docker and Docker Compose.
+
+A typical tagging process for `v1.0.0` is:
+
+- Run the full backend test suite and the frontend/smoke checklist described below.
+- Confirm Docker/Compose startup, basic navigation, editing, image paste, search, export, and notes versioning all behave as expected.
+- Create a git tag `v1.0.0` on the release commit and push tags to the remote.
+- Publish the release notes (for example in your hosting platform) referencing this README and `roadmap.md` as the detailed feature inventory.
+
+## Troubleshooting
+
+### Git versioning and authentication
+
+Notes versioning is handled by GitPython using the `NOTES_REPO_REMOTE_URL` remote and, optionally, a GitHub token. If you see errors like "Commit & push failed", "Pull failed", or commit/push operations that are repeatedly skipped:
+
+- Verify that `NOTES_REPO_REMOTE_URL` points to a reachable Git repository and that the container or host has network access to it.
+- Ensure credentials are configured for that remote (for example, via a credential helper or token-based URL).
+- Check that the repository is not in a detached HEAD state; GitPython will skip push operations in that case.
+- Use the Settings → Versioning panel to review the auto-sync status text, which shows the last commit/pull/push statuses and timestamps.
+
+If operations consistently fail, inspect server logs for the underlying Git error message (for example, non-fast-forward, permission denied, or network failures).
+
+### Image paste size limits
+
+If pasted images are rejected with an error indicating that the image is too large, or the UI shows a message like "Pasted image rejected" or "Image is too large" while the upload banner disappears:
+
+- The backend enforces a maximum size for pasted images using `imageMaxPasteBytes` from settings, with a default of 10MB.
+- The **Files & Images** section of the Settings modal exposes this as **Max pasted image size (MB)**. Increasing this value raises the allowed size; decreasing it makes the limit stricter.
+- Extremely large images will continue to be rejected even after raising the limit if the environment or browser cannot handle them comfortably.
+
+### Export and import
+
+Export functionality is implemented as:
+
+- **Export single note** – the content pane's **Export Note** button calls `GET /api/export-note/{note_path}` and downloads a self-contained HTML file with inlined styles and Mermaid support.
+- **Export notebook** – the **Notebook export** button in Settings → General calls `GET /api/export` and downloads a zip containing `notes/`, `static/`, and selected app files (including `main.py`, `Dockerfile`, `docker-compose.yml`, `requirements.txt`, `package.json`, `package-lock.json`, `README.md`, and `roadmap.md`).
+
+If exports fail:
+
+- Confirm the backend is reachable (for example, that `/health` and `/api/tree` succeed).
+- Check that the notes root is accessible and that there is sufficient disk space to build the archive.
+- Inspect server logs for details if the HTTP response includes a generic "Unable to export" error in the UI.
+
+Full notebook import is described in the architecture but remains a planned capability; some builds may not expose the `/api/import` endpoint or a corresponding UI yet. In those cases, use git-based workflows and the export zip for backup and transfer.
+
 ## Testing and automated coverage
 
 - **Backend tests (pytest)**

@@ -419,13 +419,13 @@ $(function(){
 
 - **UX & Documentation**
   - [ ] Run a final UX/content pass for layout, labels, empty states, banners, and error messages to ensure consistency.
-  - [ ] Update `README.md` with final feature list, roadmap cross-links, and screenshots or animated gifs where helpful.
-  - [ ] Add a short "Troubleshooting" section for common issues (git authentication, image paste size limits, export/import errors).
+  - [x] Update `README.md` with final feature list, roadmap cross-links, and screenshots or animated gifs where helpful.
+  - [x] Add a short "Troubleshooting" section for common issues (git authentication, image paste size limits, export/import errors).
 
 - **Deployment & Release Mechanics**
-  - [ ] Validate `Dockerfile` and `docker-compose.yml` against the current FastAPI entrypoint, static assets, and vendor bundles.
-  - [ ] Document required environment variables in an `.env` template (notes root, Git remotes, GitHub API key, etc.).
-  - [ ] Draft v1.0.0 release notes based on this roadmap and confirm the tagging process for `v1.0.0`.
+  - [x] Validate `Dockerfile` and `docker-compose.yml` against the current FastAPI entrypoint, static assets, and vendor bundles.
+  - [x] Document required environment variables in an `.env` template (notes root, Git remotes, GitHub API key, etc.).
+  - [x] Draft v1.0.0 release notes based on this roadmap and confirm the tagging process for `v1.0.0`.
 
 ---
 
