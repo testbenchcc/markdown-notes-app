@@ -13,12 +13,14 @@ from __future__ import annotations
 
 import json
 import logging
+import io
 import mimetypes
 import os
 import re
 import shutil
 import threading
 import time
+import zipfile
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -27,7 +29,7 @@ from urllib.parse import quote, unquote
 
 import markdown
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, conint
 
@@ -663,6 +665,10 @@ class GitignorePatternRequest(BaseModel):
     pattern: str
 
 
+class GitignoreFolderToggleRequest(BaseModel):
+    folderPath: str
+
+
 app = FastAPI(title="Markdown Notes App", version="0.1.0")
 
 
@@ -969,6 +975,29 @@ def get_file(file_rel_path: str) -> FileResponse:
     return FileResponse(file_path, media_type=content_type or "application/octet-stream")
 
 
+@app.get("/api/folders/{folder_path:path}/download", tags=["files"])
+def download_folder(folder_path: str) -> StreamingResponse:
+    try:
+        folder = _resolve_relative_path(folder_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not folder.is_dir():
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for file_path in folder.rglob("*"):
+            if file_path.is_file():
+                arcname = file_path.relative_to(folder).as_posix()
+                zf.write(file_path, arcname=arcname)
+
+    buffer.seek(0)
+    filename = f"{folder.name}.zip" if folder.name else "folder.zip"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return StreamingResponse(buffer, media_type="application/zip", headers=headers)
+
+
 @app.post("/api/images/cleanup", tags=["files"])
 def cleanup_images(dryRun: bool = True) -> ImageCleanupSummary:
     cfg = get_config()
@@ -1125,6 +1154,39 @@ def versioning_notes_gitignore_add(payload: GitignorePatternRequest) -> Dict[str
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     return result
+
+
+@app.post("/api/versioning/notes/gitignore/folder-toggle", tags=["versioning"])
+def versioning_notes_gitignore_folder_toggle(payload: GitignoreFolderToggleRequest) -> Dict[str, Any]:
+    try:
+        safe_folder = _validate_relative_path(payload.folderPath)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    cfg = get_config()
+    pattern = f"{safe_folder}/"
+
+    try:
+        add_result = add_gitignore_pattern(cfg.notes_root, pattern)
+        added = bool(add_result.get("added"))
+        if added:
+            ignored = True
+            lines = add_result.get("lines")
+        else:
+            remove_result = remove_gitignore_pattern(cfg.notes_root, pattern)
+            ignored = False
+            lines = remove_result.get("lines")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {
+        "folderPath": safe_folder,
+        "pattern": pattern,
+        "ignored": ignored,
+        "lines": lines,
+    }
 
 
 @app.post("/api/versioning/notes/gitignore/remove", tags=["versioning"])

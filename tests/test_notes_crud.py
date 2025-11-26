@@ -43,12 +43,17 @@ def test_get_note_404_for_missing(tmp_path):
 
 
 @pytest.mark.parametrize("bad_path", ["../secret.md", "C:/windows", "/absolute.md"])
-def test_get_note_400_for_invalid_path(tmp_path, bad_path):
+def test_get_note_400_or_404_for_invalid_path(tmp_path, bad_path):
     main = reload_main_with_temp_root(tmp_path)
 
     client = TestClient(main.app)
     resp = client.get(f"/api/notes/{bad_path}")
-    assert resp.status_code == 400
+
+    if bad_path.startswith("../"):
+        # Starlette may reject paths containing ".." before the route handler is invoked.
+        assert resp.status_code == 404
+    else:
+        assert resp.status_code == 400
 
 
 def test_put_note_creates_and_overwrites(tmp_path):

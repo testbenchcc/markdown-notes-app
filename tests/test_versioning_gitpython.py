@@ -88,6 +88,59 @@ def test_gitignore_add_and_remove_pattern(tmp_path):
     assert "*.log" not in lines_after
 
 
+def test_gitignore_folder_toggle(tmp_path):
+    main = reload_main_with_temp_root(tmp_path)
+    cfg = main.get_config()
+    root = cfg.notes_root
+
+    client = TestClient(main.app)
+
+    folder_rel = "foo/bar"
+    folder_dir = root / folder_rel
+    folder_dir.mkdir(parents=True, exist_ok=True)
+
+    # First toggle should add the folder pattern and mark it ignored.
+    resp_toggle_on = client.post(
+        "/api/versioning/notes/gitignore/folder-toggle",
+        json={"folderPath": folder_rel},
+    )
+    assert resp_toggle_on.status_code == 200
+    data_on = resp_toggle_on.json()
+    assert data_on["folderPath"] == folder_rel
+    assert data_on["pattern"] == "foo/bar/"
+    assert data_on["ignored"] is True
+
+    gitignore_path = root / ".gitignore"
+    assert gitignore_path.is_file()
+    lines = gitignore_path.read_text(encoding="utf8").splitlines()
+    assert "foo/bar/" in lines
+
+    # Second toggle should remove the pattern and mark it not ignored.
+    resp_toggle_off = client.post(
+        "/api/versioning/notes/gitignore/folder-toggle",
+        json={"folderPath": folder_rel},
+    )
+    assert resp_toggle_off.status_code == 200
+    data_off = resp_toggle_off.json()
+    assert data_off["folderPath"] == folder_rel
+    assert data_off["pattern"] == "foo/bar/"
+    assert data_off["ignored"] is False
+
+    lines_after = gitignore_path.read_text(encoding="utf8").splitlines()
+    assert "foo/bar/" not in lines_after
+
+
+def test_gitignore_folder_toggle_rejects_invalid_path(tmp_path):
+    main = reload_main_with_temp_root(tmp_path)
+
+    client = TestClient(main.app)
+    resp = client.post(
+        "/api/versioning/notes/gitignore/folder-toggle",
+        json={"folderPath": "../secret"},
+    )
+    assert resp.status_code == 400
+
+
 def test_pull_without_remote_is_skipped(tmp_path):
     main = reload_main_with_temp_root(tmp_path)
 

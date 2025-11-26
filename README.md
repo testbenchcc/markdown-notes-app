@@ -153,6 +153,11 @@ The goal is to preserve the existing layout, button placements, search position,
     - In **dry-run** mode (default), returns a summary of total/referenced/unused images and candidate paths without deleting files.
     - When `dryRun=false`, deletes the unused image files and returns which paths were removed.
 
+- **Download folder as zip**
+  - `GET /api/folders/{folder_path}/download` with `folder_path` relative to the notes root:
+    - Validates that the folder exists under the notes root.
+    - Streams a zip archive whose entries are paths relative to the selected folder.
+
 ### Search
 
 - **Text search across notes**
@@ -189,6 +194,7 @@ The goal is to preserve the existing layout, button placements, search position,
 - **Notes repository endpoints (implemented)**
   - `POST /api/versioning/notes/commit-and-push` and `/api/versioning/notes/pull` operate on the local notes repository under `NOTES_ROOT`, using GitPython for commit/push and conflict-aware pull behaviour.
   - `POST /api/versioning/notes/gitignore/add` and `/remove` adjust a `.gitignore` file under the notes root to include or remove ignore patterns.
+  - `POST /api/versioning/notes/gitignore/folder-toggle` toggles a folder-specific ignore pattern like `some/folder/` in `.gitignore` under the notes root.
 
 - **Additional endpoints (planned)**
   - `GET /api/versioning/app/history` and `/api/versioning/notes/history` to view commits, releases, and tags via GitHub APIs.
@@ -351,7 +357,7 @@ The roadmap and implementation indicate the following major feature areas that m
   - We must preserve:
     - Icons for open/closed folders, notes, and images.
     - Expand/collapse all actions and keyboard navigation.
-    - Context menu commands including gitignore integration.
+    - Context menu commands including gitignore integration and folder-level actions like "Download folder" and "Add to .gitignore (toggle)".
 
 This report is an inventory and baseline. Follow-up reports in `rework-report/` will define the v2 design for Monaco, markdown-it, and Fancytree, and describe a migration plan from the current implementation.
 

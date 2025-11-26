@@ -2501,14 +2501,68 @@ function collapseAllSubfolders(node) {
   });
 }
 
-function handleFolderDownloadPlaceholder() {
-  showError("Folder download is not implemented yet.");
+function handleFolderDownload(node) {
+  if (!node || !node.data || !node.data.path) {
+    showError("Folder download is only available for folders.");
+    return;
+  }
+
+  const relPath = node.data.path;
+  const safePath = toSafePath(relPath);
+
+  const link = document.createElement("a");
+  link.href = `/api/folders/${safePath}/download`;
+  const parts = relPath.split("/");
+  const folderName = parts[parts.length - 1] || "folder";
+  link.download = `${folderName}.zip`;
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
-function handleFolderGitignoreTogglePlaceholder() {
-  showError(
-    "Per-folder .gitignore toggle is not implemented yet. Use 'Manage .gitignore for notes…' instead.",
-  );
+async function handleFolderGitignoreToggle(node) {
+  if (!node || !node.data || !node.data.path) {
+    showError("Gitignore toggle is only available for folders.");
+    return;
+  }
+
+  const folderPath = node.data.path;
+
+  try {
+    const response = await fetch("/api/versioning/notes/gitignore/folder-toggle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderPath }),
+    });
+
+    if (!response.ok) {
+      let detail = `request failed with status ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data && data.detail) {
+          detail = data.detail;
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+      showError(`Folder .gitignore toggle failed: ${detail}`);
+      return;
+    }
+
+    const data = await response.json();
+    const ignored = Boolean(data.ignored);
+    const label = folderPath || node.title || "folder";
+
+    if (ignored) {
+      showError(`Folder '${label}' is now ignored in .gitignore.`);
+    } else {
+      showError(`Folder '${label}' is no longer ignored in .gitignore.`);
+    }
+  } catch (error) {
+    console.error("Folder gitignore toggle request failed", error);
+    showError("Unable to toggle .gitignore entry for folder.");
+  }
 }
 
 function downloadFileForNode(node) {
@@ -2601,11 +2655,11 @@ function openTreeContextMenu(event, node) {
     }, false);
 
     addItem("Add to .gitignore (toggle)", () => {
-      handleFolderGitignoreTogglePlaceholder();
+      void handleFolderGitignoreToggle(node);
     }, false);
 
     addItem("Download folder", () => {
-      handleFolderDownloadPlaceholder();
+      handleFolderDownload(node);
     }, false);
 
     const folderSep = document.createElement("div");

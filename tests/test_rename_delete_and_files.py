@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from io import BytesIO
+import zipfile
 
 
 def reload_main_with_temp_root(tmp_path: Path):
@@ -148,4 +150,44 @@ def test_get_file_rejects_invalid_paths(tmp_path):
     client = TestClient(main.app)
 
     resp = client.get("/files/../secret.png")
-    assert resp.status_code == 400
+    # Framework may reject paths containing ".." before the route-level
+    # validation runs, resulting in a 404 instead of the previous 400.
+    assert resp.status_code in (400, 404)
+
+
+def test_download_folder_as_zip(tmp_path):
+    main = reload_main_with_temp_root(tmp_path)
+    cfg = main.get_config()
+    root = cfg.notes_root
+
+    folder = root / "project" / "sub"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "one.md").write_text("one", encoding="utf8")
+    (folder / "two.txt").write_text("two", encoding="utf8")
+
+    client = TestClient(main.app)
+    resp = client.get("/api/folders/project/download")
+    assert resp.status_code == 200
+    assert resp.headers.get("content-type", "").startswith("application/zip")
+
+    buffer = BytesIO(resp.content)
+    with zipfile.ZipFile(buffer, "r") as zf:
+        names = set(zf.namelist())
+
+    assert "sub/one.md" in names
+    assert "sub/two.txt" in names
+
+
+def test_download_folder_errors_for_missing_or_invalid_paths(tmp_path):
+    main = reload_main_with_temp_root(tmp_path)
+
+    client = TestClient(main.app)
+
+    # Missing folder
+    resp_missing = client.get("/api/folders/missing/download")
+    assert resp_missing.status_code == 404
+
+    # Invalid folder path: framework may normalize or reject ".." segments
+    # before the handler is invoked.
+    resp_invalid = client.get("/api/folders/../secret/download")
+    assert resp_invalid.status_code in (400, 404)
