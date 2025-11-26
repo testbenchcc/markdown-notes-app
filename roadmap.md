@@ -365,10 +365,10 @@ $(function(){
 ## v0.9.2 – UX States & Logging
 
 - **Frontend**
-  - [ ] Improve empty states, error banners, and loading indicators.
+  - [x] Improve empty states, error banners, and loading indicators.
 
 - **Backend**
-  - [ ] Add or refine logging to support debugging production issues.
+  - [x] Add or refine logging to support debugging production issues.
 
 ---
 

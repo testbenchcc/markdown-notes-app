@@ -222,7 +222,9 @@ The goal is to preserve the existing layout, button placements, search position,
     - Editor wrapper (`#editor-wrapper`) containing a line-number gutter and a `<div id="editor">` that hosts the Monaco editor on the right.
 
 - **Global**
-  - Error banner at the top of the app for user-facing error messages.
+  - Error banner at the top of the app for user-facing messages.
+    Errors are shown prominently and auto-hide after a short delay;
+    some flows reuse the banner for non-blocking success or info messages.
   - Hidden file input for notebook import.
   - `mermaid.min.js`, `markdown-it.min.js`, the Monaco AMD loader, and `app.js` loaded at the bottom of the body.
 
@@ -252,18 +254,19 @@ The goal is to preserve the existing layout, button placements, search position,
 
 - **Keyboard shortcuts** (per roadmap + `settings-modal.html`)
   - Editing shortcuts for bold/italics/links/code, lists, headings.
-  - Save and toggle view/edit via keyboard.
-  - Insert current date/time based on configurable patterns.
-  - Indent/unindent and duplicate lines.
-  - Shortcut behavior is modified when the cursor is inside inline code or fenced code blocks: only save, indenting, and duplication remain active.
-
-### Tree and navigation (from `app.js`)
 
 - Tree is rendered using **Fancytree** backed by the `/api/tree` JSON:
   - API nodes are mapped to Fancytree nodes with folder, note, and image classes for icons and styling.
   - Expand/collapse state is persisted via the `persist` extension and restored on reload.
   - Context menu overlay supports actions like new folder/note, rename (via F2 or explicit menu actions), delete, expand/collapse, and gitignore management (per roadmap).
-  - The tree data is refreshed on startup, after create/rename/delete operations, and whenever the window regains focus so external filesystem changes appear automatically.
+  - **Improved UX states**:
+    - Auto-hiding global banner for non-blocking success/info messages.
+    - Empty tree state displays a friendly message prompting the user to create their first note.
+  - **Backend logging**:
+    - Versioning and auto-sync operations are logged for debugging and troubleshooting purposes.
+    - Logs include information about Git commands executed, sync status, and any errors encountered.
+  - When there are no notes yet, the tree shows a friendly empty state message
+    prompting you to create your first note.
 
 - Search integration:
   - Search box issues `GET /api/search?q=...`.

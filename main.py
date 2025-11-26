@@ -12,6 +12,7 @@ versioning APIs described in README.md and roadmap.md.
 from __future__ import annotations
 
 import json
+import logging
 import mimetypes
 import os
 import re
@@ -41,6 +42,7 @@ from git_versioning import (
 
 
 APP_ROOT = Path(__file__).resolve().parent
+logger = logging.getLogger("markdown_notes_app")
 
 
 class AppConfig:
@@ -241,6 +243,13 @@ def _run_auto_commit(notes_root: Path, remote_url: Optional[str]) -> None:
         entry["lastResult"] = result
         entry["lastError"] = error
 
+    logger.info(
+        "auto-commit completed status=%s committed=%s error=%s",
+        status,
+        bool(result.get("committed")) if isinstance(result, dict) else None,
+        error,
+    )
+
 
 def _run_auto_pull(notes_root: Path, remote_url: Optional[str]) -> None:
     started_at = _auto_sync_now_iso()
@@ -296,6 +305,13 @@ def _run_auto_pull(notes_root: Path, remote_url: Optional[str]) -> None:
             conflict_entry["conflictBranch"] = conflict_update["conflictBranch"]
             conflict_entry["lastError"] = conflict_update["lastError"]
 
+    logger.info(
+        "auto-pull completed status=%s conflict_active=%s error=%s",
+        status,
+        bool(_AUTO_SYNC_STATE["conflict"]["active"]),
+        error,
+    )
+
 
 def _run_auto_push(notes_root: Path, remote_url: Optional[str]) -> None:
     started_at = _auto_sync_now_iso()
@@ -334,6 +350,13 @@ def _run_auto_push(notes_root: Path, remote_url: Optional[str]) -> None:
         entry["lastStatus"] = status
         entry["lastResult"] = result
         entry["lastError"] = error
+
+    logger.info(
+        "auto-push completed status=%s pushed=%s error=%s",
+        status,
+        bool(result.get("pushed")) if isinstance(result, dict) else None,
+        error,
+    )
 
 
 def _auto_sync_loop() -> None:
@@ -1043,8 +1066,14 @@ def versioning_notes_commit_and_push(
             commit_message=payload.message if payload else None,
         )
     except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.exception("manual commit-and-push failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    logger.info(
+        "manual commit-and-push completed committed=%s pushed=%s",
+        bool(result.get("committed")) if isinstance(result, dict) else None,
+        bool(result.get("pushed")) if isinstance(result, dict) else None,
+    )
     return result
 
 
@@ -1077,8 +1106,10 @@ def versioning_notes_pull() -> Dict[str, Any]:
     try:
         result = pull_notes_with_rebase(notes_root=cfg.notes_root, remote_url=remote_url)
     except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.exception("manual pull failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+    logger.info("manual pull completed status=%s", str(result.get("status")) if isinstance(result, dict) else None)
     return result
 
 

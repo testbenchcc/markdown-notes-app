@@ -85,6 +85,14 @@ body {
   border-bottom: 1px solid var(--md-border-subtle);
 }
 
+.error-banner.banner-success {
+  background: var(--md-h2);
+}
+
+.error-banner.banner-info {
+  background: var(--md-bg-alt-soft);
+}
+
 #main {
   flex: 1;
   display: flex;
@@ -265,6 +273,14 @@ body {
   overflow-y: auto;
   font-size: 0.85rem;
   background: var(--md-menu-bg);
+}
+
+#tree[data-empty-tree="true"]::before {
+  content: "No notes yet. Use the New Note button to create your first note.";
+  display: block;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--md-text-muted);
 }
 
 #tree:focus {

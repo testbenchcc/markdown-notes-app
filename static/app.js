@@ -11,6 +11,7 @@ let latestSearchRequestId = 0;
 let isSyncingScrollFromEditor = false;
 let isSyncingScrollFromViewer = false;
 let uploadBannerHideTimerId = null;
+let errorBannerHideTimerId = null;
 let notebookSettings = null;
 let settingsDirty = false;
 let suppressSettingsDirtyTracking = false;
@@ -1360,8 +1361,19 @@ async function loadImage(imagePath) {
 function showError(message) {
   const banner = document.getElementById("error-banner");
   if (!banner) return;
+
+  if (errorBannerHideTimerId !== null) {
+    window.clearTimeout(errorBannerHideTimerId);
+    errorBannerHideTimerId = null;
+  }
+
   banner.textContent = message;
   banner.classList.remove("hidden");
+
+  errorBannerHideTimerId = window.setTimeout(() => {
+    banner.classList.add("hidden");
+    errorBannerHideTimerId = null;
+  }, 6000);
 }
 
 function getUploadBannerElement() {
@@ -1601,10 +1613,12 @@ async function loadTree() {
 
     const data = await response.json();
     const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    treeRootEl.dataset.emptyTree = nodes.length ? "false" : "true";
     const source = mapApiNodesToFancytree(nodes);
 
     if (!window.jQuery) {
       console.error("jQuery is not available; Fancytree cannot be initialized.");
+      treeRootEl.dataset.emptyTree = "false";
       treeRootEl.textContent = "Unable to load notes tree.";
       showError("Unable to load notes tree from the server.");
       return;
@@ -1614,6 +1628,7 @@ async function loadTree() {
 
     if (typeof $tree.fancytree !== "function") {
       console.error("Fancytree plugin is not available on the jQuery instance.");
+      treeRootEl.dataset.emptyTree = "false";
       treeRootEl.textContent = "Unable to load notes tree.";
       showError("Unable to load notes tree from the server.");
       return;
@@ -1640,6 +1655,7 @@ async function loadTree() {
     }
   } catch (error) {
     console.error("/api/tree request failed", error);
+    treeRootEl.dataset.emptyTree = "false";
     treeRootEl.textContent = "Unable to load notes tree.";
     showError("Unable to load notes tree from the server.");
   }
