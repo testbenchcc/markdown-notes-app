@@ -291,7 +291,7 @@ The goal is to preserve the existing layout, button placements, search position,
     - Enforced against `imageMaxPasteBytes` from settings, with an optional confirm dialog when exceeded.
 
 - Settings modal categories:
-  - **General**: spellcheck, title, tab width, date/time formats, auto-save interval, export/import buttons.
+  - **General**: spellcheck, title, tab width, date/time formats, auto-save interval, and a notebook export button (import remains planned for a later increment).
   - **File handling**: image display mode, max dimensions, default alignment, storage folder, image size limits, cleanup.
   - **Versioning**: auto-commit/pull/push toggles and intervals, notes remote URL and GitHub API key status, manual “Commit & push now” and “Pull now” actions, and an auto-sync status readout. GitHub-backed history views remain planned for a future increment.
   - **Appearance**: theme selection and export theme selection.

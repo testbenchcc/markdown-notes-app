@@ -1017,6 +1017,15 @@ async function handleRunImageCleanup() {
   }
 }
 
+function triggerNotebookExport() {
+  const link = document.createElement("a");
+  link.href = "/api/export";
+  link.download = "";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 async function loadNotebookSettings() {
   try {
     const response = await fetch("/api/settings");
@@ -2865,6 +2874,7 @@ function setupSettingsModal() {
   const closeBtn = document.getElementById("settings-close-btn");
   const footerCloseBtn = document.getElementById("settings-footer-close-btn");
   const saveBtn = document.getElementById("settings-footer-save-btn");
+  const exportNotebookBtn = document.getElementById("settings-export-notebook-btn");
   const runCleanupBtn = document.getElementById("settings-run-image-cleanup-btn");
   const autoSyncStatusBtn = document.getElementById(
     "settings-refresh-auto-sync-status-btn",
@@ -2893,6 +2903,12 @@ function setupSettingsModal() {
   saveBtn.addEventListener("click", () => {
     void handleSettingsSave();
   });
+
+  if (exportNotebookBtn) {
+    exportNotebookBtn.addEventListener("click", () => {
+      triggerNotebookExport();
+    });
+  }
 
   if (runCleanupBtn) {
     runCleanupBtn.addEventListener("click", () => {
