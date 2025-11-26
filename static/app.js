@@ -1052,7 +1052,7 @@ function clearCurrentNoteDisplay() {
   const downloadBtn = document.getElementById("note-download-btn");
 
   if (viewerEl) {
-    viewerEl.textContent = "Select a note to begin.";
+    viewerEl.textContent = "Select a note from the tree to get started.";
   }
 
   if (noteNameEl) {
@@ -1816,7 +1816,7 @@ function renderSearchResults(results, query) {
   const count = Array.isArray(results) ? results.length : 0;
   summary.textContent = count
     ? `${count} match${count === 1 ? "" : "es"}`
-    : "No matches";
+    : "No matches found";
 
   const clearBtn = document.createElement("button");
   clearBtn.type = "button";
@@ -1839,7 +1839,7 @@ function renderSearchResults(results, query) {
   if (!count) {
     const empty = document.createElement("div");
     empty.className = "search-results-empty";
-    empty.textContent = "No matches found.";
+    empty.textContent = "No matches found. Try a different search term.";
     container.appendChild(empty);
     return;
   }

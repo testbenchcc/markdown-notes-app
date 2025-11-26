@@ -418,7 +418,7 @@ $(function(){
 ## v0.9.6 – Release Prep & Ops
 
 - **UX & Documentation**
-  - [ ] Run a final UX/content pass for layout, labels, empty states, banners, and error messages to ensure consistency.
+  - [x] Run a final UX/content pass for layout, labels, empty states, banners, and error messages to ensure consistency.
   - [x] Update `README.md` with final feature list, roadmap cross-links, and screenshots or animated gifs where helpful.
   - [x] Add a short "Troubleshooting" section for common issues (git authentication, image paste size limits, export/import errors).
 
