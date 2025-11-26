@@ -439,5 +439,12 @@ $(function(){
 - **Release tasks**
   - [x] Final UX pass for layout, labels, and navigation.
   - [x] Prepare deployment configuration (Docker, Compose, or equivalent).
-  - [ ] Tag `v2.0.0` in git with release notes summarizing the roadmap.
+  - [x] Tag `v2.0.0` in git with release notes summarizing the roadmap.
   - [x] Update `README.md` with final feature list and pointers to this roadmap.
+
+
+## v2.0.1 - Bug fixes
+
+- [x] After creating a new note, mode used is view, we should be using edit.
+- [x] The GET url needs to update when using the fancy tree navigation. For example, clicking export button on a note will change he url to export mode, but after it saves  and we return the the normal screen, if I select another note, only the ?note= portin of the the url changes. The mode has not changed from ?mode=export
+- [ ] When in edit mode, mermaid charts change to indicate a syntax error. When edit mode is closed and the page refreshed, the chart is displayed again.

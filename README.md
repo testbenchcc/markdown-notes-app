@@ -11,11 +11,11 @@ This document summarizes the current implementation of the Markdown Notes App to
 
 The goal is to preserve the existing layout, button placements, search position, and overall UX while modernizing the internals.
 
-## Current Implementation Status (v2.0.0 stable release)
+## Current Implementation Status (v2.0.1 bug-fix release)
 
 - FastAPI application skeleton in `main.py` with `GET /health`.
 - Notes root resolved from `NOTES_ROOT` env var or defaulting to `notes/` under the app root (directory is created on startup).
-- `requirements.txt` defines the backend dependencies (FastAPI + Uvicorn and related libraries); the rest of this document summarizes the implemented architecture as of v2.0.0.
+- `requirements.txt` defines the backend dependencies (FastAPI + Uvicorn and related libraries); the rest of this document summarizes the implemented architecture as of v2.0.1.
 - Minimal SPA shell under `static/` (`index.html`, `styles.css`, `app.js`) served from the FastAPI app at `/`.
 - Frontend currently uses the legacy layout structure (nav pane, divider, content pane), calls `/health` to display basic status information, and loads note content into the viewer when a note is selected from the tree using `GET /api/notes/{note_path}`.
 - Left-hand notes tree is implemented with **Fancytree**, backed by `/api/tree` (v0.4.0 work-increment).
@@ -23,6 +23,7 @@ The goal is to preserve the existing layout, button placements, search position,
 - Client navigation is now fully **GET-based** (v0.4.1): selecting notes or switching modes updates `?note=...&mode=...` in the URL, browser history works with back/forward, and direct links deep-link the UI state.
 - Opening a note automatically expands, focuses, and selects its tree node so the navigation pane stays in sync with the URL-driven view (v0.4.1).
 - Tree renames now use the Fancytree inline editor (v0.4.2) so double-click, Shift+click, clickActive, and F2 all trigger an in-place rename that validates input before calling the existing rename endpoints, with the previous prompt kept as a fallback, and the inline input adopts the dark theme styles for a cohesive appearance.
+- v2.0.1 bug-fix patch: fixes the default mode after creating a new note (new notes now open in edit mode) and keeps the `mode` query parameter in sync when navigating via the Fancytree after export/download; see `roadmap.md` v2.0.1.
 - Minimal settings backend in `main.py`:
   - `NotebookSettings` model persisted to `.notebook-settings.json` under the notes root, including tab length, theme, index page title, and image paste limits.
   - `/api/settings` (`GET`/`PUT`) to load and validate settings, wiring `tabLength` into server-side markdown rendering and exposing theme/title to the frontend.

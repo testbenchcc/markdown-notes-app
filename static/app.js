@@ -1569,7 +1569,12 @@ function initializeFancytree(treeRootEl, source) {
       if (!nodePath) return;
 
       if (nodeType === "note") {
-        void loadNote(nodePath);
+        const normalizedCurrentMode = normalizeMode(currentMode);
+        const modeForNavigation =
+          normalizedCurrentMode === "export" || normalizedCurrentMode === "download"
+            ? "view"
+            : normalizedCurrentMode;
+        void loadNote(nodePath, { modeOverride: modeForNavigation });
       } else if (nodeType === "image") {
         loadImage(nodePath);
       }
@@ -2163,7 +2168,7 @@ async function handleNewNoteClick() {
 
     await loadTree();
     if (notePath) {
-      void loadNote(notePath);
+      void loadNote(notePath, { modeOverride: "edit" });
     }
   } catch (error) {
     console.error("/api/notes (create) request failed", error);
