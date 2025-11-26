@@ -387,7 +387,7 @@ $(function(){
 
 - **Backend**
   - [x] Implement `GET /api/export-note/{note_path}` for single-note HTML export using the existing markdown renderer, theme support, and Mermaid handling.
-  - [ ] Implement `GET /api/export` for notebook archive export (notes plus selected app files) with safe path handling and predictable contents.
+  - [x] Implement `GET /api/export` for notebook archive export (notes plus selected app files) with safe path handling and predictable contents.
   - [ ] Implement `POST /api/import` for notebook archive import with timestamp-aware conflict handling and clear error responses.
   - [ ] Add backend tests for export/import endpoints, including invalid paths, large notebooks, and mismatched timestamps.
 

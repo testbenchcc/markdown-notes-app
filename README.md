@@ -176,8 +176,12 @@ The goal is to preserve the existing layout, button placements, search position,
     - Responds with a download of `note-name.html`.
 
 - **Export notebook archive**
-  - `GET /api/export` (from earlier scans):
-    - Builds a zip containing the notebook files and selected app files (per roadmap: notes, static, app files, Docker files, etc.).
+  - `GET /api/export`:
+    - Builds a zip archive with a predictable layout:
+      - All content under the notes root stored under `notes/`.
+      - All static assets stored under `static/`.
+      - Selected app root files (for example, `main.py`, `Dockerfile`, `docker-compose.yml`,
+        `requirements.txt`, `package.json`, `package-lock.json`, `README.md`, and `roadmap.md`) stored at the archive root.
 
 - **Import notebook archive**
   - `POST /api/import` with zip `file` and optional `force`:

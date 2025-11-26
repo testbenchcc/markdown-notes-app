@@ -911,6 +911,65 @@ def export_note(note_path: str) -> Response:
     return Response(content=html_doc, media_type="text/html; charset=utf-8", headers=headers)
 
 
+@app.get("/api/export", tags=["export"])
+def export_notebook() -> StreamingResponse:
+    """Export the notebook and selected app files as a zip archive.
+
+    The archive has a predictable structure:
+
+    - All content under the notes root is stored under a top-level `notes/` folder.
+    - All static assets are stored under a top-level `static/` folder.
+    - Selected application files are stored at the root of the archive
+      (for example, `main.py`, `Dockerfile`, `docker-compose.yml`,
+      `requirements.txt`, `package.json`, `package-lock.json`,
+      `README.md`, and `roadmap.md`).
+    """
+
+    cfg = get_config()
+    notes_root = cfg.notes_root
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        # Notes tree under notes/
+        if notes_root.is_dir():
+            for file_path in notes_root.rglob("*"):
+                if file_path.is_file():
+                    rel = file_path.relative_to(notes_root).as_posix()
+                    arcname = f"notes/{rel}" if rel else "notes"
+                    zf.write(file_path, arcname=arcname)
+
+        # Static assets under static/
+        if STATIC_DIR.is_dir():
+            for file_path in STATIC_DIR.rglob("*"):
+                if file_path.is_file():
+                    rel = file_path.relative_to(STATIC_DIR).as_posix()
+                    arcname = f"static/{rel}" if rel else "static"
+                    zf.write(file_path, arcname=arcname)
+
+        # Selected app root files at archive root
+        app_root_files = [
+            "main.py",
+            "Dockerfile",
+            "docker-compose.yml",
+            "requirements.txt",
+            "package.json",
+            "package-lock.json",
+            "README.md",
+            "roadmap.md",
+        ]
+
+        for name in app_root_files:
+            path = APP_ROOT / name
+            if path.is_file():
+                zf.write(path, arcname=name)
+
+    buffer.seek(0)
+    timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    filename = f"notebook-export-{timestamp}.zip"
+    headers = {"Content-Disposition": f"attachment; filename=\"{filename}\""}
+    return StreamingResponse(buffer, media_type="application/zip", headers=headers)
+
+
 class PasteImageResponse(BaseModel):
     path: str
     markdown: str
