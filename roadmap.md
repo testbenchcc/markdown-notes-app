@@ -432,12 +432,12 @@ $(function(){
 ## v1.0.0 – Stable Release
 
 - **Definition of Done**
-  - [ ] All major feature areas preserved: notes tree, markdown editing, images, search, themes, versioning, export/import.
-  - [ ] Monaco + markdown-it + Fancytree + GitPython are the primary implementation stack.
-  - [ ] Core workflows have automated test coverage (backend + critical frontend paths).
+  - [x] All major feature areas preserved: notes tree, markdown editing, images, search, themes, versioning, export/import.
+  - [x] Monaco + markdown-it + Fancytree + GitPython are the primary implementation stack.
+  - [x] Core workflows have automated test coverage (backend + critical frontend paths).
 
 - **Release tasks**
-  - [ ] Final UX pass for layout, labels, and navigation.
-  - [ ] Prepare deployment configuration (Docker, Compose, or equivalent).
+  - [x] Final UX pass for layout, labels, and navigation.
+  - [x] Prepare deployment configuration (Docker, Compose, or equivalent).
   - [ ] Tag `v1.0.0` in git with release notes summarizing the roadmap.
-  - [ ] Update `README.md` with final feature list and pointers to this roadmap.
+  - [x] Update `README.md` with final feature list and pointers to this roadmap.

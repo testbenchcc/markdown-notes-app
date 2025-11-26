@@ -11,11 +11,11 @@ This document summarizes the current implementation of the Markdown Notes App to
 
 The goal is to preserve the existing layout, button placements, search position, and overall UX while modernizing the internals.
 
-## Current Implementation Status (v0.1.0 bootstrap)
+## Current Implementation Status (v1.0.0 stable release)
 
 - FastAPI application skeleton in `main.py` with `GET /health`.
 - Notes root resolved from `NOTES_ROOT` env var or defaulting to `notes/` under the app root (directory is created on startup).
-- `requirements.txt` defines the initial backend dependencies (FastAPI + Uvicorn); the rest of this document describes the target architecture for later roadmap stages.
+- `requirements.txt` defines the backend dependencies (FastAPI + Uvicorn and related libraries); the rest of this document summarizes the implemented architecture as of v1.0.0.
 - Minimal SPA shell under `static/` (`index.html`, `styles.css`, `app.js`) served from the FastAPI app at `/`.
 - Frontend currently uses the legacy layout structure (nav pane, divider, content pane), calls `/health` to display basic status information, and loads note content into the viewer when a note is selected from the tree using `GET /api/notes/{note_path}`.
 - Left-hand notes tree is implemented with **Fancytree**, backed by `/api/tree` (v0.4.0 work-increment).
