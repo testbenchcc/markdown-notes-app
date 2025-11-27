@@ -4,14 +4,16 @@ networks:
     name: comm_net
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  mermaid-local:
     image: markdown-notes-app:latest
+    build:
+      context: https://github.com/testbenchcc/markdown-notes-app.git
+      dockerfile: Dockerfile
     container_name: markdown-notes-app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
     env_file:
       - .env
+    restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

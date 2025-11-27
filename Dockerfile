@@ -5,13 +5,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install system dependencies (if needed in future). Keep minimal for now.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential \
-    && apt-get install -y git \
-    && apt-get install -y nano \
-    && apt-get install -y npm \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends build-essential
+RUN apt-get install -y git
+RUN apt-get install -y nano
+RUN apt-get install -y npm
+RUN rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt

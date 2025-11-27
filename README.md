@@ -559,5 +559,6 @@ Full notebook import is described in the architecture but remains a planned capa
     - Search for diagrams, then:
       - Use **Insert raw** to insert a standard ```mermaid fenced block and verify it renders correctly in both the live preview and view mode.
       - Use **Insert linked** to insert a ```mermaid-remote fenced block. Verify that in view mode and HTML exports the diagram is rendered using content fetched from Mermaid Local, while the underlying note still contains only the lightweight linked fence.
+      - Diagrams whose content is not valid Mermaid (for example plain text with no recognizable diagram type) will skip preview rendering for that tile without blocking other diagram previews; errors for those items are logged for debugging.
 
 Use `roadmap.md` as the source of truth for the detailed checklists for each version.

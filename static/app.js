@@ -2595,7 +2595,15 @@ function renderMermaidInsertResults(diagrams, query) {
         if (result && typeof result.then === "function") {
           result.catch((error) => {
             console.error("Mermaid rendering failed in insert modal", error);
-            if (typeof showError === "function") {
+            const isUnknownDiagramError =
+              error &&
+              (error.hash === "UnknownDiagramError" ||
+                (typeof error.message === "string" &&
+                  error.message.indexOf("No diagram type detected") !== -1) ||
+                (typeof error.str === "string" &&
+                  error.str.indexOf("No diagram type detected") !== -1));
+
+            if (!isUnknownDiagramError && typeof showError === "function") {
               showError(
                 buildMermaidErrorMessage(
                   error,
@@ -2607,7 +2615,15 @@ function renderMermaidInsertResults(diagrams, query) {
         }
       } catch (error) {
         console.error("Mermaid rendering failed in insert modal", error);
-        if (typeof showError === "function") {
+        const isUnknownDiagramError =
+          error &&
+          (error.hash === "UnknownDiagramError" ||
+            (typeof error.message === "string" &&
+              error.message.indexOf("No diagram type detected") !== -1) ||
+            (typeof error.str === "string" &&
+              error.str.indexOf("No diagram type detected") !== -1));
+
+        if (!isUnknownDiagramError && typeof showError === "function") {
           showError(
             buildMermaidErrorMessage(
               error,
