@@ -501,7 +501,7 @@ Notes versioning is handled by GitPython using the `NOTES_REPO_REMOTE_URL` remot
 - Verify that `NOTES_REPO_REMOTE_URL` points to a reachable Git repository and that the container or host has network access to it.
 - Ensure credentials are configured for that remote (for example, via a credential helper or token-based URL).
 - Check that the repository is not in a detached HEAD state; GitPython will skip push operations in that case.
-- Use the Settings → Versioning panel to review the auto-sync status text, which shows the last commit/pull/push statuses and timestamps.
+- Use the Settings → Versioning panel to review the auto-sync status text, which shows the last commit/pull/push statuses, conflict state, and timestamps. After resolving a conflict manually, running **Pull now** from this panel updates the status and clears any stale conflict marker.
 
 If operations consistently fail, inspect server logs for the underlying Git error message (for example, non-fast-forward, permission denied, or network failures).
 

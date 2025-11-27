@@ -471,4 +471,6 @@ $(function(){
 - [x] Catch Mermaid `init` promise rejections in the viewer, live edit-mode preview, and Mermaid Local insert modal so invalid or malformed diagrams no longer produce noisy `Uncaught (in promise)` console errors, while still logging failures for debugging.
 - [x] Expand ```mermaid-remote fenced blocks in the edit-mode live preview by calling the Mermaid Local API from the frontend so linked diagrams render while editing when the service is reachable; if client-side expansion fails for any reason, fall back to showing the original fenced block as code without modifying the saved note content.
 
-## v2.2.0 -
+## v2.2.0 - Versioning polish
+
+- [x] Ensure manual notes pull updates auto-sync status and conflict state so the Versioning settings panel reflects the current repository state.

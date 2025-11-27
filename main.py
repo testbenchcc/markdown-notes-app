@@ -238,6 +238,31 @@ def _auto_sync_now_iso() -> str:
     return datetime.utcnow().isoformat() + "Z"
 
 
+def _auto_sync_update_pull_state(
+    *,
+    started_at: str,
+    finished_at: str,
+    result: Dict[str, Any] | None,
+    status: str,
+    error: Optional[str],
+    conflict_update: Optional[Dict[str, Any]],
+) -> None:
+    with _AUTO_SYNC_LOCK:
+        entry = _AUTO_SYNC_STATE["pull"]
+        entry["lastRunStartedAt"] = started_at
+        entry["lastRunCompletedAt"] = finished_at
+        entry["lastStatus"] = status
+        entry["lastResult"] = result
+        entry["lastError"] = error
+
+        if conflict_update is not None:
+            conflict_entry = _AUTO_SYNC_STATE["conflict"]
+            conflict_entry["active"] = conflict_update["active"]
+            conflict_entry["lastConflictAt"] = conflict_update["lastConflictAt"]
+            conflict_entry["conflictBranch"] = conflict_update["conflictBranch"]
+            conflict_entry["lastError"] = conflict_update["lastError"]
+
+
 def _run_auto_commit(notes_root: Path, remote_url: Optional[str]) -> None:
     started_at = _auto_sync_now_iso()
 
@@ -278,13 +303,6 @@ def _run_auto_commit(notes_root: Path, remote_url: Optional[str]) -> None:
 
 def _run_auto_pull(notes_root: Path, remote_url: Optional[str]) -> None:
     started_at = _auto_sync_now_iso()
-
-    with _AUTO_SYNC_LOCK:
-        entry = _AUTO_SYNC_STATE["pull"]
-        entry["lastRunStartedAt"] = started_at
-        entry["lastStatus"] = "running"
-        entry["lastError"] = None
-
     result: Dict[str, Any] | None = None
     status = "error"
     error: Optional[str] = None
@@ -316,19 +334,14 @@ def _run_auto_pull(notes_root: Path, remote_url: Optional[str]) -> None:
 
     finished_at = _auto_sync_now_iso()
 
-    with _AUTO_SYNC_LOCK:
-        entry = _AUTO_SYNC_STATE["pull"]
-        entry["lastRunCompletedAt"] = finished_at
-        entry["lastStatus"] = status
-        entry["lastResult"] = result
-        entry["lastError"] = error
-
-        if conflict_update is not None:
-            conflict_entry = _AUTO_SYNC_STATE["conflict"]
-            conflict_entry["active"] = conflict_update["active"]
-            conflict_entry["lastConflictAt"] = conflict_update["lastConflictAt"]
-            conflict_entry["conflictBranch"] = conflict_update["conflictBranch"]
-            conflict_entry["lastError"] = conflict_update["lastError"]
+    _auto_sync_update_pull_state(
+        started_at=started_at,
+        finished_at=finished_at,
+        result=result,
+        status=status,
+        error=error,
+        conflict_update=conflict_update,
+    )
 
     logger.info(
         "auto-pull completed status=%s conflict_active=%s error=%s",
@@ -1482,13 +1495,62 @@ def versioning_notes_pull() -> Dict[str, Any]:
     cfg = get_config()
     remote_url = os.getenv("NOTES_REPO_REMOTE_URL") or None
 
+    started_at = _auto_sync_now_iso()
+    result: Dict[str, Any] | None = None
+    status = "error"
+    error: Optional[str] = None
+    conflict_update: Dict[str, Any] | None = None
+
     try:
         result = pull_notes_with_rebase(notes_root=cfg.notes_root, remote_url=remote_url)
+
+        status_value = str(result.get("status") or "unknown")
+        status = status_value
+        error = result.get("error")
+
+        if status_value == "conflict":
+            conflict_update = {
+                "active": True,
+                "lastConflictAt": started_at,
+                "conflictBranch": result.get("conflictBranch"),
+                "lastError": error,
+            }
+        elif status_value in {"ok", "skipped"}:
+            conflict_update = {
+                "active": False,
+                "lastConflictAt": None,
+                "conflictBranch": None,
+                "lastError": None,
+            }
     except Exception as exc:  # pragma: no cover - defensive fallback
         logger.exception("manual pull failed")
+        error = str(exc)
+        status = "error"
+        finished_at = _auto_sync_now_iso()
+        _auto_sync_update_pull_state(
+            started_at=started_at,
+            finished_at=finished_at,
+            result=result,
+            status=status,
+            error=error,
+            conflict_update=None,
+        )
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    logger.info("manual pull completed status=%s", str(result.get("status")) if isinstance(result, dict) else None)
+    finished_at = _auto_sync_now_iso()
+    _auto_sync_update_pull_state(
+        started_at=started_at,
+        finished_at=finished_at,
+        result=result,
+        status=status,
+        error=error,
+        conflict_update=conflict_update,
+    )
+
+    logger.info(
+        "manual pull completed status=%s",
+        str(result.get("status")) if isinstance(result, dict) else None,
+    )
     return result
 
 
