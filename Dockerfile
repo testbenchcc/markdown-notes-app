@@ -12,6 +12,9 @@ RUN apt-get install -y nano
 RUN apt-get install -y npm
 RUN rm -rf /var/lib/apt/lists/*
 
+RUN git config --global user.name "Tony"
+RUN git config --global user.email "tony@testbench.cc"
+
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -20,6 +23,10 @@ COPY scripts/build-mermaid.js ./scripts/build-mermaid.js
 RUN npm install
 
 COPY . .
+
+RUN rm -r notes
+RUN git clone https://github.com/testbenchcc/markdown-notes.git
+RUN mv markdown-notes notes
 
 EXPOSE 8000
 
