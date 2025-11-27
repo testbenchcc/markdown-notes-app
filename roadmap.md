@@ -113,7 +113,7 @@
     font-style: italic;
   }
   span.pending span.fancytree-title:after {
-    content: "\2026"; /* ellipsis */
+    content: "\2026"; /- ellipsis */
   }
 </style>
 
@@ -266,7 +266,7 @@ $(function(){
  ## v0.8.0 – GitPython-based Versioning
 
  - **Backend**
-  - [x] Integrate **GitPython** for the local notes repository (app repository integration can follow in a later increment if needed).
+  - [x] Integrate **GitPython*- for the local notes repository (app repository integration can follow in a later increment if needed).
   - [x] Implement operations:
     - [x] Commit and push notes repo.
     - [x] Pull notes repo safely, with conflict awareness.
@@ -451,7 +451,24 @@ $(function(){
 
 ## v2.0.2 - Expand to support text based files
 
-- [x] Allow seeing text based files in the fancytree. (txt, csv, php, py, js, json, bat, ps1, and any other common text based files
-- [x] For non-CSV text-based files, use Monaco as both the viewing and editing surface (with language-aware syntax highlighting). The separate markdown viewer is reserved for markdown notes and CSV tables.
-- [x] Use `Tabulator` JS library to render CSV file tabular data when in view mode. CSV remains view-only; edit mode behavior for markdown and other text-based files is unchanged.
+## v2.1.0 - Insert from Mermaid Local (mermaid.husqy.net)
 
+- [info] The site `mermaid.husqy.net` stores and serves Mermaid charts. Its API is open and documented in `@example files\mermaid-local-api-http.md`.
+- [x] Add a modal that lets users insert Mermaid charts served from the API. Each chart is displayed as a large tile with its details shown to the right, listed vertically. Includes a search bar. Provides two insert options: insert the raw chart text, or insert in linked mode, where the chart text is fetched using the chart id and API during Markdown rendering. Modal size is roughly 80% by 90% of the screen with scroll bars instead of growing the page vertically.
+- [x] Add a settings category for Mermaid:
+  - [x] Mermaid Local API Base URL (default: `mermaid.husqy.net`), stored as `mermaidLocalApiBaseUrl` in settings and used by the backend when resolving linked diagrams.
+- [x] Add shortcut to display modal `ctrl+i` when editing a markdown note.
+- [x] Linked charts insert fenced code:
+  - ```mermaid-remote
+       id: 1
+       title: My first chart
+    ```
+    - Title is inserted for the user. The API only requires the ID.
+  - [x] Linked charts have their chart contents fetched from the configured Mermaid Local API when the markdown is rendered on the backend; if the remote fetch fails, the original `mermaid-remote` fence is left unchanged.
+
+## v2.1.1 - Mermaid robustness
+
+- [x] Catch Mermaid `init` promise rejections in the viewer, live edit-mode preview, and Mermaid Local insert modal so invalid or malformed diagrams no longer produce noisy `Uncaught (in promise)` console errors, while still logging failures for debugging.
+- [x] Expand ```mermaid-remote fenced blocks in the edit-mode live preview by calling the Mermaid Local API from the frontend so linked diagrams render while editing when the service is reachable; if client-side expansion fails for any reason, fall back to showing the original fenced block as code without modifying the saved note content.
+
+## v2.2.0 -

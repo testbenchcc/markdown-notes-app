@@ -199,6 +199,13 @@
             <button
               type="button"
               class="settings-nav-item"
+              data-settings-category-id="mermaid"
+            >
+              Mermaid
+            </button>
+            <button
+              type="button"
+              class="settings-nav-item"
               data-settings-category-id="shortcuts"
             >
               Keyboard Shortcuts
@@ -254,6 +261,26 @@
                 >
                   Export notebook as zip
                 </button>
+              </div>
+            </section>
+            <section
+              class="settings-category hidden"
+              data-settings-category="mermaid"
+            >
+              <div class="settings-category-title">Mermaid</div>
+              <div class="settings-field">
+                <div class="settings-field-label">Mermaid Local API base URL</div>
+                <p class="settings-field-description">
+                  Base URL (host or full URL) for the Mermaid Local diagrams API.
+                  Defaults to <code>mermaid.husqy.net</code>. Examples:
+                  <code>https://mermaid.husqy.net</code> or
+                  <code>http://localhost:8000</code>.
+                </p>
+                <input
+                  id="settings-mermaid-local-api-base-url"
+                  type="text"
+                  class="search-input"
+                />
               </div>
             </section>
             <section
@@ -580,6 +607,67 @@
             type="button"
             class="settings-btn"
             id="settings-footer-close-btn"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
+      id="mermaid-insert-overlay"
+      class="mermaid-overlay hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mermaid-insert-title"
+    >
+      <div class="mermaid-modal">
+        <div class="mermaid-header">
+          <div class="mermaid-title-group">
+            <div id="mermaid-insert-title" class="mermaid-title">
+              Insert Mermaid chart
+            </div>
+            <div class="mermaid-subtitle muted">
+              Browse diagrams from Mermaid Local and insert them into the current
+              note.
+            </div>
+          </div>
+          <button
+            id="mermaid-insert-close-btn"
+            class="mermaid-header-close"
+            type="button"
+            aria-label="Close Mermaid insert"
+            title="Close"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="mermaid-body">
+          <div class="mermaid-search-bar">
+            <input
+              id="mermaid-search-input"
+              class="search-input"
+              type="search"
+              placeholder="Search diagrams by title or tags..."
+            />
+            <button
+              id="mermaid-search-clear-btn"
+              class="small-btn"
+              type="button"
+            >
+              Clear
+            </button>
+          </div>
+          <div
+            id="mermaid-results-container"
+            class="mermaid-results"
+            aria-live="polite"
+          ></div>
+        </div>
+        <div class="mermaid-footer">
+          <button
+            id="mermaid-insert-close-footer-btn"
+            type="button"
+            class="settings-btn"
           >
             Close
           </button>

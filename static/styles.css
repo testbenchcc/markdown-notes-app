@@ -1028,6 +1028,157 @@ body.resizing {
   display: none;
 }
 
+.mermaid-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1600;
+}
+
+.mermaid-overlay.hidden {
+  display: none;
+}
+
+.mermaid-modal {
+  width: 80vw;
+  height: 90vh;
+  max-width: 1100px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--md-bg-alt);
+  border-radius: 8px;
+  border: 1px solid var(--md-border-subtle);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+}
+
+.mermaid-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--md-border-subtle);
+  background: var(--md-bg-alt-soft);
+}
+
+.mermaid-title-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.mermaid-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.mermaid-subtitle {
+  font-size: 0.8rem;
+  color: var(--md-text-muted);
+}
+
+.mermaid-header-close {
+  border: none;
+  background: transparent;
+  color: var(--md-text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
+}
+
+.mermaid-header-close:hover {
+  color: var(--md-text-main);
+  background: var(--md-bg-alt);
+  border-radius: 4px;
+}
+
+.mermaid-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mermaid-search-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mermaid-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mermaid-tile {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  border: 1px solid var(--md-border-subtle);
+  background: var(--md-bg);
+}
+
+.mermaid-tile:hover {
+  background: var(--md-bg-alt-soft);
+}
+
+.mermaid-tile-preview {
+  flex: 0 0 260px;
+  max-width: 260px;
+  overflow: hidden;
+}
+
+.mermaid-tile-preview .mermaid {
+  min-height: 120px;
+}
+
+.mermaid-tile-details {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mermaid-tile-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.mermaid-tile-meta {
+  font-size: 0.78rem;
+  color: var(--md-text-muted);
+}
+
+.mermaid-tile-tags {
+  font-size: 0.78rem;
+}
+
+.mermaid-tile-actions {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.mermaid-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--md-border-subtle);
+  background: var(--md-bg-alt-soft);
+}
+
 div.mermaid[data-processed="true"] {
   background-color: var(--md-bg-alt-soft);
   color: var(--md-text-main);

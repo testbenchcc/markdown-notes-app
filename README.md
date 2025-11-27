@@ -12,7 +12,7 @@ This document summarizes the current implementation of the Markdown Notes App to
 
 The goal is to preserve the existing layout, button placements, search position, and overall UX while modernizing the internals.
 
-## Current Implementation Status (v2.0.2 text-file support)
+## Current Implementation Status (v2.1.0 Mermaid Local)
 
 - FastAPI application skeleton in `main.py` with `GET /health`.
 - Notes root resolved from `NOTES_ROOT` env var or defaulting to `notes/` under the app root (directory is created on startup).
@@ -26,6 +26,7 @@ The goal is to preserve the existing layout, button placements, search position,
 - Tree renames now use the Fancytree inline editor (v0.4.2) so double-click, Shift+click, clickActive, and F2 all trigger an in-place rename that validates input before calling the existing rename endpoints, with the previous prompt kept as a fallback, and the inline input adopts the dark theme styles for a cohesive appearance.
 - v2.0.1 bug-fix patch: fixes the default mode after creating a new note (new notes now open in edit mode) and keeps the `mode` query parameter in sync when navigating via the Fancytree after export/download; see `roadmap.md` v2.0.1.
 - v2.0.2 feature patch: expands the notes tree and `/api/notes` to support additional text-based files (for example `.txt`, `.csv`, `.py`, `.js`, `.json`, `.bat`, `.ps1`, and other common text files). Markdown notes remain the only editable type; non-markdown text and CSV files are shown read-only in the viewer, with CSV rendered as a Tabulator table; see `roadmap.md` v2.0.2.
+- v2.1.0 feature patch: integrates with a Mermaid Local service (for example `mermaid.husqy.net`) so you can browse and insert diagrams via a dedicated modal. The modal supports inserting raw Mermaid code blocks or linked `mermaid-remote` fences. Linked diagrams are expanded on the backend at render time by fetching diagram content from the Mermaid Local API using a configurable base URL, and the edit-mode live preview now best-effort expands these `mermaid-remote` fences on the client using the same API so linked diagrams render while editing when the service is reachable; see `roadmap.md` v2.1.0 and v2.1.1.
 - Minimal settings backend in `main.py`:
   - `NotebookSettings` model persisted to `.notebook-settings.json` under the notes root, including tab length, theme, index page title, and image paste limits.
   - `/api/settings` (`GET`/`PUT`) to load and validate settings, wiring `tabLength` into server-side markdown rendering and exposing theme/title to the frontend.
@@ -85,24 +86,31 @@ The goal is to preserve the existing layout, button placements, search position,
 ### Markdown rendering
 
 - **Preprocessing**
-  - `_preprocess_mermaid_fences()` converts \```mermaid fenced blocks into `<div class="mermaid">…</div>` to simplify client-side Mermaid integration.
+  - `_preprocess_mermaid_fences()` converts ```mermaid fenced blocks into `<div class="mermaid">…</div>` to simplify client-side Mermaid integration.
+
+- **Linked Mermaid diagrams (Mermaid Local)**
+  - `_expand_mermaid_remote_blocks()` scans for ```mermaid-remote fenced blocks that contain simple `key: value` lines (for example `id: 1`, `title: My first chart`).
+  - For each block with a valid numeric `id`, the backend calls the Mermaid Local API at the configured base URL (default `mermaid.husqy.net`) to fetch diagram `content`.
+  - When remote content is returned successfully, the `mermaid-remote` block is replaced with a standard ```mermaid fenced block containing the fetched diagram text before normal preprocessing and rendering.
+  - If the remote call fails or returns no content, the original `mermaid-remote` fence is left unchanged so notes remain readable and editable.
 
 - **Rendering**
   - `_render_markdown_html()` uses `markdown.markdown` with:
     - `extra` (common Markdown enhancements).
     - `codehilite` (syntax highlighting, inline CSS, no classes).
     - `pymdownx.tasklist` (task list checkboxes).
-  - Honors `tabLength` from settings with robust fallback behavior.
+  - Honors `tabLength` from settings with robust fallback behavior and applies linked-diagram expansion via `_expand_mermaid_remote_blocks()` before `_preprocess_mermaid_fences()`.
 
 ### Settings
 
 - **Model**
-  - `NotebookSettings` tracks editor, image, theme, auto-save, and versioning-related options, including:
+  - `NotebookSettings` tracks editor, image, theme, auto-save, Mermaid Local, and versioning-related options, including:
     - `editorSpellcheck`, `tabLength`, `autoSaveIntervalSeconds`.
     - `theme`, `exportTheme`, `indexPageTitle`, `timeZone`.
     - Image display & storage options and size limits.
     - Date/time format strings for shortcuts.
     - Auto-commit/pull notes repo and pull interval.
+    - `mermaidLocalApiBaseUrl` – base URL or host for the Mermaid Local diagrams API used when resolving `mermaid-remote` fences during markdown rendering.
 
 - **Persistence APIs**
   - `GET /api/settings` returns merged defaults + on-disk settings.
@@ -116,7 +124,7 @@ The goal is to preserve the existing layout, button placements, search position,
     - Files: `{ type: "note" | "image", name, path }`.
     - Hides dotfiles and includes:
       - Markdown notes (`.md`).
-      - Additional text-based files (for example `.txt`, `.csv`, `.py`, `.js`, `.json`, `.bat`, `.ps1`, `.ini`, `.cfg`, `.conf`, `.log`, `.html`, `.css`, and other files detected as `text/*` by `mimetypes`).
+      - Additional text-based files (for example `.txt`, `.csv`, `.py`, `.js`, `.json`, `.bat`, `.ps1`, and other common text files).
       - Whitelisted image types.
 
 - **Read single note**
@@ -302,6 +310,7 @@ The goal is to preserve the existing layout, button placements, search position,
 
 - Settings modal categories:
   - **General**: spellcheck, title, tab width, date/time formats, auto-save interval, and a notebook export button (import remains planned for a later increment).
+  - **Mermaid**: Mermaid Local API base URL used by the backend to resolve `mermaid-remote` fences and by the frontend insert modal when calling the Mermaid Local diagrams API.
   - **File handling**: image display mode, max dimensions, default alignment, storage folder, image size limits, cleanup.
   - **Versioning**: auto-commit/pull/push toggles and intervals, notes remote URL and GitHub API key status, manual “Commit & push now” and “Pull now” actions, and an auto-sync status readout. GitHub-backed history views remain planned for a future increment.
   - **Appearance**: theme selection and export theme selection.
@@ -517,6 +526,15 @@ If exports fail:
 - Check that the notes root is accessible and that there is sufficient disk space to build the archive.
 - Inspect server logs for details if the HTTP response includes a generic "Unable to export" error in the UI.
 
+### Mermaid diagram errors
+
+- If the browser console shows messages like `UnknownDiagramError: No diagram type detected ...` or `Cannot read properties of null (reading 'getBoundingClientRect')` from `mermaid.min.js`:
+- Ensure that any ```mermaid fenced blocks contain valid Mermaid diagram syntax (for example `flowchart`, `sequenceDiagram`, or `stateDiagram-v2`), not metadata lines such as `id:` or `title:` that are used only inside ```mermaid-remote fences.
+- Linked diagrams inserted via **Insert linked** use ```mermaid-remote fenced blocks. When rendering notes on the backend (view mode, exports), these fences are expanded by calling the configured Mermaid Local API; if the Mermaid Local service is unavailable, those fences are left as-is and rendered as code instead of diagrams.
+- In edit mode, the live preview also tries to expand ```mermaid-remote fenced blocks on the client using the same Mermaid Local API so linked diagrams render while you edit when the service responds. If client-side expansion fails for any reason (for example, network errors, invalid IDs, or server errors), the preview falls back to showing the original fenced block as code, and the saved note content is not modified.
+- The frontend now catches Mermaid render promise rejections in the viewer, live preview, and Mermaid Local insert modal so these cases no longer produce unhandled promise rejections; errors are still logged to the console for debugging.
+- When a diagram fails to parse or render (for example, with the same parse errors reported by mermaid.live), the app now surfaces a detailed message in the global error banner derived from Mermaid’s error object (including line information where available). The inline diagram area may still display Mermaid’s generic error SVG, but you no longer have to inspect the developer console to see why it failed.
+
 Full notebook import is described in the architecture but remains a planned capability; some builds may not expose the `/api/import` endpoint or a corresponding UI yet. In those cases, use git-based workflows and the export zip for backup and transfer.
 
 ## Testing and automated coverage
@@ -534,6 +552,12 @@ Full notebook import is described in the architecture but remains a planned capa
   - Image paste workflow:
     - Paste an image into an existing note, confirm that the upload progress banner appears and disappears as expected, and verify that oversized pastes produce a clear error while leaving existing content intact.
   - Tree context menu operations:
-    - From the tree context menu, exercise new folder/note creation, rename, delete, folder download, and `.gitignore` toggle for a folder, confirming both backend effects and UI updates.
+    - From the tree context menu, exercise new folder/note, rename, delete, folder download, and `.gitignore` toggle for a folder, confirming both backend effects and UI updates.
+  - Mermaid Local integration (v2.1.0):
+    - Ensure a Mermaid Local service (for example `https://mermaid.husqy.net` or a local instance) is reachable at the configured **Mermaid Local API base URL** in Settings → Mermaid.
+    - Open a markdown note, switch to edit mode, and press `Ctrl+I` to open the **Insert Mermaid chart** modal.
+    - Search for diagrams, then:
+      - Use **Insert raw** to insert a standard ```mermaid fenced block and verify it renders correctly in both the live preview and view mode.
+      - Use **Insert linked** to insert a ```mermaid-remote fenced block. Verify that in view mode and HTML exports the diagram is rendered using content fetched from Mermaid Local, while the underlying note still contains only the lightweight linked fence.
 
 Use `roadmap.md` as the source of truth for the detailed checklists for each version.

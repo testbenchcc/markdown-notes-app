@@ -19,6 +19,13 @@ let suppressSettingsDirtyTracking = false;
 const SETTINGS_LOCAL_STORAGE_KEY = "markdown-notes-app-settings";
 let lastSettingsSaveCompletedAtMs = 0;
 const SETTINGS_DOUBLE_SAVE_CLOSE_WINDOW_MS = 4000;
+const DEFAULT_MERMAID_LOCAL_API_BASE_URL = "mermaid.husqy.net";
+let mermaidSearchDebounceTimerId = null;
+let mermaidLatestRequestId = 0;
+let mermaidInsertInitialized = false;
+let mermaidRemotePreviewLatestRequestId = 0;
+const mermaidPreviewContentCache = new Map();
+let mermaidInitialized = false;
 
 const VALID_MODES = new Set(["view", "edit", "export", "download"]);
 const DEFAULT_MODE = "view";
@@ -119,6 +126,84 @@ function ensureMarkdownRenderer() {
   return markdownRenderer;
 }
 
+function buildMermaidErrorMessage(error, contextLabel) {
+  const base = contextLabel && String(contextLabel).trim()
+    ? String(contextLabel).trim()
+    : "Mermaid diagram error";
+
+  if (!error) {
+    return base;
+  }
+
+  if (typeof error === "string") {
+    return `${base}: ${error}`;
+  }
+
+  if (typeof error.message === "string" && error.message) {
+    return `${base}: ${error.message}`;
+  }
+
+  if (typeof error.str === "string" && error.str) {
+    return `${base}: ${error.str}`;
+  }
+
+  try {
+    const asJson = JSON.stringify(error);
+    if (asJson && asJson !== "{}") {
+      return `${base}: ${asJson}`;
+    }
+  } catch {
+  }
+
+  return base;
+}
+
+function initializeMermaidIfNeeded() {
+  if (mermaidInitialized) return;
+  if (typeof window === "undefined") return;
+
+  const mermaid = window.mermaid;
+  if (!mermaid) return;
+
+  try {
+    if (typeof mermaid.setParseErrorHandler === "function") {
+      mermaid.setParseErrorHandler((err) => {
+        const message = buildMermaidErrorMessage(err, "Mermaid diagram parse error");
+        if (typeof showError === "function") {
+          showError(message);
+        } else if (typeof console !== "undefined" && console && console.error) {
+          console.error(message, err);
+        }
+      });
+    } else if (Object.prototype.hasOwnProperty.call(mermaid, "parseError")) {
+      mermaid.parseError = (err) => {
+        const message = buildMermaidErrorMessage(err, "Mermaid diagram parse error");
+        if (typeof showError === "function") {
+          showError(message);
+        } else if (typeof console !== "undefined" && console && console.error) {
+          console.error(message, err);
+        }
+      };
+    }
+  } catch (error) {
+    if (typeof console !== "undefined" && console && console.error) {
+      console.error("Failed to attach Mermaid parse error handler", error);
+    }
+  }
+
+  try {
+    if (typeof mermaid.initialize === "function") {
+      mermaid.initialize({ startOnLoad: false });
+    }
+  } catch (error) {
+    if (typeof console !== "undefined" && console && console.error) {
+      console.error("Failed to initialize Mermaid", error);
+    }
+  }
+
+  mermaidInitialized = true;
+}
+
 function preprocessMermaidFences(text) {
   const lines = [];
   let inMermaid = false;
@@ -127,7 +212,11 @@ function preprocessMermaidFences(text) {
   text.split(/\r?\n/).forEach((line) => {
     const trimmed = line.trimStart();
 
-    if (!inMermaid && trimmed.startsWith("```mermaid")) {
+    if (
+      !inMermaid &&
+      trimmed.startsWith("```mermaid") &&
+      !trimmed.startsWith("```mermaid-remote")
+    ) {
       inMermaid = true;
       buffer = [];
       return;
@@ -155,6 +244,143 @@ function preprocessMermaidFences(text) {
   return lines.join("\n");
 }
 
+async function fetchMermaidDiagramContentForPreview(diagramId) {
+  const id = Number(diagramId);
+  if (!Number.isFinite(id) || id <= 0) {
+    return null;
+  }
+
+  if (mermaidPreviewContentCache.has(id)) {
+    return mermaidPreviewContentCache.get(id);
+  }
+
+  const url = buildMermaidLocalApiUrl(`/api/diagrams/${encodeURIComponent(String(id))}`);
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      mermaidPreviewContentCache.set(id, null);
+      return null;
+    }
+
+    const data = await response.json();
+    const content = typeof data.content === "string" ? data.content : "";
+    const normalized = content.trim() ? content : null;
+    mermaidPreviewContentCache.set(id, normalized);
+    return normalized;
+  } catch (error) {
+    console.error("Mermaid Local request failed for preview", error);
+    mermaidPreviewContentCache.set(id, null);
+    return null;
+  }
+}
+
+async function expandMermaidRemoteBlocksForPreview(text) {
+  const lines = text.split(/\r?\n/);
+  const blocks = [];
+  let inRemote = false;
+  let buffer = [];
+  let startIndex = -1;
+  let fenceIndent = "";
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const stripped = line.trimStart();
+
+    if (!inRemote && stripped.startsWith("```mermaid-remote")) {
+      inRemote = true;
+      buffer = [];
+      startIndex = i;
+      fenceIndent = line.slice(0, line.length - stripped.length);
+      continue;
+    }
+
+    if (inRemote && stripped.startsWith("```")) {
+      const endIndex = i;
+      blocks.push({
+        startIndex,
+        endIndex,
+        fenceIndent,
+        bodyLines: buffer.slice(),
+      });
+      inRemote = false;
+      buffer = [];
+      fenceIndent = "";
+      continue;
+    }
+
+    if (inRemote) {
+      buffer.push(line);
+    }
+  }
+
+  if (!blocks.length) {
+    return text;
+  }
+
+  const replacementsByStart = new Map();
+
+  await Promise.all(
+    blocks.map(async (block) => {
+      let diagramId = null;
+
+      for (const bodyLine of block.bodyLines) {
+        const bodyStripped = bodyLine.trim();
+        if (!bodyStripped || bodyStripped.indexOf(":") === -1) {
+          continue;
+        }
+        const [rawKey, ...rest] = bodyStripped.split(":");
+        const key = rawKey.trim().toLowerCase();
+        const value = rest.join(":").trim();
+        if (key === "id") {
+          const parsed = Number.parseInt(value, 10);
+          if (Number.isFinite(parsed) && parsed > 0) {
+            diagramId = parsed;
+          }
+          break;
+        }
+      }
+
+      let replacementLines = null;
+
+      if (diagramId !== null) {
+        const content = await fetchMermaidDiagramContentForPreview(diagramId);
+        if (typeof content === "string" && content.trim()) {
+          const body = content.replace(/\r?\n$/, "");
+          const contentLines = body.split(/\r?\n/);
+          replacementLines = [
+            `${block.fenceIndent}\`\`\`mermaid`,
+            ...contentLines.map((l) => `${block.fenceIndent}${l}`),
+            `${block.fenceIndent}\`\`\``,
+          ];
+        }
+      }
+
+      if (!replacementLines) {
+        replacementLines = lines.slice(block.startIndex, block.endIndex + 1);
+      }
+
+      replacementsByStart.set(block.startIndex, {
+        endIndex: block.endIndex,
+        lines: replacementLines,
+      });
+    }),
+  );
+
+  const resultLines = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const replacement = replacementsByStart.get(i);
+    if (replacement) {
+      resultLines.push(...replacement.lines);
+      i = replacement.endIndex;
+    } else {
+      resultLines.push(lines[i]);
+    }
+  }
+
+  return resultLines.join("\n");
+}
+
 function renderViewerHtml(html) {
   const viewerEl = document.getElementById("viewer");
   if (!viewerEl) return;
@@ -163,10 +389,25 @@ function renderViewerHtml(html) {
   viewerEl.innerHTML = html;
 
   if (window.mermaid && typeof window.mermaid.init === "function") {
-    try {
-      window.mermaid.init(undefined, viewerEl.querySelectorAll(".mermaid"));
-    } catch (error) {
-      console.error("Mermaid rendering failed", error);
+    initializeMermaidIfNeeded();
+    const mermaidNodes = viewerEl.querySelectorAll(".mermaid");
+    if (mermaidNodes.length) {
+      try {
+        const result = window.mermaid.init(undefined, mermaidNodes);
+        if (result && typeof result.then === "function") {
+          result.catch((error) => {
+            console.error("Mermaid rendering failed", error);
+            if (typeof showError === "function") {
+              showError(buildMermaidErrorMessage(error, "Mermaid rendering failed"));
+            }
+          });
+        }
+      } catch (error) {
+        console.error("Mermaid rendering failed", error);
+        if (typeof showError === "function") {
+          showError(buildMermaidErrorMessage(error, "Mermaid rendering failed"));
+        }
+      }
     }
   }
 }
@@ -359,6 +600,16 @@ function applyImageSettingsFromSettings(settings) {
   const widthValue = fitToNoteWidth ? "100%" : `${maxWidth}px`;
   root.style.setProperty("--viewer-image-max-width", widthValue);
   root.style.setProperty("--viewer-image-max-height", `${maxHeight}px`);
+}
+
+function applySettingsToMermaidSection(settings) {
+  if (!settings || typeof document === "undefined") return;
+
+  const baseUrlEl = document.getElementById("settings-mermaid-local-api-base-url");
+  if (baseUrlEl) {
+    const value = settings.mermaidLocalApiBaseUrl || DEFAULT_MERMAID_LOCAL_API_BASE_URL;
+    baseUrlEl.value = value;
+  }
 }
 
 function applySettingsToGeneralSection(settings) {
@@ -775,6 +1026,7 @@ function applyAllSettings(settings, options = {}) {
   applySettingsToFilesAndImagesSection(settings);
   applySettingsToEditorSection(settings);
   applySettingsToAppearanceSection(settings);
+  applySettingsToMermaidSection(settings);
   applySettingsToVersioningSection(settings);
   suppressSettingsDirtyTracking = false;
   if (resetDirty) {
@@ -969,9 +1221,25 @@ function buildUpdatedSettingsFromAllSections(baseSettings) {
   let next = baseSettings || {};
   next = buildUpdatedSettingsFromGeneralSection(next);
   next = buildUpdatedSettingsFromFilesAndImagesSection(next);
+  next = buildUpdatedSettingsFromMermaidSection(next);
   next = buildUpdatedSettingsFromEditorSection(next);
   next = buildUpdatedSettingsFromAppearanceSection(next);
   next = buildUpdatedSettingsFromVersioningSection(next);
+  return next;
+}
+
+function buildUpdatedSettingsFromMermaidSection(baseSettings) {
+  if (typeof document === "undefined") return baseSettings || {};
+
+  const next = { ...(baseSettings || {}) };
+  const baseUrlEl = document.getElementById("settings-mermaid-local-api-base-url");
+  if (baseUrlEl) {
+    const value = baseUrlEl.value.trim();
+    if (value) {
+      next.mermaidLocalApiBaseUrl = value;
+    }
+  }
+
   return next;
 }
 
@@ -1198,9 +1466,25 @@ function updatePreviewFromEditor() {
     const md = ensureMarkdownRenderer();
     if (!md) return;
 
-    const processed = preprocessMermaidFences(value);
-    const html = md.render(processed);
-    renderViewerHtml(html);
+    const requestId = ++mermaidRemotePreviewLatestRequestId;
+
+    (async () => {
+      let expanded = value;
+      try {
+        expanded = await expandMermaidRemoteBlocksForPreview(value);
+      } catch (error) {
+        console.error("Mermaid-remote expansion for preview failed", error);
+        expanded = value;
+      }
+
+      if (requestId !== mermaidRemotePreviewLatestRequestId) {
+        return;
+      }
+
+      const processed = preprocessMermaidFences(expanded);
+      const html = md.render(processed);
+      renderViewerHtml(html);
+    })();
   } else if (currentFileType === "csv") {
     // CSV remains view-only: just refresh the table view if needed.
     renderCsvView(value);
@@ -2150,6 +2434,276 @@ function insertMarkdownAtCursor(markdownText) {
   ]);
 
   monacoEditor.focus();
+}
+
+function getMermaidLocalApiBaseUrlFromSettings() {
+  const settings = notebookSettings || {};
+  let raw = settings.mermaidLocalApiBaseUrl || DEFAULT_MERMAID_LOCAL_API_BASE_URL;
+  raw = String(raw).trim();
+  if (!raw) {
+    raw = DEFAULT_MERMAID_LOCAL_API_BASE_URL;
+  }
+  if (!/^https?:\/\//i.test(raw)) {
+    raw = `https://${raw}`;
+  }
+  if (raw.endsWith("/")) {
+    raw = raw.slice(0, -1);
+  }
+  return raw;
+}
+
+function buildMermaidLocalApiUrl(path) {
+  const base = getMermaidLocalApiBaseUrlFromSettings();
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${cleanPath}`;
+}
+
+async function fetchMermaidDiagrams(query) {
+  const trimmed = (query || "").trim();
+  const url = trimmed
+    ? buildMermaidLocalApiUrl(`/api/diagrams/search/${encodeURIComponent(trimmed)}`)
+    : buildMermaidLocalApiUrl("/api/diagrams");
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Mermaid Local API request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (Array.isArray(data.items)) {
+    return data.items;
+  }
+  return [];
+}
+
+function renderMermaidInsertResults(diagrams, query) {
+  const container = document.getElementById("mermaid-results-container");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  if (!Array.isArray(diagrams) || !diagrams.length) {
+    const empty = document.createElement("div");
+    empty.className = "settings-field-description";
+    empty.textContent = query
+      ? "No diagrams found. Try a different search term."
+      : "No diagrams found. Create diagrams in Mermaid Local first.";
+    container.appendChild(empty);
+    return;
+  }
+
+  diagrams.forEach((diagram) => {
+    const tile = document.createElement("div");
+    tile.className = "mermaid-tile";
+
+    const preview = document.createElement("div");
+    preview.className = "mermaid-tile-preview";
+    const mermaidEl = document.createElement("div");
+    mermaidEl.className = "mermaid";
+    if (typeof diagram.content === "string") {
+      mermaidEl.textContent = diagram.content;
+    }
+    preview.appendChild(mermaidEl);
+
+    const details = document.createElement("div");
+    details.className = "mermaid-tile-details";
+
+    const titleEl = document.createElement("div");
+    titleEl.className = "mermaid-tile-title";
+    const titleText = diagram.title || `Diagram ${diagram.id}`;
+    titleEl.textContent = titleText;
+
+    const metaEl = document.createElement("div");
+    metaEl.className = "mermaid-tile-meta";
+    const idText = typeof diagram.id === "number" ? `ID: ${diagram.id}` : "";
+    metaEl.textContent = idText;
+
+    const tagsEl = document.createElement("div");
+    tagsEl.className = "mermaid-tile-tags";
+    if (Array.isArray(diagram.tags) && diagram.tags.length) {
+      tagsEl.textContent = `Tags: ${diagram.tags.join(", ")}`;
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "mermaid-tile-actions";
+
+    const insertRawBtn = document.createElement("button");
+    insertRawBtn.type = "button";
+    insertRawBtn.className = "settings-btn";
+    insertRawBtn.textContent = "Insert raw";
+    insertRawBtn.addEventListener("click", () => {
+      if (!currentNotePath || currentFileType !== "markdown" || currentMode !== "edit") {
+        showError("Mermaid insert is only available when editing a markdown note.");
+        return;
+      }
+      const content = typeof diagram.content === "string" ? diagram.content : "";
+      const snippet = `\n\n\"\"\"mermaid\n${content}\n\"\"\"\n`;
+      const fenced = snippet.replace(/\"\"\"/g, "```");
+      insertMarkdownAtCursor(fenced);
+      if (currentMode === "edit") {
+        updatePreviewFromEditor();
+      }
+    });
+
+    const insertLinkedBtn = document.createElement("button");
+    insertLinkedBtn.type = "button";
+    insertLinkedBtn.className = "settings-btn";
+    insertLinkedBtn.textContent = "Insert linked";
+    insertLinkedBtn.addEventListener("click", () => {
+      if (!currentNotePath || currentFileType !== "markdown" || currentMode !== "edit") {
+        showError("Mermaid insert is only available when editing a markdown note.");
+        return;
+      }
+      const id = diagram.id;
+      if (typeof id !== "number") {
+        showError("Selected diagram is missing a numeric ID.");
+        return;
+      }
+      const title = diagram.title || `Diagram ${id}`;
+      const snippetLines = [
+        "```mermaid-remote",
+        `id: ${id}`,
+        `title: ${title}`,
+        "```",
+        "",
+      ];
+      const snippet = `\n${snippetLines.join("\n")}`;
+      insertMarkdownAtCursor(snippet);
+    });
+
+    actions.appendChild(insertRawBtn);
+    actions.appendChild(insertLinkedBtn);
+
+    details.appendChild(titleEl);
+    details.appendChild(metaEl);
+    if (tagsEl.textContent) {
+      details.appendChild(tagsEl);
+    }
+    details.appendChild(actions);
+
+    tile.appendChild(preview);
+    tile.appendChild(details);
+    container.appendChild(tile);
+
+    if (window.mermaid && typeof window.mermaid.init === "function") {
+      try {
+        initializeMermaidIfNeeded();
+        const result = window.mermaid.init(undefined, [mermaidEl]);
+        if (result && typeof result.then === "function") {
+          result.catch((error) => {
+            console.error("Mermaid rendering failed in insert modal", error);
+            if (typeof showError === "function") {
+              showError(
+                buildMermaidErrorMessage(
+                  error,
+                  "Mermaid rendering failed in Mermaid Local insert modal",
+                ),
+              );
+            }
+          });
+        }
+      } catch (error) {
+        console.error("Mermaid rendering failed in insert modal", error);
+        if (typeof showError === "function") {
+          showError(
+            buildMermaidErrorMessage(
+              error,
+              "Mermaid rendering failed in Mermaid Local insert modal",
+            ),
+          );
+        }
+      }
+    }
+  });
+}
+
+async function loadMermaidInsertResults(query) {
+  const requestId = ++mermaidLatestRequestId;
+  try {
+    const diagrams = await fetchMermaidDiagrams(query);
+    if (requestId !== mermaidLatestRequestId) {
+      return;
+    }
+    renderMermaidInsertResults(diagrams, query || "");
+  } catch (error) {
+    if (requestId !== mermaidLatestRequestId) {
+      return;
+    }
+    console.error("Mermaid Local API request failed", error);
+    showError("Unable to load diagrams from Mermaid Local.");
+    renderMermaidInsertResults([], query || "");
+  }
+}
+
+function openMermaidInsertModal() {
+  const overlay = document.getElementById("mermaid-insert-overlay");
+  if (!overlay) return;
+
+  if (!currentNotePath || currentFileType !== "markdown" || currentMode !== "edit") {
+    showError("Mermaid insert is only available when editing a markdown note.");
+    return;
+  }
+
+  const input = document.getElementById("mermaid-search-input");
+  const clearBtn = document.getElementById("mermaid-search-clear-btn");
+
+  if (!mermaidInsertInitialized) {
+    if (input) {
+      input.addEventListener("input", () => {
+        const value = input.value || "";
+        if (mermaidSearchDebounceTimerId !== null) {
+          window.clearTimeout(mermaidSearchDebounceTimerId);
+        }
+        mermaidSearchDebounceTimerId = window.setTimeout(() => {
+          mermaidSearchDebounceTimerId = null;
+          void loadMermaidInsertResults(value);
+        }, 250);
+      });
+
+      input.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          if (mermaidSearchDebounceTimerId !== null) {
+            window.clearTimeout(mermaidSearchDebounceTimerId);
+            mermaidSearchDebounceTimerId = null;
+          }
+          void loadMermaidInsertResults(input.value || "");
+        }
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        if (input) {
+          input.value = "";
+          input.focus();
+        }
+        if (mermaidSearchDebounceTimerId !== null) {
+          window.clearTimeout(mermaidSearchDebounceTimerId);
+          mermaidSearchDebounceTimerId = null;
+        }
+        void loadMermaidInsertResults("");
+      });
+    }
+
+    mermaidInsertInitialized = true;
+  }
+
+  if (input) {
+    input.value = "";
+    input.focus();
+  }
+
+  overlay.classList.remove("hidden");
+  void loadMermaidInsertResults("");
+}
+
+function closeMermaidInsertModal() {
+  const overlay = document.getElementById("mermaid-insert-overlay");
+  if (!overlay) return;
+  overlay.classList.add("hidden");
 }
 
 function uploadPastedImage(file) {
@@ -3153,6 +3707,9 @@ function setupSettingsModal() {
       }
       event.preventDefault();
       handleClose();
+    } else if ((event.ctrlKey || event.metaKey) && (event.key === "i" || event.key === "I")) {
+      event.preventDefault();
+      openMermaidInsertModal();
     }
   });
 }
@@ -3193,6 +3750,28 @@ window.addEventListener("DOMContentLoaded", () => {
   setupSearch();
   initializeNavigationFromUrl();
   setupViewerScrollSync();
+  const mermaidOverlay = document.getElementById("mermaid-insert-overlay");
+  const mermaidCloseBtn = document.getElementById("mermaid-insert-close-btn");
+  const mermaidCloseFooterBtn = document.getElementById(
+    "mermaid-insert-close-footer-btn",
+  );
+  if (mermaidOverlay) {
+    mermaidOverlay.addEventListener("click", (event) => {
+      if (event.target === mermaidOverlay) {
+        closeMermaidInsertModal();
+      }
+    });
+  }
+  if (mermaidCloseBtn) {
+    mermaidCloseBtn.addEventListener("click", () => {
+      closeMermaidInsertModal();
+    });
+  }
+  if (mermaidCloseFooterBtn) {
+    mermaidCloseFooterBtn.addEventListener("click", () => {
+      closeMermaidInsertModal();
+    });
+  }
 });
 
 window.addEventListener("focus", () => {

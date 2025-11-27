@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import quote, unquote
 
 import markdown
+import requests
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -111,6 +112,8 @@ class NotebookSettings(BaseModel):
     autoPushIntervalSeconds: Optional[conint(gt=0)] = None
 
     timeZone: Optional[str] = None
+
+    mermaidLocalApiBaseUrl: Optional[str] = "mermaid.husqy.net"
 
     model_config = ConfigDict(extra="ignore")
 
@@ -575,13 +578,130 @@ def build_notes_tree() -> List[Dict[str, Any]]:
     return _build_tree_for_directory(root, root)
 
 
+def _get_mermaid_local_api_base_url(settings: NotebookSettings) -> str:
+    raw = (settings.mermaidLocalApiBaseUrl or "mermaid.husqy.net").strip()
+    if not raw:
+        raw = "mermaid.husqy.net"
+    if not raw.lower().startswith(("http://", "https://")):
+        raw = f"https://{raw}"
+    while raw.endswith("/"):
+        raw = raw[:-1]
+    return raw
+
+
+def _fetch_mermaid_remote_content(diagram_id: int, settings: NotebookSettings) -> Optional[str]:
+    if diagram_id <= 0:
+        return None
+
+    base_url = _get_mermaid_local_api_base_url(settings)
+    url = f"{base_url}/api/diagrams/{diagram_id}"
+
+    try:
+        response = requests.get(url, timeout=3.0)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        logger.warning("Mermaid Local request failed: %s", exc)
+        return None
+
+    if response.status_code != 200:
+        logger.warning(
+            "Mermaid Local request failed with status %s for id=%s",
+            response.status_code,
+            diagram_id,
+        )
+        return None
+
+    try:
+        data = response.json()
+    except ValueError:
+        logger.warning("Mermaid Local response for id=%s was not valid JSON", diagram_id)
+        return None
+
+    content = data.get("content")
+    if not isinstance(content, str) or not content.strip():
+        return None
+    return content
+
+
+def _expand_mermaid_remote_blocks(markdown_text: str, settings: NotebookSettings) -> str:
+    lines: List[str] = []
+    in_remote = False
+    buffer: List[str] = []
+    fence_indent = ""
+
+    for line in markdown_text.splitlines():
+        stripped = line.lstrip()
+
+        if not in_remote and stripped.startswith("```mermaid-remote"):
+            in_remote = True
+            buffer = []
+            fence_indent = line[: len(line) - len(stripped)]
+            continue
+
+        if in_remote and stripped.startswith("```"):
+            diagram_id: Optional[int] = None
+            for body_line in buffer:
+                body_stripped = body_line.strip()
+                if not body_stripped or ":" not in body_stripped:
+                    continue
+                key, value = body_stripped.split(":", 1)
+                key = key.strip().lower()
+                value = value.strip()
+                if key == "id":
+                    try:
+                        diagram_id = int(value)
+                    except ValueError:
+                        diagram_id = None
+                    break
+
+            replacement_lines: List[str]
+            if diagram_id is not None:
+                remote_content = _fetch_mermaid_remote_content(diagram_id, settings)
+                if remote_content is not None:
+                    body = remote_content.rstrip("\n")
+                    replacement_lines = [
+                        f"{fence_indent}```mermaid",
+                        *(f"{fence_indent}{l}" for l in body.splitlines() or [""]),
+                        f"{fence_indent}```",
+                    ]
+                else:
+                    replacement_lines = [
+                        f"{fence_indent}```mermaid-remote",
+                        *buffer,
+                        f"{fence_indent}```",
+                    ]
+            else:
+                replacement_lines = [
+                    f"{fence_indent}```mermaid-remote",
+                    *buffer,
+                    f"{fence_indent}```",
+                ]
+
+            lines.extend(replacement_lines)
+            in_remote = False
+            buffer = []
+            fence_indent = ""
+            continue
+
+        if in_remote:
+            buffer.append(line)
+        else:
+            lines.append(line)
+
+    if in_remote and buffer:
+        lines.extend(buffer)
+
+    return "\n".join(lines)
+
+
 def _preprocess_mermaid_fences(text: str) -> str:
     lines: List[str] = []
     in_mermaid = False
     buffer: List[str] = []
 
     for line in text.splitlines():
-        if not in_mermaid and line.lstrip().startswith("```mermaid"):
+        stripped = line.lstrip()
+
+        if not in_mermaid and stripped.startswith("```mermaid") and not stripped.startswith("```mermaid-remote"):
             in_mermaid = True
             buffer = []
             continue
@@ -602,8 +722,14 @@ def _preprocess_mermaid_fences(text: str) -> str:
     return "\n".join(lines)
 
 
-def _render_markdown_html(markdown_text: str, tab_length: int = DEFAULT_TAB_LENGTH) -> str:
-    processed = _preprocess_mermaid_fences(markdown_text)
+def _render_markdown_html(
+    markdown_text: str,
+    tab_length: int = DEFAULT_TAB_LENGTH,
+    settings: NotebookSettings | None = None,
+) -> str:
+    effective_settings = settings or _load_settings()
+    expanded = _expand_mermaid_remote_blocks(markdown_text, effective_settings)
+    processed = _preprocess_mermaid_fences(expanded)
     html = markdown.markdown(
         processed,
         extensions=["extra", "codehilite", "pymdownx.tasklist"],
@@ -873,7 +999,11 @@ def get_note(note_path: str) -> Dict[str, Any]:
     html = ""
     if kind == "markdown":
         settings = _load_settings()
-        html = _render_markdown_html(content, tab_length=settings.tabLength)
+        html = _render_markdown_html(
+            content,
+            tab_length=settings.tabLength,
+            settings=settings,
+        )
 
     return {
         "path": _relative_to_notes_root(note_file),
@@ -919,7 +1049,11 @@ def export_note(note_path: str) -> Response:
 
     content = note_file.read_text(encoding="utf8")
     settings = _load_settings()
-    body_html = _render_markdown_html(content, tab_length=settings.tabLength)
+    body_html = _render_markdown_html(
+        content,
+        tab_length=settings.tabLength,
+        settings=settings,
+    )
 
     title = note_file.stem or note_file.name
     safe_title = html_escape(title)
