@@ -7,7 +7,7 @@ services:
   mermaid-local:
     image: markdown-notes-app:latest
     build:
-      context: git@github.com:testbenchcc/markdown-notes-app.git
+      context: https://github.com/testbenchcc/markdown-notes-app.git
       dockerfile: Dockerfile
     container_name: markdown-notes-app
     env_file:
