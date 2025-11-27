@@ -24,7 +24,7 @@ RUN npm install
 
 COPY . .
 
-RUN rm -r notes
+RUN rm -rf notes || true
 RUN git clone https://github.com/testbenchcc/markdown-notes.git
 RUN mv markdown-notes notes
 
