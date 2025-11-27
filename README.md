@@ -86,7 +86,7 @@ The goal is to preserve the existing layout, button placements, search position,
 ### Markdown rendering
 
 - **Preprocessing**
-  - `_preprocess_mermaid_fences()` converts ```mermaid fenced blocks into `<div class="mermaid">…</div>` to simplify client-side Mermaid integration.
+  - `_preprocess_mermaid_fences()` converts ```mermaid fenced blocks into `<pre class="mermaid">…</pre>` to simplify client-side Mermaid integration while preserving the raw diagram text for Mermaid (including frontmatter-style headers).
 
 - **Linked Mermaid diagrams (Mermaid Local)**
   - `_expand_mermaid_remote_blocks()` scans for ```mermaid-remote fenced blocks that contain simple `key: value` lines (for example `id: 1`, `title: My first chart`).

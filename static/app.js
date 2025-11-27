@@ -225,7 +225,7 @@ function preprocessMermaidFences(text) {
     if (inMermaid && trimmed.startsWith("```")) {
       inMermaid = false;
       const body = buffer.join("\n").replace(/^[\n]+|[\n]+$/g, "");
-      lines.push(`<div class="mermaid">${body}</div>`);
+      lines.push(`<pre class="mermaid">${body}</pre>`);
       buffer = [];
       return;
     }

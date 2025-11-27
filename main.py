@@ -708,7 +708,7 @@ def _preprocess_mermaid_fences(text: str) -> str:
         if in_mermaid and line.lstrip().startswith("```"):
             in_mermaid = False
             body = "\n".join(buffer).strip("\n")
-            lines.append(f'<div class="mermaid">{body}</div>')
+            lines.append(f'<pre class="mermaid">{body}</pre>')
             buffer = []
             continue
         if in_mermaid:
