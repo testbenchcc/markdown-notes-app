@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import os
 import socket
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -18,6 +19,42 @@ class CommitResult:
     hexsha: Optional[str] = None
     message: Optional[str] = None
     summary: Optional[str] = None
+
+
+def _build_authenticated_url(base_url: str) -> str:
+    """Return an HTTPS URL augmented with GITHUB_API_KEY credentials if available.
+
+    The token is injected only in-memory for individual git commands and is not
+    written back to git configuration. If the URL already contains credentials
+    or no token is configured, the original URL is returned unchanged.
+    """
+
+    token = os.getenv("GITHUB_API_KEY") or ""
+    if not token:
+        return base_url
+
+    if not base_url.startswith("https://"):
+        return base_url
+
+    prefix = "https://"
+    rest = base_url[len(prefix) :]
+
+    # If credentials are already present (for example, user included a token
+    # directly in NOTES_REPO_REMOTE_URL), leave the URL as-is.
+    host_part = rest.split("/", 1)[0]
+    if "@" in host_part:
+        return base_url
+
+    return f"{prefix}{token}@{rest}"
+
+
+def _sanitize_git_error(message: str) -> str:
+    """Redact any occurrence of the GITHUB_API_KEY token from git error text."""
+
+    token = os.getenv("GITHUB_API_KEY") or ""
+    if token and token in message:
+        message = message.replace(token, "****")
+    return message
 
 
 def _ensure_repo(notes_root: Path, remote_url: Optional[str] = None) -> Repo:
@@ -150,7 +187,14 @@ def _push_notes(repo: Repo) -> tuple[bool, Dict[str, Any]]:
                     "detail": "Repository is in a detached HEAD state; cannot determine branch to push.",
                 }
             else:
-                origin.push(branch_name)
+                remote_url = origin.url
+                auth_url = _build_authenticated_url(remote_url)
+
+                if auth_url != remote_url:
+                    repo.git.push(auth_url, branch_name)
+                else:
+                    origin.push(branch_name)
+
                 pushed = True
                 push_status = {
                     "status": "ok",
@@ -160,7 +204,7 @@ def _push_notes(repo: Repo) -> tuple[bool, Dict[str, Any]]:
         except GitCommandError as exc:
             push_status = {
                 "status": "error",
-                "detail": str(exc),
+                "detail": _sanitize_git_error(str(exc)),
             }
 
     return pushed, push_status
@@ -268,8 +312,13 @@ def pull_notes_with_rebase(
     # Record state before pull.
     local_before = branch_ref.commit.hexsha
 
+    auth_url = _build_authenticated_url(origin.url)
+
     try:
-        origin.fetch()
+        if auth_url != origin.url:
+            repo.git.fetch(auth_url)
+        else:
+            origin.fetch()
     except GitCommandError:
         # Non-fatal for our purposes; pull will surface any real problems.
         pass
@@ -280,7 +329,10 @@ def pull_notes_with_rebase(
         remote_before = None
 
     try:
-        repo.git.pull("--rebase", origin.name, branch_name)
+        if auth_url != origin.url:
+            repo.git.pull("--rebase", auth_url, branch_name)
+        else:
+            repo.git.pull("--rebase", origin.name, branch_name)
         local_after = branch_ref.commit.hexsha
         return {
             "status": "ok",
@@ -326,7 +378,7 @@ def pull_notes_with_rebase(
             "remoteBefore": remote_before,
             "conflictBranch": conflict_branch_name if conflict_created else None,
             "resetStatus": reset_status,
-            "error": str(exc),
+            "error": _sanitize_git_error(str(exc)),
         }
 
 
