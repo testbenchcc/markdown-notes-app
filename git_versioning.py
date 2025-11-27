@@ -45,7 +45,8 @@ def _build_authenticated_url(base_url: str) -> str:
     if "@" in host_part:
         return base_url
 
-    return f"{prefix}{token}@{rest}"
+    # For GitHub PATs, recommended form is https://x-access-token:PAT@github.com/...
+    return f"{prefix}x-access-token:{token}@{rest}"
 
 
 def _sanitize_git_error(message: str) -> str:
