@@ -16,6 +16,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY package.json ./
+COPY scripts/build-mermaid.js ./scripts/build-mermaid.js
 RUN npm install
 
 COPY . .
