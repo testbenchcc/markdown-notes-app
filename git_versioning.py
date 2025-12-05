@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime
 import os
 import socket
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
-
-from git import GitCommandError, InvalidGitRepositoryError, NoSuchPathError, Repo
 
 
 CONFLICT_BRANCH_PREFIX = "conflict"
@@ -58,7 +57,20 @@ def _sanitize_git_error(message: str) -> str:
     return message
 
 
-def _ensure_repo(notes_root: Path, remote_url: Optional[str] = None) -> Repo:
+def _run_git(notes_root: Path, *args: str) -> tuple[bool, str, str, int]:
+    """Run a git command in the given notes root and return (ok, stdout, stderr, code)."""
+
+    proc = subprocess.run(
+        ["git", *args],
+        cwd=str(notes_root),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    return proc.returncode == 0, proc.stdout, proc.stderr, proc.returncode
+
+
+def _ensure_repo(notes_root: Path, remote_url: Optional[str] = None) -> None:
     """Open or initialize a Git repository at the given notes root.
 
     If ``remote_url`` is provided, ensure an ``origin`` remote exists and
@@ -68,62 +80,62 @@ def _ensure_repo(notes_root: Path, remote_url: Optional[str] = None) -> Repo:
     root = Path(notes_root).resolve()
     root.mkdir(parents=True, exist_ok=True)
 
-    try:
-        repo = Repo(root)
-    except (InvalidGitRepositoryError, NoSuchPathError):
-        repo = Repo.init(root)
+    git_dir = root / ".git"
+    if not git_dir.is_dir():
+        _run_git(root, "init")
 
     if remote_url:
-        origin = next((r for r in repo.remotes if r.name == "origin"), None)
-        if origin is None:
-            repo.create_remote("origin", remote_url)
-        elif origin.url != remote_url:
-            origin.set_url(remote_url)
-
-    return repo
+        ok, current_url, _, _ = _run_git(root, "remote", "get-url", "origin")
+        if not ok:
+            _run_git(root, "remote", "add", "origin", remote_url)
+        elif current_url.strip() != remote_url:
+            _run_git(root, "remote", "set-url", "origin", remote_url)
 
 
-def _ensure_user_identity(repo: Repo) -> None:
+def _ensure_user_identity(notes_root: Path) -> None:
     """Ensure the repository has a local user.name and user.email.
 
     This avoids commit failures in environments where Git is not globally
     configured. Existing values are preserved if already set.
     """
 
-    try:
-        reader = repo.config_reader()
-        try:
-            reader.get_value("user", "name")
-            has_name = True
-        except Exception:
-            has_name = False
+    root = Path(notes_root).resolve()
 
-        try:
-            reader.get_value("user", "email")
-            has_email = True
-        except Exception:
-            has_email = False
-    except Exception:
-        has_name = False
-        has_email = False
+    ok_name, name_out, _, _ = _run_git(root, "config", "--get", "user.name")
+    has_name = ok_name and bool(name_out.strip())
+
+    ok_email, email_out, _, _ = _run_git(root, "config", "--get", "user.email")
+    has_email = ok_email and bool(email_out.strip())
 
     if has_name and has_email:
         return
 
-    writer = None
-    try:
-        writer = repo.config_writer()
-        if not has_name:
-            writer.set_value("user", "name", "Markdown Notes App")
-        if not has_email:
-            writer.set_value("user", "email", "markdown-notes-app@example.local")
-    finally:
-        if writer is not None:
-            writer.release()
+    if not has_name:
+        _run_git(root, "config", "user.name", "Markdown Notes App")
+    if not has_email:
+        _run_git(root, "config", "user.email", "markdown-notes-app@example.local")
 
 
-def _get_origin(repo: Repo):
-    return next((r for r in repo.remotes if r.name == "origin"), None)
+def _get_current_branch(notes_root: Path) -> tuple[Optional[str], Optional[str]]:
+    """Return the current branch name or an error message if unavailable."""
+
+    root = Path(notes_root).resolve()
+    ok, out, err, _ = _run_git(root, "rev-parse", "--abbrev-ref", "HEAD")
+    if not ok:
+        return None, _sanitize_git_error(err or out)
+
+    branch = out.strip()
+    if not branch or branch == "HEAD":
+        return None, "Repository is in a detached HEAD state; cannot determine branch."
+
+    return branch, None
+
+
+def _get_head_hexsha(notes_root: Path) -> Optional[str]:
+    root = Path(notes_root).resolve()
+    ok, out, _, _ = _run_git(root, "rev-parse", "HEAD")
+    value = out.strip()
+    return value if ok and value else None
 
 
 def _commit_notes(
@@ -131,84 +143,75 @@ def _commit_notes(
     notes_root: Path,
     remote_url: Optional[str] = None,
     commit_message: Optional[str] = None,
-) -> tuple[Repo, CommitResult]:
+) -> CommitResult:
     """Stage all changes under ``notes_root`` and create a commit if needed."""
 
-    repo = _ensure_repo(notes_root, remote_url)
-
-    _ensure_user_identity(repo)
+    root = Path(notes_root).resolve()
+    _ensure_repo(root, remote_url)
+    _ensure_user_identity(root)
 
     # Stage all tracked and untracked changes.
-    try:
-        repo.git.add(all=True)
-    except GitCommandError:
-        # If "git add" fails for some reason, continue and rely on is_dirty.
-        pass
+    _run_git(root, "add", "-A")
 
-    dirty = repo.is_dirty(index=True, working_tree=True, untracked_files=True)
+    ok_status, status_out, _, _ = _run_git(root, "status", "--porcelain")
+    dirty = ok_status and bool(status_out.strip())
 
-    if dirty:
-        message = commit_message or f"Auto-commit notes at {datetime.utcnow().isoformat()}Z"
-        commit_obj = repo.index.commit(message)
-        commit_info = CommitResult(
-            committed=True,
-            hexsha=commit_obj.hexsha,
-            message=str(commit_obj.message).strip() or None,
-            summary=getattr(commit_obj, "summary", None),
-        )
-    else:
-        commit_info = CommitResult(
+    if not dirty:
+        return CommitResult(
             committed=False,
             summary="No changes to commit",
         )
 
-    return repo, commit_info
+    message = commit_message or f"Auto-commit notes at {datetime.utcnow().isoformat()}Z"
+    ok_commit, _, commit_err, _ = _run_git(root, "commit", "-m", message)
+    if not ok_commit:
+        return CommitResult(
+            committed=False,
+            summary=_sanitize_git_error(commit_err) or "Commit failed",
+        )
+
+    hexsha = _get_head_hexsha(root)
+
+    return CommitResult(
+        committed=True,
+        hexsha=hexsha,
+        message=message,
+        summary=None,
+    )
 
 
-def _push_notes(repo: Repo) -> tuple[bool, Dict[str, Any]]:
+def _push_notes(notes_root: Path) -> tuple[bool, Dict[str, Any]]:
     """Push the active branch to the ``origin`` remote if configured."""
 
-    origin = _get_origin(repo)
-    push_status: Dict[str, Any] = {
-        "status": "skipped",
-        "detail": "No 'origin' remote configured.",
+    root = Path(notes_root).resolve()
+
+    ok_remote, _, _, _ = _run_git(root, "remote", "get-url", "origin")
+    if not ok_remote:
+        return False, {
+            "status": "skipped",
+            "detail": "No 'origin' remote configured.",
+        }
+
+    branch_name, branch_error = _get_current_branch(root)
+    if not branch_name:
+        return False, {
+            "status": "skipped",
+            "detail": branch_error
+            or "Repository is in a detached HEAD state; cannot determine branch to push.",
+        }
+
+    ok_push, _, push_err, _ = _run_git(root, "push", "origin", branch_name)
+    if not ok_push:
+        return False, {
+            "status": "error",
+            "detail": _sanitize_git_error(push_err),
+        }
+
+    return True, {
+        "status": "ok",
+        "remote": "origin",
+        "branch": branch_name,
     }
-    pushed = False
-
-    if origin is not None:
-        try:
-            try:
-                branch_name = repo.active_branch.name
-            except TypeError:
-                branch_name = None
-
-            if not branch_name:
-                push_status = {
-                    "status": "skipped",
-                    "detail": "Repository is in a detached HEAD state; cannot determine branch to push.",
-                }
-            else:
-                remote_url = origin.url
-                auth_url = _build_authenticated_url(remote_url)
-
-                if auth_url != remote_url:
-                    repo.git.push(auth_url, branch_name)
-                else:
-                    origin.push(branch_name)
-
-                pushed = True
-                push_status = {
-                    "status": "ok",
-                    "remote": origin.name,
-                    "branch": branch_name,
-                }
-        except GitCommandError as exc:
-            push_status = {
-                "status": "error",
-                "detail": _sanitize_git_error(str(exc)),
-            }
-
-    return pushed, push_status
 
 
 def commit_notes_only(
@@ -219,14 +222,11 @@ def commit_notes_only(
 ) -> Dict[str, Any]:
     """Stage all changes under ``notes_root`` and commit if needed (no push)."""
 
-    repo, commit_info = _commit_notes(
+    commit_info = _commit_notes(
         notes_root=notes_root,
         remote_url=remote_url,
         commit_message=commit_message,
     )
-
-    # repo is currently unused but kept for symmetry with _commit_notes.
-    _ = repo
 
     return {
         "committed": bool(commit_info.committed),
@@ -241,8 +241,9 @@ def push_notes(
 ) -> Dict[str, Any]:
     """Push the active branch for the notes repo to its ``origin`` remote."""
 
-    repo = _ensure_repo(notes_root, remote_url)
-    pushed, push_status = _push_notes(repo)
+    root = Path(notes_root).resolve()
+    _ensure_repo(root, remote_url)
+    pushed, push_status = _push_notes(root)
 
     return {
         "pushed": pushed,
@@ -261,13 +262,14 @@ def commit_and_push_notes(
     Returns a JSON-serializable dict describing commit and push results.
     """
 
-    repo, commit_info = _commit_notes(
+    commit_info = _commit_notes(
         notes_root=notes_root,
         remote_url=remote_url,
         commit_message=commit_message,
     )
 
-    pushed, push_status = _push_notes(repo)
+    root = Path(notes_root).resolve()
+    pushed, push_status = _push_notes(root)
 
     return {
         "committed": bool(commit_info.committed),
@@ -290,51 +292,42 @@ def pull_notes_with_rebase(
     branch.
     """
 
-    repo = _ensure_repo(notes_root, remote_url)
+    root = Path(notes_root).resolve()
+    _ensure_repo(root, remote_url)
 
-    origin = _get_origin(repo)
-    if origin is None:
+    ok_remote, _, _, _ = _run_git(root, "remote", "get-url", "origin")
+    if not ok_remote:
         return {
             "status": "skipped",
             "detail": "No 'origin' remote configured.",
         }
 
-    try:
-        branch_ref = repo.active_branch
-        branch_name = branch_ref.name
-    except TypeError:
+    branch_name, branch_error = _get_current_branch(root)
+    if not branch_name:
         return {
             "status": "error",
-            "detail": "Repository is in a detached HEAD state; cannot pull.",
+            "detail": branch_error or "Repository is in a detached HEAD state; cannot pull.",
         }
 
-    remote_branch_ref_name = f"{origin.name}/{branch_name}"
+    remote_branch_ref_name = f"origin/{branch_name}"
 
     # Record state before pull.
-    local_before = branch_ref.commit.hexsha
+    ok_local_before, local_before_out, _, _ = _run_git(root, "rev-parse", "HEAD")
+    local_before = local_before_out.strip() if ok_local_before and local_before_out.strip() else None
 
-    auth_url = _build_authenticated_url(origin.url)
+    ok_remote_before, remote_before_out, _, _ = _run_git(root, "rev-parse", remote_branch_ref_name)
+    remote_before = remote_before_out.strip() if ok_remote_before and remote_before_out.strip() else None
 
-    try:
-        if auth_url != origin.url:
-            repo.git.fetch(auth_url)
-        else:
-            origin.fetch()
-    except GitCommandError:
-        # Non-fatal for our purposes; pull will surface any real problems.
-        pass
+    # Fetch latest changes; errors here are non-fatal and will surface on pull.
+    _run_git(root, "fetch", "origin")
 
     try:
-        remote_before = repo.refs[remote_branch_ref_name].commit.hexsha
-    except Exception:
-        remote_before = None
+        ok_pull, _, pull_err, _ = _run_git(root, "pull", "--rebase", "origin", branch_name)
+        if not ok_pull:
+            raise RuntimeError(pull_err or "git pull --rebase failed")
 
-    try:
-        if auth_url != origin.url:
-            repo.git.pull("--rebase", auth_url, branch_name)
-        else:
-            repo.git.pull("--rebase", origin.name, branch_name)
-        local_after = branch_ref.commit.hexsha
+        ok_after, local_after_out, _, _ = _run_git(root, "rev-parse", "HEAD")
+        local_after = local_after_out.strip() if ok_after and local_after_out.strip() else None
         return {
             "status": "ok",
             "branch": branch_name,
@@ -342,12 +335,9 @@ def pull_notes_with_rebase(
             "localAfter": local_after,
             "remoteBefore": remote_before,
         }
-    except GitCommandError as exc:
+    except Exception as exc:  # pragma: no cover - defensive fallback
         # Attempt to abort any in-progress rebase.
-        try:
-            repo.git.rebase("--abort")
-        except GitCommandError:
-            pass
+        _run_git(root, "rebase", "--abort")
 
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         host = socket.gethostname().split(".")[0]
@@ -357,20 +347,13 @@ def pull_notes_with_rebase(
         conflict_created = False
         reset_status: Optional[str] = None
 
-        try:
-            # Create a branch that points to the pre-pull local commit.
-            repo.create_head(conflict_branch_name, local_before)
-            conflict_created = True
-        except GitCommandError:
-            conflict_created = False
+        if local_before:
+            ok_conflict, _, _, _ = _run_git(root, "branch", conflict_branch_name, local_before)
+            conflict_created = ok_conflict
 
         if remote_before:
-            try:
-                # Force the main branch back to the remote tip.
-                repo.git.branch("-f", branch_name, remote_branch_ref_name)
-                reset_status = "reset-to-remote"
-            except GitCommandError:
-                reset_status = "reset-failed"
+            ok_reset, _, _, _ = _run_git(root, "branch", "-f", branch_name, remote_branch_ref_name)
+            reset_status = "reset-to-remote" if ok_reset else "reset-failed"
 
         return {
             "status": "conflict",

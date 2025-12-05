@@ -48,6 +48,11 @@ from git_versioning import (
 APP_ROOT = Path(__file__).resolve().parent
 logger = logging.getLogger("markdown_notes_app")
 
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if present
+load_dotenv(APP_ROOT / ".env")
+
 
 class AppConfig:
     """Application configuration for the Markdown Notes App.
@@ -1500,6 +1505,8 @@ def versioning_notes_pull() -> Dict[str, Any]:
     status = "error"
     error: Optional[str] = None
     conflict_update: Dict[str, Any] | None = None
+
+    print(f"notes_root={cfg.notes_root}, remote_url={remote_url}")
 
     try:
         result = pull_notes_with_rebase(notes_root=cfg.notes_root, remote_url=remote_url)
