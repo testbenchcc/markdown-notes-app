@@ -209,9 +209,9 @@ The goal is to preserve the existing layout, button placements, search position,
 
 ### Versioning and GitHub integration
 
-- Uses a GitHub fine-grained token (`GITHUB_API_KEY`) together with per-repo remote URLs:
+- Uses a GitHub fine-grained token (`GH_ACCESS_TOKEN`) together with per-repo remote URLs:
   - `APP_REPO_REMOTE_URL` for the app repo (reserved for future history/metadata endpoints).
-  - `NOTES_REPO_REMOTE_URL` for the notes repo. When this is an HTTPS URL and `GITHUB_API_KEY` is set, GitPython-based pull and push operations derive credentials from the token at runtime so you do not have to embed the token directly in the URL. The token is not written back to git configuration, and git error messages are sanitized to avoid leaking it.
+  - `NOTES_REPO_REMOTE_URL` for the notes repo. When this is an HTTPS URL and `GH_ACCESS_TOKEN` is set, GitPython-based pull and push operations derive credentials from the token at runtime so you do not have to embed the token directly in the URL. The token is not written back to git configuration, and git error messages are sanitized to avoid leaking it.
 
 - **Notes repository endpoints (implemented)**
   - `POST /api/versioning/notes/commit-and-push` and `/api/versioning/notes/pull` operate on the local notes repository under `NOTES_ROOT`, using GitPython for commit/push and conflict-aware pull behaviour.
@@ -456,7 +456,7 @@ Key variables used by the app include:
 - `HOST`, `PORT`, `UVICORN_RELOAD` – FastAPI/Uvicorn host, port, and reload flag used when running `python main.py`.
 - `NOTES_REPO_REMOTE_URL` – remote URL for the notes repository used by GitPython-based auto-commit/pull/push and manual sync. This is typically a clean HTTPS URL like `https://github.com/your-user/markdown-notes.git`.
 - `APP_REPO_REMOTE_URL` – remote URL for the application repository (planned for future GitHub-backed history views).
-- `GITHUB_API_KEY` – optional GitHub fine-grained token. When set, GitPython-based HTTPS push/pull to `NOTES_REPO_REMOTE_URL` derive credentials from this token instead of requiring the token to be embedded directly in the URL.
+- `GH_ACCESS_TOKEN` – optional GitHub fine-grained token. When set, GitPython-based HTTPS push/pull to `NOTES_REPO_REMOTE_URL` derive credentials from this token instead of requiring the token to be embedded directly in the URL.
 
 The `.env` file is ignored by git so that secrets and machine-specific paths are not committed.
 
@@ -465,7 +465,7 @@ The `.env` file is ignored by git so that secrets and machine-specific paths are
 Containerized usage is supported via the root `Dockerfile` and `docker-compose.yml`:
 
 - The Dockerfile builds a Python 3.11 image, installs backend dependencies plus the required frontend vendor packages (Monaco, markdown-it, Fancytree, jQuery, Mermaid), copies the app code, and runs `uvicorn main:app --host 0.0.0.0 --port 8000`.
-- `docker-compose.yml` builds this image and exposes the app on port 8000, loading configuration from a `.env` file via the `env_file: [.env]` directive so that `NOTES_ROOT`, `NOTES_REPO_REMOTE_URL`, `APP_REPO_REMOTE_URL`, and `GITHUB_API_KEY` are available inside the container.
+- `docker-compose.yml` builds this image and exposes the app on port 8000, loading configuration from a `.env` file via the `env_file: [.env]` directive so that `NOTES_ROOT`, `NOTES_REPO_REMOTE_URL`, `APP_REPO_REMOTE_URL`, and `GH_ACCESS_TOKEN` are available inside the container.
 
 To run with Compose:
 

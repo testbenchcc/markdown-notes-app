@@ -21,14 +21,14 @@ class CommitResult:
 
 
 def _build_authenticated_url(base_url: str) -> str:
-    """Return an HTTPS URL augmented with GITHUB_API_KEY credentials if available.
+    """Return an HTTPS URL augmented with GH_ACCESS_TOKEN credentials if available.
 
     The token is injected only in-memory for individual git commands and is not
     written back to git configuration. If the URL already contains credentials
     or no token is configured, the original URL is returned unchanged.
     """
 
-    token = os.getenv("GITHUB_API_KEY") or ""
+    token = os.getenv("GH_ACCESS_TOKEN") or ""
     if not token:
         return base_url
 
@@ -49,9 +49,9 @@ def _build_authenticated_url(base_url: str) -> str:
 
 
 def _sanitize_git_error(message: str) -> str:
-    """Redact any occurrence of the GITHUB_API_KEY token from git error text."""
+    """Redact any occurrence of the GH_ACCESS_TOKEN token from git error text."""
 
-    token = os.getenv("GITHUB_API_KEY") or ""
+    token = os.getenv("GH_ACCESS_TOKEN") or ""
     if token and token in message:
         message = message.replace(token, "****")
     return message
@@ -185,7 +185,7 @@ def _push_notes(notes_root: Path) -> tuple[bool, Dict[str, Any]]:
 
     root = Path(notes_root).resolve()
 
-    ok_remote, _, _, _ = _run_git(root, "remote", "get-url", "origin")
+    ok_remote, origin_url, _, _ = _run_git(root, "remote", "get-url", "origin")
     if not ok_remote:
         return False, {
             "status": "skipped",
@@ -200,7 +200,11 @@ def _push_notes(notes_root: Path) -> tuple[bool, Dict[str, Any]]:
             or "Repository is in a detached HEAD state; cannot determine branch to push.",
         }
 
-    ok_push, _, push_err, _ = _run_git(root, "push", "origin", branch_name)
+    origin_url = (origin_url or "").strip()
+    auth_url = _build_authenticated_url(origin_url) if origin_url else origin_url
+    remote_arg = auth_url if auth_url and auth_url != origin_url else "origin"
+
+    ok_push, _, push_err, _ = _run_git(root, "push", remote_arg, branch_name)
     if not ok_push:
         return False, {
             "status": "error",

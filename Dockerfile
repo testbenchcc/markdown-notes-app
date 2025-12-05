@@ -12,7 +12,7 @@ RUN apt-get install -y nano
 RUN apt-get install -y npm
 RUN rm -rf /var/lib/apt/lists/*
 
-RUN git config --global user.name "Tony"
+RUN git config --global user.name "testbenchcc"
 RUN git config --global user.email "tony@testbench.cc"
 
 COPY requirements.txt ./
